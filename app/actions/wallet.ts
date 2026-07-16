@@ -209,6 +209,64 @@ export async function cancelWithdrawal(withdrawalId: number) {
   return { success: true }
 }
 
+// ─── Admin: get all trader wallet balances ────────────────────────────────────
+
+export async function getAllTraderBalances() {
+  await requireAdmin()
+
+  const traders = await db
+    .select({ id: user.id, name: user.name, email: user.email, isActivated: user.isActivated, createdAt: user.createdAt })
+    .from(user)
+    .where(eq(user.role, 'trader'))
+
+  const results = await Promise.all(
+    traders.map(async (t) => {
+      // Confirmed deposits
+      const depRes = await db.select({ total: sum(fundRequests.amount) }).from(fundRequests)
+        .where(sql`"userId" = ${t.id} AND status = 'confirmed'`)
+      const totalDeposited = parseFloat(String(depRes[0]?.total ?? '0')) || 0
+
+      // Auto-trade profits
+      const profitRes = await db.select({ total: sum(autoTradeLogs.dailyNet) }).from(autoTradeLogs)
+        .where(eq(autoTradeLogs.userId, t.id))
+      const tradeProfits = parseFloat(String(profitRes[0]?.total ?? '0')) || 0
+
+      // Referral commissions (paid)
+      const commRes = await db.select({ total: sum(referralCommissions.amount) }).from(referralCommissions)
+        .where(sql`"userId" = ${t.id} AND status = 'paid'`)
+      const referralEarnings = parseFloat(String(commRes[0]?.total ?? '0')) || 0
+
+      // Approved withdrawals
+      const withRes = await db.select({ total: sum(withdrawals.amount) }).from(withdrawals)
+        .where(sql`"userId" = ${t.id} AND status = 'approved'`)
+      const totalWithdrawn = parseFloat(String(withRes[0]?.total ?? '0')) || 0
+
+      // Pending withdrawals
+      const pendRes = await db.select({ total: sum(withdrawals.amount) }).from(withdrawals)
+        .where(sql`"userId" = ${t.id} AND status = 'pending'`)
+      const pendingWithdrawal = parseFloat(String(pendRes[0]?.total ?? '0')) || 0
+
+      const activationDebit = t.isActivated ? 100 : 0
+      const available = Math.max(0, parseFloat(
+        (totalDeposited + tradeProfits + referralEarnings - totalWithdrawn - pendingWithdrawal - activationDebit).toFixed(2)
+      ))
+
+      return {
+        ...t,
+        totalDeposited,
+        tradeProfits,
+        referralEarnings,
+        totalWithdrawn,
+        pendingWithdrawal,
+        activationDebit,
+        available,
+      }
+    })
+  )
+
+  return results
+}
+
 // ─── Admin: get all withdrawals ───────────────────────────────────────────────
 
 export async function getAllWithdrawals() {

@@ -13,7 +13,7 @@ import {
 import { getRoleLabel, UserRole } from '@/lib/roles'
 import { getAllAutoTradePlans, createAutoTradePlan, updateAutoTradePlanStatus } from '@/app/actions/auto-trade'
 import { getActivationFeeRequests, approveActivationFee, rejectActivationFee } from '@/app/actions/referral'
-import { getAllWithdrawals, reviewWithdrawal } from '@/app/actions/wallet'
+import { getAllWithdrawals, reviewWithdrawal, getAllTraderBalances } from '@/app/actions/wallet'
 import {
   LogOut, Users, Trash2, ChevronDown, Wallet, Plus,
   CheckCircle2, XCircle, Clock, AlertCircle, Pencil,
@@ -21,7 +21,7 @@ import {
   TrendingUp, Activity, PauseCircle, StopCircle, DollarSign, Gift, ArrowUpCircle,
 } from 'lucide-react'
 
-type Tab = 'users' | 'deposit-addresses' | 'fund-requests' | 'auto-trade' | 'activation-fees' | 'withdrawals'
+type Tab = 'users' | 'deposit-addresses' | 'fund-requests' | 'auto-trade' | 'activation-fees' | 'withdrawals' | 'wallets'
 type Network = 'TRC20' | 'BEP20' | 'ERC20'
 
 interface User { id: string; name: string | null; email: string; role: string; createdAt: Date }
@@ -46,6 +46,11 @@ interface WithdrawalReq {
   id: number; userId: string; amount: string; network: string; walletAddress: string
   status: string; txHash: string | null; note: string | null; createdAt: Date; reviewedAt: Date | null
   trader: { name: string | null; email: string } | null
+}
+interface TraderBalance {
+  id: string; name: string | null; email: string; isActivated: boolean; createdAt: Date
+  totalDeposited: number; tradeProfits: number; referralEarnings: number
+  totalWithdrawn: number; pendingWithdrawal: number; activationDebit: number; available: number
 }
 
 const NETWORK_META: Record<Network, { color: string; bg: string; border: string; chain: string }> = {
@@ -128,6 +133,10 @@ export default function AdminClient() {
   const [rejectNote, setRejectNote] = useState('')
   const [showRejectModal, setShowRejectModal] = useState<number | null>(null)
 
+  // Trader Balances
+  const [traderBalances, setTraderBalances] = useState<TraderBalance[]>([])
+  const [loadingBalances, setLoadingBalances] = useState(false)
+
   // Withdrawals
   const [withdrawalReqs, setWithdrawalReqs] = useState<WithdrawalReq[]>([])
   const [loadingWithdrawals, setLoadingWithdrawals] = useState(false)
@@ -143,6 +152,7 @@ export default function AdminClient() {
     if (activeTab === 'auto-trade') loadAutoTradePlans()
     if (activeTab === 'activation-fees') loadActivationFeeReqs()
     if (activeTab === 'withdrawals') loadWithdrawalReqs()
+    if (activeTab === 'wallets') loadTraderBalances()
   }, [activeTab])
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
@@ -300,6 +310,15 @@ export default function AdminClient() {
     } finally { setReviewingFeeId(null) }
   }
 
+  const loadTraderBalances = async () => {
+    setLoadingBalances(true)
+    try {
+      const data = await getAllTraderBalances()
+      setTraderBalances(data as TraderBalance[])
+    } catch { /* ignore */ }
+    finally { setLoadingBalances(false) }
+  }
+
   const loadWithdrawalReqs = async () => {
     setLoadingWithdrawals(true)
     try {
@@ -448,6 +467,7 @@ export default function AdminClient() {
             { key: 'auto-trade' as Tab,           label: 'Auto Trade',        icon: TrendingUp, badge: autoTradePlans.filter(p => p.status === 'active').length },
             { key: 'activation-fees' as Tab,      label: 'Activations',       icon: Gift,        badge: activationFeeReqs.filter(f => f.status === 'pending').length },
             { key: 'withdrawals' as Tab,          label: 'Withdrawals',        icon: ArrowUpCircle, badge: withdrawalReqs.filter(w => w.status === 'pending').length },
+            { key: 'wallets' as Tab,              label: 'Wallets',             icon: Wallet,        badge: traderBalances.length },
           ]).map(tab => (
             <button
               key={tab.key}
@@ -1184,6 +1204,172 @@ export default function AdminClient() {
                           </td>
                         </tr>
                       ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Card>
+          </div>
+        )}
+
+        {/* ── WALLETS TAB ── */}
+        {activeTab === 'wallets' && (
+          <div className="space-y-6">
+            <Card className="bg-slate-900 border-slate-800 overflow-hidden">
+              <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+                <h2 className="text-white font-bold text-lg flex items-center gap-2">
+                  <Wallet className="w-5 h-5 text-amber-400" />
+                  Trader Wallet Balances
+                </h2>
+                <button
+                  onClick={loadTraderBalances}
+                  className="p-2 rounded-lg hover:bg-slate-800 text-slate-500 hover:text-white transition-colors"
+                >
+                  <RefreshCw className={`w-4 h-4 ${loadingBalances ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
+
+              {/* Summary strip */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 px-6 py-4 border-b border-slate-800">
+                {[
+                  {
+                    label: 'Total Traders',
+                    value: traderBalances.length,
+                    color: 'text-white',
+                    icon: Users,
+                  },
+                  {
+                    label: 'Total Deposited',
+                    value: '$' + traderBalances.reduce((s, t) => s + t.totalDeposited, 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+                    color: 'text-blue-400',
+                    icon: ArrowUpCircle,
+                  },
+                  {
+                    label: 'Total Available',
+                    value: '$' + traderBalances.reduce((s, t) => s + t.available, 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+                    color: 'text-amber-400',
+                    icon: Wallet,
+                  },
+                  {
+                    label: 'Total Withdrawn',
+                    value: '$' + traderBalances.reduce((s, t) => s + t.totalWithdrawn, 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+                    color: 'text-red-400',
+                    icon: DollarSign,
+                  },
+                ].map(({ label, value, color, icon: Icon }) => (
+                  <div key={label} className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-slate-800 shrink-0">
+                      <Icon className={`w-4 h-4 ${color}`} />
+                    </div>
+                    <div>
+                      <p className="text-slate-500 text-xs">{label}</p>
+                      <p className={`text-lg font-bold ${color}`}>{value}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {loadingBalances ? (
+                <div className="p-12 text-center text-slate-500">
+                  <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-3 text-amber-400" />
+                  Loading balances...
+                </div>
+              ) : traderBalances.length === 0 ? (
+                <div className="p-12 text-center text-slate-500 text-sm">
+                  No traders registered yet.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-800 bg-slate-950/40">
+                        {['Trader', 'Status', 'Deposited', 'Trade Profit', 'Referral', 'Withdrawn', 'Pending', 'Available Balance'].map(h => (
+                          <th key={h} className="px-5 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {traderBalances
+                        .sort((a, b) => b.available - a.available)
+                        .map((t, i) => (
+                          <tr
+                            key={t.id}
+                            className={`border-b border-slate-800/60 hover:bg-slate-800/30 transition-colors ${i % 2 !== 0 ? 'bg-slate-900/20' : ''}`}
+                          >
+                            {/* Trader */}
+                            <td className="px-5 py-4">
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
+                                  <span className="text-amber-400 text-xs font-bold">
+                                    {(t.name ?? t.email).charAt(0).toUpperCase()}
+                                  </span>
+                                </div>
+                                <div>
+                                  <p className="text-white font-medium text-sm">{t.name || '—'}</p>
+                                  <p className="text-slate-500 text-xs">{t.email}</p>
+                                </div>
+                              </div>
+                            </td>
+                            {/* Activation status */}
+                            <td className="px-5 py-4">
+                              {t.isActivated ? (
+                                <span className="flex items-center gap-1 text-xs font-semibold text-green-400 bg-green-500/10 border border-green-500/20 rounded-full px-2.5 py-1 w-fit">
+                                  <CheckCircle2 className="w-3 h-3" />Active
+                                </span>
+                              ) : (
+                                <span className="flex items-center gap-1 text-xs font-semibold text-slate-400 bg-slate-700/40 border border-slate-600/30 rounded-full px-2.5 py-1 w-fit">
+                                  <Clock className="w-3 h-3" />Inactive
+                                </span>
+                              )}
+                            </td>
+                            {/* Deposited */}
+                            <td className="px-5 py-4">
+                              <span className="text-blue-400 font-semibold">
+                                ${t.totalDeposited.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                            </td>
+                            {/* Trade profit */}
+                            <td className="px-5 py-4">
+                              <span className={t.tradeProfits > 0 ? 'text-green-400 font-semibold' : 'text-slate-500'}>
+                                +${t.tradeProfits.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                            </td>
+                            {/* Referral */}
+                            <td className="px-5 py-4">
+                              <span className={t.referralEarnings > 0 ? 'text-purple-400 font-semibold' : 'text-slate-500'}>
+                                +${t.referralEarnings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                            </td>
+                            {/* Withdrawn */}
+                            <td className="px-5 py-4">
+                              <span className={t.totalWithdrawn > 0 ? 'text-red-400 font-semibold' : 'text-slate-500'}>
+                                -${t.totalWithdrawn.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                            </td>
+                            {/* Pending withdrawal */}
+                            <td className="px-5 py-4">
+                              {t.pendingWithdrawal > 0 ? (
+                                <span className="text-amber-400 text-xs font-semibold bg-amber-500/10 border border-amber-500/20 rounded-full px-2 py-0.5">
+                                  ${t.pendingWithdrawal.toFixed(2)}
+                                </span>
+                              ) : (
+                                <span className="text-slate-600 text-xs">—</span>
+                              )}
+                            </td>
+                            {/* Available balance — highlighted */}
+                            <td className="px-5 py-4">
+                              <div className="flex items-center gap-2">
+                                <div className={`px-3 py-1.5 rounded-lg border font-bold text-sm font-mono ${
+                                  t.available > 0
+                                    ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                                    : 'bg-slate-800 border-slate-700 text-slate-500'
+                                }`}>
+                                  ${t.available.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
                     </tbody>
                   </table>
                 </div>
