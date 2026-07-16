@@ -1,10 +1,13 @@
 import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
+import { Inter } from 'next/font/google'
 import './globals.css'
 
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
+
 export const metadata: Metadata = {
-  title: 'Arbitrage IQ - Crypto Arbitrage Intelligence',
-  description: 'Real-time arbitrage opportunities across major cryptocurrency exchanges powered by AI scoring',
+  title: 'ArbiX AI — Discover Arbitrage Opportunities Before Everyone Else',
+  description: 'Monitor prices across global exchanges, compare spreads, estimate transaction costs, and identify potential arbitrage opportunities using AI-powered analytics.',
   generator: 'v0.app',
   icons: {
     icon: [
@@ -27,7 +30,7 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   colorScheme: 'dark',
-  themeColor: [{ media: '(prefers-color-scheme: dark)', color: '#0f172a' }],
+  themeColor: [{ media: '(prefers-color-scheme: dark)', color: '#050816' }],
 }
 
 export default function RootLayout({
@@ -36,8 +39,8 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className="bg-slate-900">
-      <body className="antialiased bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+    <html lang="en" className={inter.className} style={{ backgroundColor: '#050816' }}>
+      <body className="antialiased font-sans" style={{ backgroundColor: '#050816', color: '#FFFFFF' }}>
         {children}
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>

@@ -1,23 +1,29 @@
-import { auth } from '@/lib/auth'
-import { headers } from 'next/headers'
-import { redirect } from 'next/navigation'
-import { DashboardClient } from '@/components/dashboard-client'
+import { Navbar } from '@/components/landing/navbar'
+import { Hero } from '@/components/landing/hero'
+import { LiveMarket } from '@/components/landing/live-market'
+import { Features } from '@/components/landing/features'
+import { HowItWorks } from '@/components/landing/how-it-works'
+import { AISection } from '@/components/landing/ai-section'
+import { WhyChooseUs } from '@/components/landing/why-choose-us'
+import { Testimonials } from '@/components/landing/testimonials'
+import { FAQ } from '@/components/landing/faq'
+import { Registration } from '@/components/landing/registration'
+import { Footer } from '@/components/landing/footer'
 
-export const metadata = {
-  title: 'Arbitrage IQ - Crypto Arbitrage Intelligence',
-  description: 'Real-time arbitrage opportunities across major crypto exchanges',
-}
-
-export default async function Home() {
-  const session = await auth.api.getSession({ headers: await headers() })
-
-  if (!session?.user) {
-    redirect('/sign-in')
-  }
-
+export default function Home() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-      <DashboardClient user={session.user} />
-    </div>
+    <main style={{ backgroundColor: '#050816', minHeight: '100vh' }}>
+      <Navbar />
+      <Hero />
+      <LiveMarket />
+      <Features />
+      <HowItWorks />
+      <AISection />
+      <WhyChooseUs />
+      <Testimonials />
+      <FAQ />
+      <Registration />
+      <Footer />
+    </main>
   )
 }
