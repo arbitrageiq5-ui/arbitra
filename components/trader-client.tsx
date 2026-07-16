@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { authClient } from '@/lib/auth-client'
 import { getMarketOpportunities } from '@/app/actions/arbitrage'
 import { getDepositAddresses, submitFundRequest, getMyFundRequests } from '@/app/actions/deposits'
+import { getWalletSummary } from '@/app/actions/wallet'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import {
@@ -12,6 +13,7 @@ import {
   Copy, Check, ChevronUp, ChevronDown, Filter, X,
   Clock, CheckCircle2, XCircle, PlusCircle, ArrowRightLeft,
   Activity, BarChart3, AlertTriangle, Shield, Link2, Gift, ArrowDownCircle,
+  Eye, EyeOff,
 } from 'lucide-react'
 import { ExchangeConnectionManager } from '@/components/exchange-connection-manager'
 import { TradeExecutionPanel } from '@/components/trade-execution-panel'
@@ -88,6 +90,10 @@ export function TraderClient({ user }: { user: { id: string; name?: string | nul
   const [oppPage, setOppPage] = useState(0)
   const OPP_PAGE_SIZE = 25
 
+  // Wallet balance for header
+  const [walletBalance, setWalletBalance] = useState<number | null>(null)
+  const [walletBalanceVisible, setWalletBalanceVisible] = useState(true)
+
   // Funds state
   const [depositAddresses, setDepositAddresses] = useState<DepositAddress[]>([])
   const [fundRequests, setFundRequests] = useState<FundRequest[]>([])
@@ -100,6 +106,19 @@ export function TraderClient({ user }: { user: { id: string; name?: string | nul
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitSuccess, setSubmitSuccess] = useState(false)
+
+  // Load wallet balance on mount and refresh every 60s
+  useEffect(() => {
+    const fetchBalance = async () => {
+      try {
+        const summary = await getWalletSummary()
+        setWalletBalance(summary.balance)
+      } catch { /* silent */ }
+    }
+    fetchBalance()
+    const interval = setInterval(fetchBalance, 60000)
+    return () => clearInterval(interval)
+  }, [])
 
   // Load opportunities on mount
   useEffect(() => {
@@ -216,7 +235,39 @@ export function TraderClient({ user }: { user: { id: string; name?: string | nul
             <span className="hidden sm:block text-slate-700">|</span>
             <span className="hidden sm:block text-slate-400 text-sm font-medium">Trader Dashboard</span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
+            {/* Wallet Balance Chip */}
+            <button
+              onClick={() => setActiveTab('wallet')}
+              className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg border border-slate-700 hover:border-amber-500/40 transition-all group"
+              title="Go to Wallet"
+            >
+              <Wallet className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <div className="flex flex-col items-start leading-none">
+                <span className="text-slate-500 text-[10px] font-medium uppercase tracking-wide">Balance</span>
+                {walletBalance === null ? (
+                  <span className="text-slate-500 text-xs mt-0.5 animate-pulse">Loading...</span>
+                ) : walletBalanceVisible ? (
+                  <span className="text-amber-400 font-bold text-sm font-mono">
+                    ${walletBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                ) : (
+                  <span className="text-amber-400 font-bold text-sm tracking-widest">••••••</span>
+                )}
+              </div>
+              <button
+                onClick={e => { e.stopPropagation(); setWalletBalanceVisible(v => !v) }}
+                className="ml-1 text-slate-500 hover:text-slate-300 transition-colors"
+                title={walletBalanceVisible ? 'Hide balance' : 'Show balance'}
+              >
+                {walletBalanceVisible
+                  ? <EyeOff className="w-3.5 h-3.5" />
+                  : <Eye className="w-3.5 h-3.5" />
+                }
+              </button>
+            </button>
+
+            {/* User Badge */}
             <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-slate-800 rounded-lg border border-slate-700">
               <div className="w-2 h-2 rounded-full bg-amber-400" />
               <span className="text-slate-300 text-sm">{user.name ?? user.email}</span>
