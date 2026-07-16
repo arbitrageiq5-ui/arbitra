@@ -261,16 +261,19 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
                   <span className="text-amber-400 font-bold text-sm tracking-widest">••••••</span>
                 )}
               </div>
-              <button
+              <span
+                role="button"
+                tabIndex={0}
                 onClick={e => { e.stopPropagation(); setWalletBalanceVisible(v => !v) }}
-                className="ml-1 text-slate-500 hover:text-slate-300 transition-colors"
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); setWalletBalanceVisible(v => !v) } }}
+                className="ml-1 text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
                 title={walletBalanceVisible ? 'Hide balance' : 'Show balance'}
               >
                 {walletBalanceVisible
                   ? <EyeOff className="w-3.5 h-3.5" />
                   : <Eye className="w-3.5 h-3.5" />
                 }
-              </button>
+              </span>
             </button>
 
             {/* User Badge */}

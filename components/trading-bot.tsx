@@ -14,8 +14,8 @@ import {
   createTradingBot, getMyBots, getBotOrders,
   startBot, stopBot, deleteBot, triggerSafetyOrder,
   simulateTakeProfit, updateBotConfig, getMyExchangeAccountsForBot,
-  DCA_PAIRS, type DcaConfig,
 } from '@/app/actions/trading-bot'
+import { DCA_PAIRS, type DcaConfig } from '@/lib/trading-bot-constants'
 import { SUPPORTED_EXCHANGES } from '@/lib/exchange-constants'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
