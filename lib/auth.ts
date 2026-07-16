@@ -20,7 +20,9 @@ export const auth = betterAuth({
       ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
       : process.env.VERCEL_URL
         ? `https://${process.env.VERCEL_URL}`
-        : process.env.V0_RUNTIME_URL),
+        : process.env.V0_RUNTIME_URL
+          ? process.env.V0_RUNTIME_URL
+          : 'http://localhost:3000'),
   emailAndPassword: {
     enabled: true,
     autoSignIn: true,
@@ -56,8 +58,9 @@ export const auth = betterAuth({
   },
   advanced: {
     defaultCookieAttributes: {
-      sameSite: 'lax' as const,
-      secure: false,
+      sameSite: 'none' as const,
+      secure: true,
+      httpOnly: true,
     },
   },
 })
