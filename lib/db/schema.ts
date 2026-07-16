@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, boolean, serial, decimal, integer } from 'drizzle-orm/pg-core'
+import { pgTable, text, timestamp, boolean, serial, decimal, integer, jsonb } from 'drizzle-orm/pg-core'
 
 // --- Better Auth required tables -------------------------------------------
 // Column names are camelCase to match Better Auth's defaults. Do not rename.
@@ -277,6 +277,57 @@ export const withdrawals = pgTable('withdrawals', {
   note: text('note'),
   createdAt: timestamp('createdAt').notNull().defaultNow(),
   updatedAt: timestamp('updatedAt').notNull().defaultNow(),
+})
+
+// --- Trading Bots ---
+
+export const tradingBots = pgTable('trading_bots', {
+  id: serial('id').primaryKey(),
+  userId: text('userId').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  // 'dca' | 'grid' | 'martingale'
+  strategy: text('strategy').notNull().default('dca'),
+  // 'spot' | 'futures'
+  marketType: text('market_type').notNull().default('spot'),
+  exchange: text('exchange').notNull(),
+  exchangeAccountId: integer('exchange_account_id').references(() => exchangeAccounts.id, { onDelete: 'set null' }),
+  symbol: text('symbol').notNull(),
+  baseCurrency: text('base_currency').notNull(),
+  quoteCurrency: text('quote_currency').notNull(),
+  // 'active' | 'paused' | 'stopped' | 'error'
+  status: text('status').notNull().default('stopped'),
+  totalInvested: decimal('total_invested', { precision: 18, scale: 2 }).notNull().default('0'),
+  totalOrders: integer('total_orders').notNull().default(0),
+  avgBuyPrice: decimal('avg_buy_price', { precision: 20, scale: 8 }).notNull().default('0'),
+  currentPrice: decimal('current_price', { precision: 20, scale: 8 }).notNull().default('0'),
+  unrealizedPnl: decimal('unrealized_pnl', { precision: 18, scale: 2 }).notNull().default('0'),
+  realizedPnl: decimal('realized_pnl', { precision: 18, scale: 2 }).notNull().default('0'),
+  // DCA config: { baseOrderSize, safetyOrderSize, maxSafetyOrders, priceDeviationPct, takeProfitPct, leverage?, interval }
+  config: jsonb('config').notNull().default({}),
+  startedAt: timestamp('started_at'),
+  stoppedAt: timestamp('stopped_at'),
+  createdAt: timestamp('createdAt').notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt').notNull().defaultNow(),
+})
+
+export const dcaOrders = pgTable('dca_orders', {
+  id: serial('id').primaryKey(),
+  botId: integer('bot_id').notNull().references(() => tradingBots.id, { onDelete: 'cascade' }),
+  userId: text('userId').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  // 'buy' | 'sell' | 'take_profit'
+  orderType: text('order_type').notNull().default('buy'),
+  // 'spot' | 'futures'
+  marketType: text('market_type').notNull().default('spot'),
+  symbol: text('symbol').notNull(),
+  qty: decimal('qty', { precision: 20, scale: 8 }).notNull(),
+  price: decimal('price', { precision: 20, scale: 8 }).notNull(),
+  total: decimal('total', { precision: 18, scale: 2 }).notNull(),
+  triggerCondition: text('trigger_condition'),
+  exchangeOrderId: text('exchange_order_id'),
+  // 'pending' | 'filled' | 'cancelled' | 'failed'
+  status: text('status').notNull().default('pending'),
+  filledAt: timestamp('filled_at'),
+  createdAt: timestamp('createdAt').notNull().defaultNow(),
 })
 
 export const autoTradeLogs = pgTable('auto_trade_logs', {

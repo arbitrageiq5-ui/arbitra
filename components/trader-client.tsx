@@ -14,7 +14,7 @@ import {
   Copy, Check, ChevronUp, ChevronDown, Filter, X,
   Clock, CheckCircle2, XCircle, PlusCircle, ArrowRightLeft,
   Activity, BarChart3, AlertTriangle, Shield, Link2, Gift, ArrowDownCircle,
-  Eye, EyeOff,
+  Eye, EyeOff, Bot,
 } from 'lucide-react'
 import { ExchangeConnectionManager } from '@/components/exchange-connection-manager'
 import { TradeExecutionPanel } from '@/components/trade-execution-panel'
@@ -22,13 +22,14 @@ import { AutoTradePlatform } from '@/components/auto-trade-platform'
 import { PassiveIncome } from '@/components/passive-income'
 import { TraderWallet } from '@/components/trader-wallet'
 import { ActivationFeeModal } from '@/components/activation-fee-modal'
+import { TradingBot } from '@/components/trading-bot'
 
 type Opportunity = Awaited<ReturnType<typeof getMarketOpportunities>>[number]
 type DepositAddress = Awaited<ReturnType<typeof getDepositAddresses>>[number]
 type FundRequest = Awaited<ReturnType<typeof getMyFundRequests>>[number]
 
 type Network = 'TRC20' | 'BEP20' | 'ERC20'
-type Tab = 'wallet' | 'opportunities' | 'funds' | 'exchanges' | 'trade' | 'auto-trade' | 'passive-income'
+type Tab = 'wallet' | 'opportunities' | 'funds' | 'exchanges' | 'trade' | 'auto-trade' | 'passive-income' | 'trading-bot'
 type SortKey = 'netProfit' | 'spread' | 'volume24h' | 'symbol'
 type SortDir = 'asc' | 'desc'
 
@@ -299,6 +300,7 @@ export function TraderClient({ user }: { user: { id: string; name?: string | nul
           {([
         { key: 'wallet' as Tab, label: 'Wallet', icon: Wallet, count: null },
           { key: 'auto-trade' as Tab, label: 'Auto Trade', icon: Zap, count: null },
+          { key: 'trading-bot' as Tab, label: 'Trading Bots', icon: Bot, count: null },
           { key: 'passive-income' as Tab, label: 'Passive Income', icon: Gift, count: null },
           { key: 'opportunities' as Tab, label: 'Opportunities', icon: TrendingUp, count: null },
           { key: 'trade' as Tab, label: 'Trade & Transfer', icon: ArrowRightLeft, count: null },
@@ -335,6 +337,11 @@ export function TraderClient({ user }: { user: { id: string; name?: string | nul
         {/* ── TAB: AUTO TRADE ── */}
         {activeTab === 'auto-trade' && (
           <AutoTradePlatform />
+        )}
+
+        {/* ── TAB: TRADING BOTS ── */}
+        {activeTab === 'trading-bot' && (
+          <TradingBot />
         )}
 
         {/* ── TAB: PASSIVE INCOME ── */}
