@@ -82,14 +82,16 @@ function LiquidityBadge({ value }: { value: 'High' | 'Medium' | 'Low' }) {
 const PAGE_SIZE = 8
 
 export function LiveMarket() {
+  const [mounted, setMounted] = useState(false)
   const [data, setData] = useState<Opportunity[]>([])
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(0)
   const [pulse, setPulse] = useState<number[]>([])
 
-  // Populate data only on the client to avoid SSR/client Math.random() mismatch
+  // Only run on client — avoids all SSR/client Math.random() hydration mismatches
   useEffect(() => {
     setData(buildData())
+    setMounted(true)
   }, [])
 
   // Simulate live ticks
@@ -204,7 +206,7 @@ export function LiveMarket() {
                 </tr>
               </thead>
               <tbody>
-                {pageData.length === 0 && data.length === 0 && Array.from({ length: 8 }, (_, i) => (
+                {!mounted && Array.from({ length: 8 }, (_, i) => (
                   <tr key={i} className="border-b border-white/[0.04]">
                     {Array.from({ length: 11 }, (_, j) => (
                       <td key={j} className="px-4 py-3">
@@ -213,7 +215,7 @@ export function LiveMarket() {
                     ))}
                   </tr>
                 ))}
-                {pageData.map((row, i) => {
+                {mounted && pageData.map((row, i) => {
                   const isUpdating = pulse.includes(data.indexOf(row))
                   return (
                     <motion.tr
