@@ -11,7 +11,7 @@ import {
 } from '@/app/actions/arbitrage'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { ArrowUpRight, ArrowDownLeft, Bell, LogOut, Zap } from 'lucide-react'
+import { ArrowUpRight, ArrowDownLeft, Bell, LogOut, Zap, BarChart3, Settings, Wallet, Search } from 'lucide-react'
 
 export function DashboardClient({ user }: { user: any }) {
   const router = useRouter()
@@ -71,6 +71,43 @@ export function DashboardClient({ user }: { user: any }) {
             <h1 className="text-2xl font-bold text-white">Arbitrage IQ</h1>
           </div>
           <div className="flex items-center gap-4">
+            <div className="hidden lg:flex items-center gap-1">
+              <button
+                onClick={() => router.push('/')}
+                className="px-3 py-2 rounded-lg hover:bg-slate-700 transition-colors flex items-center gap-2 text-slate-300 hover:text-white"
+              >
+                <Zap className="w-4 h-4" />
+                <span className="text-sm">Dashboard</span>
+              </button>
+              <button
+                onClick={() => router.push('/opportunities')}
+                className="px-3 py-2 rounded-lg hover:bg-slate-700 transition-colors flex items-center gap-2 text-slate-300 hover:text-white"
+              >
+                <Search className="w-4 h-4" />
+                <span className="text-sm">Explore</span>
+              </button>
+              <button
+                onClick={() => router.push('/portfolio')}
+                className="px-3 py-2 rounded-lg hover:bg-slate-700 transition-colors flex items-center gap-2 text-slate-300 hover:text-white"
+              >
+                <Wallet className="w-4 h-4" />
+                <span className="text-sm">Portfolio</span>
+              </button>
+              <button
+                onClick={() => router.push('/analytics')}
+                className="px-3 py-2 rounded-lg hover:bg-slate-700 transition-colors flex items-center gap-2 text-slate-300 hover:text-white"
+              >
+                <BarChart3 className="w-4 h-4" />
+                <span className="text-sm">Analytics</span>
+              </button>
+              <button
+                onClick={() => router.push('/settings')}
+                className="px-3 py-2 rounded-lg hover:bg-slate-700 transition-colors flex items-center gap-2 text-slate-300 hover:text-white"
+              >
+                <Settings className="w-4 h-4" />
+                <span className="text-sm">Settings</span>
+              </button>
+            </div>
             <div className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-700/50">
               <span className="text-sm text-slate-400">Welcome,</span>
               <span className="text-sm font-semibold text-white">{user.name || user.email}</span>
