@@ -143,3 +143,30 @@ export const userPermissions = pgTable('user_permissions', {
   createdAt: timestamp('createdAt').defaultNow(),
   updatedAt: timestamp('updatedAt').defaultNow(),
 })
+
+// --- Deposit / Fund Management ---
+
+export const depositAddresses = pgTable('deposit_addresses', {
+  id: serial('id').primaryKey(),
+  network: text('network').notNull(), // 'TRC20' | 'BEP20' | 'ERC20'
+  address: text('address').notNull(),
+  label: text('label'),
+  isActive: boolean('is_active').notNull().default(true),
+  createdBy: text('created_by').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('createdAt').notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt').notNull().defaultNow(),
+})
+
+export const fundRequests = pgTable('fund_requests', {
+  id: serial('id').primaryKey(),
+  userId: text('userId').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  network: text('network').notNull(), // 'TRC20' | 'BEP20' | 'ERC20'
+  amount: decimal('amount', { precision: 18, scale: 2 }).notNull(),
+  txHash: text('tx_hash'),
+  status: text('status').notNull().default('pending'), // 'pending' | 'confirmed' | 'rejected'
+  note: text('note'),
+  reviewedBy: text('reviewedBy').references(() => user.id),
+  reviewedAt: timestamp('reviewedAt'),
+  createdAt: timestamp('createdAt').notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt').notNull().defaultNow(),
+})

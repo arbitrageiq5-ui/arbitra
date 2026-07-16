@@ -11,8 +11,9 @@ import {
 } from '@/app/actions/arbitrage'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { ArrowUpRight, ArrowDownLeft, Bell, LogOut, Zap, BarChart3, Settings, Wallet, Search, Shield } from 'lucide-react'
+import { ArrowUpRight, ArrowDownLeft, Bell, LogOut, Zap, BarChart3, Settings, Wallet, Search, Shield, PlusCircle } from 'lucide-react'
 import { getRoleLabel, hasPermission, UserRole } from '@/lib/roles'
+import { AddFundsModal } from '@/components/add-funds-modal'
 
 export function DashboardClient({ user }: { user: any }) {
   const userRole = user.role as UserRole
@@ -22,6 +23,7 @@ export function DashboardClient({ user }: { user: any }) {
   const [loading, setLoading] = useState(true)
   const [scoringId, setScoringId] = useState<number | null>(null)
   const [unreadCount, setUnreadCount] = useState(0)
+  const [showAddFunds, setShowAddFunds] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -134,6 +136,16 @@ export function DashboardClient({ user }: { user: any }) {
                 </span>
               )}
             </button>
+            {userRole === 'trader' && (
+              <Button
+                size="sm"
+                onClick={() => setShowAddFunds(true)}
+                className="bg-amber-500 hover:bg-amber-600 text-black font-semibold gap-2"
+              >
+                <PlusCircle className="w-4 h-4" />
+                Add Funds
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="sm"
@@ -271,6 +283,9 @@ export function DashboardClient({ user }: { user: any }) {
             </div>
           )}
         </Card>
+
+        {/* Add Funds Modal */}
+        {showAddFunds && <AddFundsModal onClose={() => setShowAddFunds(false)} />}
 
         {/* Notifications Section */}
         {notifications.length > 0 && (
