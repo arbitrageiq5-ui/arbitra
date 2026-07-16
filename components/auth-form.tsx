@@ -42,7 +42,12 @@ export function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
       return
     }
 
-    router.push('/opportunities')
+    // Fetch session to get role, then redirect to role-specific dashboard
+    const session = await authClient.getSession()
+    const role = (session?.data?.user as unknown as { role?: string })?.role ?? 'viewer'
+    if (role === 'admin') router.push('/admin')
+    else if (role === 'trader') router.push('/trader')
+    else router.push('/opportunities')
     router.refresh()
   }
 

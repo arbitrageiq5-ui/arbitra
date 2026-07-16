@@ -4,24 +4,26 @@ import { redirect } from 'next/navigation'
 import { OpportunitiesClient } from '@/components/opportunities-client'
 
 export const metadata = {
-  title: 'Opportunities Explorer - Arbitrage IQ',
-  description: 'Explore and analyze arbitrage opportunities across exchanges',
+  title: 'Market Opportunities - Arbitrage IQ',
+  description: 'Explore live arbitrage opportunities across all major exchanges',
 }
 
 export default async function OpportunitiesPage() {
   const session = await auth.api.getSession({ headers: await headers() })
 
-  if (!session?.user) {
-    redirect('/sign-in')
-  }
+  if (!session?.user) redirect('/sign-in')
+
+  const role = (session.user as unknown as { role?: string }).role ?? 'viewer'
+
+  // Traders and admins have their own dashboards
+  if (role === 'admin') redirect('/admin')
+  if (role === 'trader') redirect('/trader')
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-      <OpportunitiesClient user={{
-        name: session.user.name,
-        email: session.user.email,
-        role: (session.user as unknown as { role?: string }).role ?? 'viewer',
-      }} />
-    </div>
+    <OpportunitiesClient user={{
+      name: session.user.name,
+      email: session.user.email,
+      role,
+    }} />
   )
 }
