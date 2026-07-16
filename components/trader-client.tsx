@@ -245,7 +245,7 @@ export function TraderClient({ user }: { user: { id: string; name?: string | nul
               <Wallet className="w-3.5 h-3.5 text-amber-400 shrink-0" />
               <div className="flex flex-col items-start leading-none">
                 <span className="text-slate-500 text-[10px] font-medium uppercase tracking-wide">Balance</span>
-                {walletBalance === null ? (
+                {walletBalance == null ? (
                   <span className="text-slate-500 text-xs mt-0.5 animate-pulse">Loading...</span>
                 ) : walletBalanceVisible ? (
                   <span className="text-amber-400 font-bold text-sm font-mono">
