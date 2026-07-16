@@ -1,13 +1,15 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { getActivationStatus, submitActivationFee } from '@/app/actions/referral'
 import {
   Shield, Copy, Check, Clock, CheckCircle2, XCircle,
-  ChevronRight, AlertTriangle, Wallet, X, RefreshCw,
+  ChevronRight, AlertTriangle, Wallet, X, RefreshCw, LogOut,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { copyToClipboard } from '@/lib/utils'
+import { authClient } from '@/lib/auth-client'
 
 type DepositAddress = {
   id: number
@@ -43,9 +45,17 @@ function CopyBtn({ text }: { text: string }) {
 }
 
 export function ActivationFeeModal() {
+  const router = useRouter()
   const [status, setStatus] = useState<ActivationStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [dismissed, setDismissed] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
+
+  const handleSignOut = async () => {
+    setSigningOut(true)
+    await authClient.signOut()
+    router.push('/sign-in')
+  }
 
   // Form state
   const [selectedNetwork, setSelectedNetwork] = useState<string | null>(null)
@@ -109,16 +119,27 @@ export function ActivationFeeModal() {
         {/* Top accent bar */}
         <div className="h-1 w-full bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600" />
 
-        {/* Dismiss button — only shown when there is a pending/submitted fee */}
-        {(hasPending || submitted) && (
+        {/* Top-right controls — sign out is always available; dismiss when pending */}
+        <div className="absolute top-4 right-4 flex items-center gap-1">
+          {(hasPending || submitted) && (
+            <button
+              onClick={() => setDismissed(true)}
+              className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-slate-800 transition-colors"
+              title="Continue to dashboard"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
           <button
-            onClick={() => setDismissed(true)}
-            className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-slate-800 transition-colors"
-            title="Continue to dashboard"
+            onClick={handleSignOut}
+            disabled={signingOut}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors text-xs font-medium disabled:opacity-50"
+            title="Sign out"
           >
-            <X className="w-4 h-4" />
+            <LogOut className="w-3.5 h-3.5" />
+            {signingOut ? 'Signing out...' : 'Sign Out'}
           </button>
-        )}
+        </div>
 
         {/* Header */}
         <div className="px-6 pt-6 pb-4">
