@@ -112,7 +112,7 @@ export function TraderClient({ user }: { user: { id: string; name?: string | nul
     const fetchBalance = async () => {
       try {
         const summary = await getWalletSummary()
-        setWalletBalance(summary.balance)
+        setWalletBalance(summary.available)
       } catch { /* silent */ }
     }
     fetchBalance()
