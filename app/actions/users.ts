@@ -191,11 +191,13 @@ export async function resetUserPassword(userId: string, newPassword: string) {
 
   if (newPassword.length < 8) throw new Error('Password must be at least 8 characters')
 
-  // Use Better Auth's internal scrypt hash — same algorithm used during sign-up
-  // @ts-ignore — .mjs path not in TS declarations but exists at runtime
-  const cryptoMod = await import('better-auth/dist/crypto/password.mjs')
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const hashed: string = await (cryptoMod as any).hashPassword(newPassword)
+  // Replicate better-auth's hashPassword: scrypt via Node crypto, stored as "salt:hash" hex
+  const { scrypt, randomBytes } = await import('crypto')
+  const { promisify } = await import('util')
+  const scryptAsync = promisify(scrypt)
+  const salt = randomBytes(16).toString('hex')
+  const derivedKey = await scryptAsync(newPassword, salt, 64) as Buffer
+  const hashed = `${salt}:${derivedKey.toString('hex')}`
 
   // Update the password in the account table (Better Auth stores credentials there)
   await pool.query(
