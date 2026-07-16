@@ -13,14 +13,15 @@ import {
 import { getRoleLabel, UserRole } from '@/lib/roles'
 import { getAllAutoTradePlans, createAutoTradePlan, updateAutoTradePlanStatus } from '@/app/actions/auto-trade'
 import { getActivationFeeRequests, approveActivationFee, rejectActivationFee } from '@/app/actions/referral'
+import { getAllWithdrawals, reviewWithdrawal } from '@/app/actions/wallet'
 import {
   LogOut, Users, Trash2, ChevronDown, Wallet, Plus,
   CheckCircle2, XCircle, Clock, AlertCircle, Pencil,
   Zap, Shield, BarChart3, RefreshCw, UserPlus, X, Eye, EyeOff, KeyRound,
-  TrendingUp, Activity, PauseCircle, StopCircle, DollarSign, Gift,
+  TrendingUp, Activity, PauseCircle, StopCircle, DollarSign, Gift, ArrowUpCircle,
 } from 'lucide-react'
 
-type Tab = 'users' | 'deposit-addresses' | 'fund-requests' | 'auto-trade' | 'activation-fees'
+type Tab = 'users' | 'deposit-addresses' | 'fund-requests' | 'auto-trade' | 'activation-fees' | 'withdrawals'
 type Network = 'TRC20' | 'BEP20' | 'ERC20'
 
 interface User { id: string; name: string | null; email: string; role: string; createdAt: Date }
@@ -40,6 +41,11 @@ interface ActivationFeeReq {
   id: number; userId: string; amount: string; txHash: string | null
   status: string; note: string | null; createdAt: Date; reviewedAt: Date | null
   trader: { name: string | null; email: string; referredBy: string | null } | null
+}
+interface WithdrawalReq {
+  id: number; userId: string; amount: string; network: string; walletAddress: string
+  status: string; txHash: string | null; note: string | null; createdAt: Date; reviewedAt: Date | null
+  trader: { name: string | null; email: string } | null
 }
 
 const NETWORK_META: Record<Network, { color: string; bg: string; border: string; chain: string }> = {
@@ -122,12 +128,21 @@ export default function AdminClient() {
   const [rejectNote, setRejectNote] = useState('')
   const [showRejectModal, setShowRejectModal] = useState<number | null>(null)
 
+  // Withdrawals
+  const [withdrawalReqs, setWithdrawalReqs] = useState<WithdrawalReq[]>([])
+  const [loadingWithdrawals, setLoadingWithdrawals] = useState(false)
+  const [reviewingWithdrawId, setReviewingWithdrawId] = useState<number | null>(null)
+  const [withdrawTxHash, setWithdrawTxHash] = useState('')
+  const [withdrawNote, setWithdrawNote] = useState('')
+  const [showWithdrawRejectModal, setShowWithdrawRejectModal] = useState<number | null>(null)
+
   useEffect(() => { loadUsers() }, [])
   useEffect(() => {
     if (activeTab === 'deposit-addresses') loadAddresses()
     if (activeTab === 'fund-requests') loadFundRequests()
     if (activeTab === 'auto-trade') loadAutoTradePlans()
     if (activeTab === 'activation-fees') loadActivationFeeReqs()
+    if (activeTab === 'withdrawals') loadWithdrawalReqs()
   }, [activeTab])
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
@@ -285,6 +300,40 @@ export default function AdminClient() {
     } finally { setReviewingFeeId(null) }
   }
 
+  const loadWithdrawalReqs = async () => {
+    setLoadingWithdrawals(true)
+    try {
+      const data = await getAllWithdrawals()
+      setWithdrawalReqs(data as WithdrawalReq[])
+    } catch { /* ignore */ }
+    finally { setLoadingWithdrawals(false) }
+  }
+
+  const handleApproveWithdrawal = async (id: number) => {
+    try {
+      setReviewingWithdrawId(id)
+      await reviewWithdrawal(id, 'approved', withdrawTxHash || undefined)
+      await loadWithdrawalReqs()
+      setWithdrawTxHash('')
+      showToast('Withdrawal approved and sent.')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to approve', 'error')
+    } finally { setReviewingWithdrawId(null) }
+  }
+
+  const handleRejectWithdrawal = async (id: number) => {
+    try {
+      setReviewingWithdrawId(id)
+      await reviewWithdrawal(id, 'rejected', undefined, withdrawNote || undefined)
+      await loadWithdrawalReqs()
+      setShowWithdrawRejectModal(null)
+      setWithdrawNote('')
+      showToast('Withdrawal rejected.')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to reject', 'error')
+    } finally { setReviewingWithdrawId(null) }
+  }
+
   const handleStartEdit = (network: Network) => {
     const existing = addresses.find(a => a.network === network && a.isActive)
     setEditNetwork(network)
@@ -397,7 +446,8 @@ export default function AdminClient() {
             { key: 'deposit-addresses' as Tab,    label: 'Deposit Addresses', icon: Wallet,     badge: activeAddressNetworks.length },
             { key: 'fund-requests' as Tab,        label: 'Fund Requests',     icon: Clock,      badge: pendingCount },
             { key: 'auto-trade' as Tab,           label: 'Auto Trade',        icon: TrendingUp, badge: autoTradePlans.filter(p => p.status === 'active').length },
-            { key: 'activation-fees' as Tab,      label: 'Activations',       icon: Gift,       badge: activationFeeReqs.filter(f => f.status === 'pending').length },
+            { key: 'activation-fees' as Tab,      label: 'Activations',       icon: Gift,        badge: activationFeeReqs.filter(f => f.status === 'pending').length },
+            { key: 'withdrawals' as Tab,          label: 'Withdrawals',        icon: ArrowUpCircle, badge: withdrawalReqs.filter(w => w.status === 'pending').length },
           ]).map(tab => (
             <button
               key={tab.key}
@@ -1007,7 +1057,178 @@ export default function AdminClient() {
           </div>
         )}
 
+        {/* ── WITHDRAWALS TAB ── */}
+        {activeTab === 'withdrawals' && (
+          <div className="space-y-6">
+            <Card className="bg-slate-900 border-slate-800 overflow-hidden">
+              <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+                <h2 className="text-white font-bold text-lg flex items-center gap-2">
+                  <ArrowUpCircle className="w-5 h-5 text-red-400" />
+                  Withdrawal Requests
+                </h2>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-slate-500 bg-slate-800 px-2.5 py-1 rounded-full">
+                    {withdrawalReqs.filter(w => w.status === 'pending').length} pending
+                  </span>
+                  <button onClick={loadWithdrawalReqs} className="p-2 rounded-lg hover:bg-slate-800 text-slate-500 hover:text-white transition-colors">
+                    <RefreshCw className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Summary */}
+              <div className="grid grid-cols-3 gap-4 px-6 py-4 border-b border-slate-800">
+                {[
+                  { label: 'Total Requests', value: withdrawalReqs.length, color: 'text-white' },
+                  { label: 'Approved', value: withdrawalReqs.filter(w => w.status === 'approved').length, color: 'text-green-400' },
+                  { label: 'Total Paid Out', value: '$' + withdrawalReqs.filter(w => w.status === 'approved').reduce((s, w) => s + parseFloat(String(w.amount)), 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), color: 'text-red-400' },
+                ].map(({ label, value, color }) => (
+                  <div key={label}>
+                    <p className="text-slate-500 text-xs">{label}</p>
+                    <p className={`text-xl font-bold ${color}`}>{value}</p>
+                  </div>
+                ))}
+              </div>
+
+              {loadingWithdrawals ? (
+                <div className="p-12 text-center text-slate-500">
+                  <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-red-400" />
+                  Loading...
+                </div>
+              ) : withdrawalReqs.length === 0 ? (
+                <div className="p-12 text-center text-slate-500 text-sm">No withdrawal requests yet.</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-800 bg-slate-950/40">
+                        {['Trader', 'Amount', 'Network', 'Wallet Address', 'Status', 'Submitted', 'Actions'].map(h => (
+                          <th key={h} className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {withdrawalReqs.map((w, i) => (
+                        <tr key={w.id} className={`border-b border-slate-800/60 hover:bg-slate-800/30 ${i % 2 !== 0 ? 'bg-slate-900/20' : ''}`}>
+                          <td className="px-4 py-3.5">
+                            <p className="text-white font-medium text-xs">{w.trader?.name || '—'}</p>
+                            <p className="text-slate-500 text-xs">{w.trader?.email}</p>
+                          </td>
+                          <td className="px-4 py-3.5 text-red-400 font-bold">${parseFloat(String(w.amount)).toFixed(2)}</td>
+                          <td className="px-4 py-3.5">
+                            <span className={`text-xs font-bold border rounded-full px-2 py-0.5 ${
+                              w.network === 'TRC20' ? 'text-red-400 bg-red-500/10 border-red-500/20' :
+                              w.network === 'BEP20' ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' :
+                              'text-blue-400 bg-blue-500/10 border-blue-500/20'
+                            }`}>{w.network}</span>
+                          </td>
+                          <td className="px-4 py-3.5">
+                            <code className="text-slate-400 text-xs font-mono">{w.walletAddress.slice(0, 18)}...</code>
+                          </td>
+                          <td className="px-4 py-3.5">
+                            {w.status === 'pending' && (
+                              <span className="flex items-center gap-1 text-xs font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-full px-2.5 py-1 w-fit">
+                                <Clock className="w-3 h-3" />Pending
+                              </span>
+                            )}
+                            {w.status === 'approved' && (
+                              <span className="flex items-center gap-1 text-xs font-semibold text-green-400 bg-green-500/10 border border-green-500/20 rounded-full px-2.5 py-1 w-fit">
+                                <CheckCircle2 className="w-3 h-3" />Approved
+                              </span>
+                            )}
+                            {w.status === 'rejected' && (
+                              <span className="flex items-center gap-1 text-xs font-semibold text-red-400 bg-red-500/10 border border-red-500/20 rounded-full px-2.5 py-1 w-fit">
+                                <XCircle className="w-3 h-3" />Rejected
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3.5 text-slate-500 text-xs">
+                            {new Date(w.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}
+                          </td>
+                          <td className="px-4 py-3.5">
+                            {w.status === 'pending' && (
+                              <div className="space-y-1.5">
+                                <div className="flex items-center gap-1.5">
+                                  <input
+                                    type="text"
+                                    placeholder="TX hash (optional)"
+                                    value={reviewingWithdrawId === w.id ? withdrawTxHash : ''}
+                                    onChange={e => setWithdrawTxHash(e.target.value)}
+                                    onFocus={() => setReviewingWithdrawId(w.id)}
+                                    className="flex-1 min-w-[100px] bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-xs font-mono focus:outline-none focus:border-green-500/40"
+                                  />
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  <Button
+                                    size="sm"
+                                    disabled={reviewingWithdrawId === w.id && !withdrawTxHash && false}
+                                    onClick={() => handleApproveWithdrawal(w.id)}
+                                    className="h-7 px-3 text-xs bg-green-700 hover:bg-green-600 text-white gap-1 font-semibold"
+                                  >
+                                    <CheckCircle2 className="w-3 h-3" />Approve
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    onClick={() => setShowWithdrawRejectModal(w.id)}
+                                    variant="ghost"
+                                    className="h-7 px-3 text-xs border border-red-500/30 text-red-400 hover:bg-red-900/20 gap-1"
+                                  >
+                                    <XCircle className="w-3 h-3" />Reject
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+                            {w.status === 'approved' && w.txHash && (
+                              <code className="text-green-400/70 text-xs font-mono">{w.txHash.slice(0, 14)}...</code>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Card>
+          </div>
+        )}
+
       </main>
+
+      {/* Reject Withdrawal Modal */}
+      {showWithdrawRejectModal !== null && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <Card className="bg-slate-900 border-slate-700 p-6 w-full max-w-sm space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-white font-bold flex items-center gap-2">
+                <XCircle className="w-5 h-5 text-red-400" />Reject Withdrawal
+              </h3>
+              <button onClick={() => { setShowWithdrawRejectModal(null); setWithdrawNote('') }} className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-500 hover:text-white transition-colors">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div>
+              <label className="text-slate-400 text-xs font-medium mb-1.5 block">Reason (optional)</label>
+              <input
+                type="text"
+                value={withdrawNote}
+                onChange={e => setWithdrawNote(e.target.value)}
+                placeholder="e.g. Invalid wallet address"
+                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-white placeholder-slate-600 text-sm focus:outline-none focus:border-red-500/50 transition-colors"
+              />
+            </div>
+            <div className="flex gap-3">
+              <Button onClick={() => { setShowWithdrawRejectModal(null); setWithdrawNote('') }} variant="ghost" className="flex-1 border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800">Cancel</Button>
+              <Button
+                onClick={() => handleRejectWithdrawal(showWithdrawRejectModal)}
+                disabled={reviewingWithdrawId === showWithdrawRejectModal}
+                className="flex-1 bg-red-700 hover:bg-red-600 text-white font-bold"
+              >
+                {reviewingWithdrawId === showWithdrawRejectModal ? 'Rejecting...' : 'Reject'}
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
 
       {/* Reject Activation Fee Modal */}
       {showRejectModal !== null && (

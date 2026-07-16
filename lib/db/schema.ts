@@ -248,6 +248,37 @@ export const referralCommissions = pgTable('referral_commissions', {
   createdAt: timestamp('createdAt').notNull().defaultNow(),
 })
 
+// --- Wallet ---
+
+export const walletTransactions = pgTable('wallet_transactions', {
+  id: serial('id').primaryKey(),
+  userId: text('userId').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  // type: 'deposit' | 'withdrawal' | 'auto_trade_profit' | 'referral_commission' | 'activation_fee' | 'auto_trade_principal'
+  type: text('type').notNull(),
+  amount: decimal('amount', { precision: 18, scale: 2 }).notNull(), // positive = credit, negative = debit
+  balanceAfter: decimal('balance_after', { precision: 18, scale: 2 }).notNull().default('0'),
+  refId: text('ref_id'),       // foreign key value (e.g. fundRequest id, withdrawal id)
+  refTable: text('ref_table'), // which table (e.g. 'fund_requests', 'withdrawals')
+  description: text('description'),
+  status: text('status').notNull().default('completed'), // 'completed' | 'pending' | 'reversed'
+  createdAt: timestamp('createdAt').notNull().defaultNow(),
+})
+
+export const withdrawals = pgTable('withdrawals', {
+  id: serial('id').primaryKey(),
+  userId: text('userId').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  amount: decimal('amount', { precision: 18, scale: 2 }).notNull(),
+  network: text('network').notNull(), // 'TRC20' | 'BEP20' | 'ERC20'
+  walletAddress: text('wallet_address').notNull(),
+  status: text('status').notNull().default('pending'), // 'pending' | 'approved' | 'rejected'
+  reviewedBy: text('reviewed_by').references(() => user.id),
+  reviewedAt: timestamp('reviewed_at'),
+  txHash: text('tx_hash'),
+  note: text('note'),
+  createdAt: timestamp('createdAt').notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt').notNull().defaultNow(),
+})
+
 export const autoTradeLogs = pgTable('auto_trade_logs', {
   id: serial('id').primaryKey(),
   planId: integer('plan_id').notNull().references(() => autoTradePlans.id, { onDelete: 'cascade' }),

@@ -11,19 +11,20 @@ import {
   LogOut, Zap, Wallet, TrendingUp, RefreshCw, Search,
   Copy, Check, ChevronUp, ChevronDown, Filter, X,
   Clock, CheckCircle2, XCircle, PlusCircle, ArrowRightLeft,
-  Activity, BarChart3, AlertTriangle, Shield, Link2, Gift,
+  Activity, BarChart3, AlertTriangle, Shield, Link2, Gift, ArrowDownCircle,
 } from 'lucide-react'
 import { ExchangeConnectionManager } from '@/components/exchange-connection-manager'
 import { TradeExecutionPanel } from '@/components/trade-execution-panel'
 import { AutoTradePlatform } from '@/components/auto-trade-platform'
 import { PassiveIncome } from '@/components/passive-income'
+import { TraderWallet } from '@/components/trader-wallet'
 
 type Opportunity = Awaited<ReturnType<typeof getMarketOpportunities>>[number]
 type DepositAddress = Awaited<ReturnType<typeof getDepositAddresses>>[number]
 type FundRequest = Awaited<ReturnType<typeof getMyFundRequests>>[number]
 
 type Network = 'TRC20' | 'BEP20' | 'ERC20'
-type Tab = 'opportunities' | 'funds' | 'exchanges' | 'trade' | 'auto-trade' | 'passive-income'
+type Tab = 'wallet' | 'opportunities' | 'funds' | 'exchanges' | 'trade' | 'auto-trade' | 'passive-income'
 type SortKey = 'netProfit' | 'spread' | 'volume24h' | 'symbol'
 type SortDir = 'asc' | 'desc'
 
@@ -240,12 +241,13 @@ export function TraderClient({ user }: { user: { id: string; name?: string | nul
       <div className="border-b border-slate-800 bg-slate-900/60">
         <div className="max-w-screen-xl mx-auto px-4 md:px-6 flex gap-1">
           {([
-        { key: 'auto-trade' as Tab, label: 'Auto Trade', icon: Zap, count: null },
+        { key: 'wallet' as Tab, label: 'Wallet', icon: Wallet, count: null },
+          { key: 'auto-trade' as Tab, label: 'Auto Trade', icon: Zap, count: null },
           { key: 'passive-income' as Tab, label: 'Passive Income', icon: Gift, count: null },
           { key: 'opportunities' as Tab, label: 'Opportunities', icon: TrendingUp, count: null },
           { key: 'trade' as Tab, label: 'Trade & Transfer', icon: ArrowRightLeft, count: null },
           { key: 'exchanges' as Tab, label: 'Exchanges', icon: Link2, count: null },
-          { key: 'funds' as Tab, label: 'Funds & Deposits', icon: Wallet, count: pendingCount || null },
+          { key: 'funds' as Tab, label: 'Deposits', icon: ArrowDownCircle, count: pendingCount || null },
           ]).map(tab => (
             <button
               key={tab.key}
@@ -269,6 +271,11 @@ export function TraderClient({ user }: { user: { id: string; name?: string | nul
       </div>
 
       <main className="flex-1 max-w-screen-xl mx-auto px-4 md:px-6 py-6 w-full">
+        {/* ── TAB: WALLET ── */}
+        {activeTab === 'wallet' && (
+          <TraderWallet />
+        )}
+
         {/* ── TAB: AUTO TRADE ── */}
         {activeTab === 'auto-trade' && (
           <AutoTradePlatform />
