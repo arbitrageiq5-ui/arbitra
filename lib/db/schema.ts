@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, boolean, serial, decimal } from 'drizzle-orm/pg-core'
+import { pgTable, text, timestamp, boolean, serial, decimal, integer } from 'drizzle-orm/pg-core'
 
 // --- Better Auth required tables -------------------------------------------
 // Column names are camelCase to match Better Auth's defaults. Do not rename.
@@ -146,6 +146,29 @@ export const userPermissions = pgTable('user_permissions', {
   grantedBy: text('grantedBy').references(() => user.id),
   createdAt: timestamp('createdAt').defaultNow(),
   updatedAt: timestamp('updatedAt').defaultNow(),
+})
+
+// --- Trade Orders ---
+
+export const tradeOrders = pgTable('trade_orders', {
+  id: serial('id').primaryKey(),
+  userId: text('userId').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  exchangeAccountId: integer('exchange_account_id').references(() => exchangeAccounts.id, { onDelete: 'set null' }),
+  symbol: text('symbol').notNull(),
+  side: text('side').notNull(),            // 'buy' | 'sell'
+  orderType: text('order_type').notNull().default('market'),
+  amount: decimal('amount', { precision: 20, scale: 8 }).notNull(),
+  price: decimal('price', { precision: 20, scale: 8 }),
+  filled: decimal('filled', { precision: 20, scale: 8 }).default('0'),
+  cost: decimal('cost', { precision: 20, scale: 8 }).default('0'),
+  fee: decimal('fee', { precision: 20, scale: 8 }).default('0'),
+  exchange: text('exchange').notNull(),
+  externalOrderId: text('external_order_id'),
+  status: text('status').notNull().default('pending'), // pending|open|closed|canceled|failed
+  tradeMode: text('trade_mode').notNull().default('paper'), // 'paper' | 'live'
+  note: text('note'),
+  createdAt: timestamp('createdAt').notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt').notNull().defaultNow(),
 })
 
 // --- Deposit / Fund Management ---

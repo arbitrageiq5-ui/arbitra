@@ -11,15 +11,17 @@ import {
   LogOut, Zap, Wallet, TrendingUp, RefreshCw, Search,
   Copy, Check, ChevronUp, ChevronDown, Filter, X,
   Clock, CheckCircle2, XCircle, PlusCircle, ArrowRightLeft,
-  Activity, BarChart3, AlertTriangle, Shield,
+  Activity, BarChart3, AlertTriangle, Shield, Link2,
 } from 'lucide-react'
+import { ExchangeConnectionManager } from '@/components/exchange-connection-manager'
+import { TradeExecutionPanel } from '@/components/trade-execution-panel'
 
 type Opportunity = Awaited<ReturnType<typeof getMarketOpportunities>>[number]
 type DepositAddress = Awaited<ReturnType<typeof getDepositAddresses>>[number]
 type FundRequest = Awaited<ReturnType<typeof getMyFundRequests>>[number]
 
 type Network = 'TRC20' | 'BEP20' | 'ERC20'
-type Tab = 'opportunities' | 'funds'
+type Tab = 'opportunities' | 'funds' | 'exchanges' | 'trade'
 type SortKey = 'netProfit' | 'spread' | 'volume24h' | 'symbol'
 type SortDir = 'asc' | 'desc'
 
@@ -236,8 +238,10 @@ export function TraderClient({ user }: { user: { id: string; name?: string | nul
       <div className="border-b border-slate-800 bg-slate-900/60">
         <div className="max-w-screen-xl mx-auto px-4 md:px-6 flex gap-1">
           {([
-            { key: 'opportunities' as Tab, label: 'Trade Opportunities', icon: ArrowRightLeft, count: null },
-            { key: 'funds' as Tab, label: 'Funds & Deposits', icon: Wallet, count: pendingCount || null },
+        { key: 'opportunities' as Tab, label: 'Opportunities', icon: TrendingUp, count: null },
+          { key: 'trade' as Tab, label: 'Trade & Transfer', icon: ArrowRightLeft, count: null },
+          { key: 'exchanges' as Tab, label: 'Exchanges', icon: Link2, count: null },
+          { key: 'funds' as Tab, label: 'Funds & Deposits', icon: Wallet, count: pendingCount || null },
           ]).map(tab => (
             <button
               key={tab.key}
@@ -464,6 +468,20 @@ export function TraderClient({ user }: { user: { id: string; name?: string | nul
                 </>
               )}
             </Card>
+          </div>
+        )}
+
+        {/* ── TAB: EXCHANGES ── */}
+        {activeTab === 'exchanges' && (
+          <div className="space-y-6">
+            <ExchangeConnectionManager />
+          </div>
+        )}
+
+        {/* ── TAB: TRADE & TRANSFER ── */}
+        {activeTab === 'trade' && (
+          <div className="space-y-6">
+            <TradeExecutionPanel />
           </div>
         )}
 

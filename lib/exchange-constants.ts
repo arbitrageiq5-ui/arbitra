@@ -1,0 +1,17 @@
+export const SUPPORTED_EXCHANGES: Record<string, { name: string; hasPassphrase: boolean; docsUrl: string }> = {
+  binance:    { name: 'Binance',    hasPassphrase: false, docsUrl: 'https://www.binance.com/en/my/settings/api-management' },
+  htx:        { name: 'HTX',        hasPassphrase: false, docsUrl: 'https://www.htx.com/en-us/user/api-management' },
+  bybit:      { name: 'Bybit',      hasPassphrase: false, docsUrl: 'https://www.bybit.com/app/user/api-management' },
+  bitget:     { name: 'Bitget',     hasPassphrase: true,  docsUrl: 'https://www.bitget.com/en/account/apiManage' },
+  kucoin:     { name: 'KuCoin',     hasPassphrase: true,  docsUrl: 'https://www.kucoin.com/account/api' },
+  okx:        { name: 'OKX',        hasPassphrase: true,  docsUrl: 'https://www.okx.com/account/my-api' },
+  gateio:     { name: 'Gate.io',    hasPassphrase: false, docsUrl: 'https://www.gate.io/myaccount/apiv4keys' },
+  mexc:       { name: 'MEXC',       hasPassphrase: false, docsUrl: 'https://www.mexc.com/user/openapi' },
+  kraken:     { name: 'Kraken',     hasPassphrase: false, docsUrl: 'https://www.kraken.com/u/security/api' },
+  coinbase:   { name: 'Coinbase',   hasPassphrase: false, docsUrl: 'https://www.coinbase.com/settings/api' },
+  poloniex:   { name: 'Poloniex',   hasPassphrase: false, docsUrl: 'https://poloniex.com/apiKeys' },
+  cryptocom:  { name: 'Crypto.com', hasPassphrase: false, docsUrl: 'https://crypto.com/exchange/personal/api-management' },
+  phemex:     { name: 'Phemex',     hasPassphrase: false, docsUrl: 'https://phemex.com/user-center/api-management' },
+  bingx:      { name: 'BingX',      hasPassphrase: false, docsUrl: 'https://bingx.com/en-us/account/api' },
+  lbank:      { name: 'LBank',      hasPassphrase: false, docsUrl: 'https://www.lbank.com/en-US/user/api' },
+}

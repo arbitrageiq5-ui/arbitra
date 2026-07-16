@@ -6,6 +6,8 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  // ccxt uses CJS internals (protobufjs) that must not be bundled by Turbopack
+  serverExternalPackages: ['ccxt', 'protobufjs'],
 }
 
 export default nextConfig
