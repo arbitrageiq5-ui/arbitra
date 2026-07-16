@@ -11,9 +11,11 @@ import {
 } from '@/app/actions/arbitrage'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { ArrowUpRight, ArrowDownLeft, Bell, LogOut, Zap, BarChart3, Settings, Wallet, Search } from 'lucide-react'
+import { ArrowUpRight, ArrowDownLeft, Bell, LogOut, Zap, BarChart3, Settings, Wallet, Search, Shield } from 'lucide-react'
+import { getRoleLabel, hasPermission, UserRole } from '@/lib/roles'
 
 export function DashboardClient({ user }: { user: any }) {
+  const userRole = user.role as UserRole
   const router = useRouter()
   const [opportunities, setOpportunities] = useState<any[]>([])
   const [notifications, setNotifications] = useState<any[]>([])
@@ -107,10 +109,22 @@ export function DashboardClient({ user }: { user: any }) {
                 <Settings className="w-4 h-4" />
                 <span className="text-sm">Settings</span>
               </button>
+              {userRole === 'admin' && (
+                <button
+                  onClick={() => router.push('/admin')}
+                  className="px-3 py-2 rounded-lg hover:bg-slate-700 transition-colors flex items-center gap-2 text-yellow-300 hover:text-yellow-200"
+                >
+                  <Shield className="w-4 h-4" />
+                  <span className="text-sm">Admin</span>
+                </button>
+              )}
             </div>
             <div className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-700/50">
               <span className="text-sm text-slate-400">Welcome,</span>
               <span className="text-sm font-semibold text-white">{user.name || user.email}</span>
+              <span className="ml-2 px-2 py-1 rounded text-xs font-medium bg-blue-500/20 text-blue-300">
+                {getRoleLabel(userRole)}
+              </span>
             </div>
             <button className="relative p-2 hover:bg-slate-700 rounded-lg transition-colors">
               <Bell className="w-5 h-5 text-slate-300" />
@@ -237,14 +251,18 @@ export function DashboardClient({ user }: { user: any }) {
                         )}
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <Button
-                          size="sm"
-                          disabled={scoringId === opp.id}
-                          onClick={() => handleScoreOpportunity(opp.id)}
-                          className="bg-amber-500 hover:bg-amber-600 text-black font-semibold"
-                        >
-                          {scoringId === opp.id ? 'Scoring...' : 'Score'}
-                        </Button>
+                        {hasPermission(userRole, 'canExecuteTrades') ? (
+                          <Button
+                            size="sm"
+                            disabled={scoringId === opp.id}
+                            onClick={() => handleScoreOpportunity(opp.id)}
+                            className="bg-amber-500 hover:bg-amber-600 text-black font-semibold"
+                          >
+                            {scoringId === opp.id ? 'Scoring...' : 'Score'}
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-slate-500">View only</span>
+                        )}
                       </td>
                     </tr>
                   ))}

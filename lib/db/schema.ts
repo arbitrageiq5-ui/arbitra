@@ -9,6 +9,7 @@ export const user = pgTable('user', {
   email: text('email').notNull().unique(),
   emailVerified: boolean('emailVerified').notNull().default(false),
   image: text('image'),
+  role: text('role').default('viewer').notNull(), // 'viewer' | 'trader' | 'admin'
   createdAt: timestamp('createdAt').notNull().defaultNow(),
   updatedAt: timestamp('updatedAt').notNull().defaultNow(),
 })
@@ -116,4 +117,29 @@ export const notifications = pgTable('notifications', {
   data: text('data'),
   isRead: boolean('isRead').default(false),
   createdAt: timestamp('createdAt').defaultNow(),
+})
+
+// --- RBAC Tables ---
+
+export const auditLogs = pgTable('audit_logs', {
+  id: serial('id').primaryKey(),
+  userId: text('userId').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  action: text('action').notNull(),
+  resource: text('resource').notNull(),
+  resourceId: serial('resourceId'),
+  details: text('details'), // JSON stringified
+  ipAddress: text('ipAddress'),
+  userAgent: text('userAgent'),
+  createdAt: timestamp('createdAt').defaultNow(),
+})
+
+export const userPermissions = pgTable('user_permissions', {
+  id: serial('id').primaryKey(),
+  userId: text('userId').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  resource: text('resource').notNull(),
+  action: text('action').notNull(),
+  granted: boolean('granted').default(true),
+  grantedBy: text('grantedBy').references(() => user.id),
+  createdAt: timestamp('createdAt').defaultNow(),
+  updatedAt: timestamp('updatedAt').defaultNow(),
 })

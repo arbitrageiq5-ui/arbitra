@@ -8,12 +8,14 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card } from '@/components/ui/card'
+import { getRoleLabel, getRoleDescription, UserRole } from '@/lib/roles'
 
 export function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
   const router = useRouter()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [selectedRole, setSelectedRole] = useState<UserRole>('viewer')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -55,16 +57,46 @@ export function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           {isSignUp && (
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="name">Name</Label>
-              <Input
-                id="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-                autoComplete="name"
-              />
-            </div>
+            <>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="name">Name</Label>
+                <Input
+                  id="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                  autoComplete="name"
+                />
+              </div>
+              <div className="flex flex-col gap-3 pb-2 border-b border-slate-200">
+                <Label className="text-base font-semibold">Select your role</Label>
+                <div className="space-y-2">
+                  {(['viewer', 'trader', 'admin'] as const).map((role) => (
+                    <label
+                      key={role}
+                      className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                        selectedRole === role
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="role"
+                        value={role}
+                        checked={selectedRole === role}
+                        onChange={(e) => setSelectedRole(e.target.value as UserRole)}
+                        className="mt-1"
+                      />
+                      <div className="flex-1">
+                        <p className="font-medium text-slate-900">{getRoleLabel(role)}</p>
+                        <p className="text-xs text-slate-600">{getRoleDescription(role)}</p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </>
           )}
           <div className="flex flex-col gap-2">
             <Label htmlFor="email">Email</Label>
