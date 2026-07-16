@@ -36,7 +36,8 @@ export function Registration() {
       email: form.email,
       password: form.password,
       name: form.name,
-    } as Parameters<typeof authClient.signUp.email>[0])
+      role: 'viewer',
+    })
 
     setLoading(false)
 

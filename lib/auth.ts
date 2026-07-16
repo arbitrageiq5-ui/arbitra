@@ -25,6 +25,16 @@ export const auth = betterAuth({
     enabled: true,
     autoSignIn: true,
   },
+  user: {
+    additionalFields: {
+      role: {
+        type: 'string',
+        required: false,
+        defaultValue: 'viewer',
+        input: true, // allows the client to send role during signUp
+      },
+    },
+  },
   trustedOrigins: [
     // localhost for dev preview
     'http://localhost:3000',

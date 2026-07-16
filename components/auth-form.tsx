@@ -32,7 +32,7 @@ export function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
           password,
           name,
           role: selectedRole,
-        } as Parameters<typeof authClient.signUp.email>[0])
+        })
       : await authClient.signIn.email({ email, password })
 
     setLoading(false)
