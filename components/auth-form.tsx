@@ -27,7 +27,12 @@ export function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
     setLoading(true)
 
     const { error } = isSignUp
-      ? await authClient.signUp.email({ email, password, name })
+      ? await authClient.signUp.email({
+          email,
+          password,
+          name,
+          role: selectedRole,
+        } as Parameters<typeof authClient.signUp.email>[0])
       : await authClient.signIn.email({ email, password })
 
     setLoading(false)

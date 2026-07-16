@@ -2,8 +2,9 @@
 
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { CheckCircle2, Zap, TrendingUp, ShieldCheck, Bell } from 'lucide-react'
+import { CheckCircle2, Zap, TrendingUp, ShieldCheck, Bell, Loader2 } from 'lucide-react'
 import Link from 'next/link'
+import { authClient } from '@/lib/auth-client'
 
 const benefits = [
   { icon: Zap, text: 'Free forever plan — no credit card required' },
@@ -23,9 +24,27 @@ export function Registration() {
     name: '', email: '', phone: '', country: '', password: '', referral: '', agree: false,
   })
   const [submitted, setSubmitted] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    setError(null)
+    setLoading(true)
+
+    const { error: signUpError } = await authClient.signUp.email({
+      email: form.email,
+      password: form.password,
+      name: form.name,
+    } as Parameters<typeof authClient.signUp.email>[0])
+
+    setLoading(false)
+
+    if (signUpError) {
+      setError(signUpError.message ?? 'Something went wrong. Please try again.')
+      return
+    }
+
     setSubmitted(true)
   }
 
@@ -205,11 +224,19 @@ export function Registration() {
                       </span>
                     </label>
 
+                    {error && (
+                      <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-2.5" role="alert">
+                        {error}
+                      </p>
+                    )}
+
                     <button
                       type="submit"
-                      className="w-full py-3.5 rounded-xl text-sm font-semibold text-[#050816] bg-[#00D4FF] hover:bg-[#00D4FF]/90 transition-all shadow-[0_0_30px_rgba(0,212,255,0.35)] hover:shadow-[0_0_50px_rgba(0,212,255,0.55)]"
+                      disabled={loading}
+                      className="w-full py-3.5 rounded-xl text-sm font-semibold text-[#050816] bg-[#00D4FF] hover:bg-[#00D4FF]/90 disabled:opacity-60 disabled:cursor-not-allowed transition-all shadow-[0_0_30px_rgba(0,212,255,0.35)] hover:shadow-[0_0_50px_rgba(0,212,255,0.55)] flex items-center justify-center gap-2"
                     >
-                      Create Free Account
+                      {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+                      {loading ? 'Creating account...' : 'Create Free Account'}
                     </button>
 
                     <p className="text-center text-xs text-[#98A2B3]">
