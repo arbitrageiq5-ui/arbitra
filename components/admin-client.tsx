@@ -11,13 +11,15 @@ import {
   getAllFundRequests, reviewFundRequest,
 } from '@/app/actions/deposits'
 import { getRoleLabel, UserRole } from '@/lib/roles'
+import { getAllAutoTradePlans, createAutoTradePlan, updateAutoTradePlanStatus } from '@/app/actions/auto-trade'
 import {
   LogOut, Users, Trash2, ChevronDown, Wallet, Plus,
   CheckCircle2, XCircle, Clock, AlertCircle, Pencil,
   Zap, Shield, BarChart3, RefreshCw, UserPlus, X, Eye, EyeOff, KeyRound,
+  TrendingUp, Activity, PauseCircle, StopCircle, DollarSign,
 } from 'lucide-react'
 
-type Tab = 'users' | 'deposit-addresses' | 'fund-requests'
+type Tab = 'users' | 'deposit-addresses' | 'fund-requests' | 'auto-trade'
 type Network = 'TRC20' | 'BEP20' | 'ERC20'
 
 interface User { id: string; name: string | null; email: string; role: string; createdAt: Date }
@@ -26,6 +28,12 @@ interface FundRequest {
   id: number; userId: string; network: string; amount: string; txHash: string | null
   status: string; note: string | null; reviewedAt: Date | null; createdAt: Date
   userName: string | null; userEmail: string | null
+}
+interface AutoTradePlan {
+  id: number; userId: string; principal: string; grossReturnPct: string; feePct: string
+  netReturnPct: string; status: string; startDate: string; endDate: string | null
+  note: string | null; createdAt: Date
+  user: { id: string; name: string | null; email: string }
 }
 
 const NETWORK_META: Record<Network, { color: string; bg: string; border: string; chain: string }> = {
@@ -90,10 +98,22 @@ export default function AdminClient() {
   // After a successful reset we store {userId -> plaintext} so admin can see/copy it with show/hide
   const [revealedPasswords, setRevealedPasswords] = useState<Record<string, { plain: string; visible: boolean }>>({})
 
+  // Auto Trade Plans
+  const [autoTradePlans, setAutoTradePlans] = useState<AutoTradePlan[]>([])
+  const [loadingPlans, setLoadingPlans] = useState(false)
+  const [showCreatePlan, setShowCreatePlan] = useState(false)
+  const [planTargetUserId, setPlanTargetUserId] = useState('')
+  const [planPrincipal, setPlanPrincipal] = useState('')
+  const [planStartDate, setPlanStartDate] = useState(new Date().toISOString().split('T')[0])
+  const [planNote, setPlanNote] = useState('')
+  const [creatingPlan, setCreatingPlan] = useState(false)
+  const [togglingPlanId, setTogglingPlanId] = useState<number | null>(null)
+
   useEffect(() => { loadUsers() }, [])
   useEffect(() => {
     if (activeTab === 'deposit-addresses') loadAddresses()
     if (activeTab === 'fund-requests') loadFundRequests()
+    if (activeTab === 'auto-trade') loadAutoTradePlans()
   }, [activeTab])
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
@@ -180,6 +200,42 @@ export default function AdminClient() {
       ...prev,
       [userId]: { ...prev[userId], visible: !prev[userId].visible },
     }))
+  }
+
+  const loadAutoTradePlans = async () => {
+    setLoadingPlans(true)
+    try {
+      const data = await getAllAutoTradePlans()
+      setAutoTradePlans(data as AutoTradePlan[])
+    } catch { /* ignore */ }
+    finally { setLoadingPlans(false) }
+  }
+
+  const handleCreatePlan = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      setCreatingPlan(true)
+      await createAutoTradePlan(planTargetUserId, parseFloat(planPrincipal), planStartDate, planNote || undefined)
+      await loadAutoTradePlans()
+      setShowCreatePlan(false)
+      setPlanTargetUserId(''); setPlanPrincipal(''); setPlanNote('')
+      setPlanStartDate(new Date().toISOString().split('T')[0])
+      showToast('Auto-trade plan created and daily logs generated')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to create plan', 'error')
+    } finally { setCreatingPlan(false) }
+  }
+
+  const handleTogglePlan = async (planId: number, currentStatus: string) => {
+    try {
+      setTogglingPlanId(planId)
+      const next = currentStatus === 'active' ? 'paused' : 'active'
+      await updateAutoTradePlanStatus(planId, next as 'active' | 'paused')
+      await loadAutoTradePlans()
+      showToast(`Plan ${next === 'active' ? 'resumed' : 'paused'}`)
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to update plan', 'error')
+    } finally { setTogglingPlanId(null) }
   }
 
   const handleStartEdit = (network: Network) => {
@@ -290,9 +346,10 @@ export default function AdminClient() {
       <div className="border-b border-slate-800 bg-slate-900/60">
         <div className="max-w-screen-xl mx-auto px-4 md:px-6 flex gap-1">
           {([
-            { key: 'users' as Tab,               label: 'Users',             icon: Users,    badge: users.length },
-            { key: 'deposit-addresses' as Tab,    label: 'Deposit Addresses', icon: Wallet,   badge: activeAddressNetworks.length },
-            { key: 'fund-requests' as Tab,        label: 'Fund Requests',     icon: Clock,    badge: pendingCount },
+            { key: 'users' as Tab,               label: 'Users',             icon: Users,      badge: users.length },
+            { key: 'deposit-addresses' as Tab,    label: 'Deposit Addresses', icon: Wallet,     badge: activeAddressNetworks.length },
+            { key: 'fund-requests' as Tab,        label: 'Fund Requests',     icon: Clock,      badge: pendingCount },
+            { key: 'auto-trade' as Tab,           label: 'Auto Trade',        icon: TrendingUp, badge: autoTradePlans.filter(p => p.status === 'active').length },
           ]).map(tab => (
             <button
               key={tab.key}
@@ -641,6 +698,146 @@ export default function AdminClient() {
             )}
           </Card>
         )}
+
+        {/* ── AUTO TRADE TAB ── */}
+        {activeTab === 'auto-trade' && (
+          <div className="space-y-6">
+            <Card className="bg-slate-900 border-slate-800 overflow-hidden">
+              <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between flex-wrap gap-3">
+                <h2 className="text-white font-bold text-lg flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-amber-400" />
+                  Auto-Trade Plans
+                </h2>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() => { setShowCreatePlan(true); setPlanTargetUserId(users.find(u => u.role === 'trader')?.id ?? '') }}
+                    className="bg-amber-600 hover:bg-amber-700 text-black font-semibold gap-2 h-8 text-xs"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Assign Plan
+                  </Button>
+                  <button onClick={loadAutoTradePlans} className="p-2 rounded-lg hover:bg-slate-800 text-slate-500 hover:text-white transition-colors">
+                    <RefreshCw className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Summary cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 px-6 py-4 border-b border-slate-800">
+                {[
+                  { label: 'Total Plans', value: autoTradePlans.length, color: 'text-white' },
+                  { label: 'Active', value: autoTradePlans.filter(p => p.status === 'active').length, color: 'text-green-400' },
+                  { label: 'Paused', value: autoTradePlans.filter(p => p.status === 'paused').length, color: 'text-yellow-400' },
+                  { label: 'Total Principal', value: '$' + autoTradePlans.reduce((s, p) => s + parseFloat(p.principal), 0).toLocaleString('en-US', { maximumFractionDigits: 0 }), color: 'text-amber-400' },
+                ].map(({ label, value, color }) => (
+                  <div key={label}>
+                    <p className="text-slate-500 text-xs">{label}</p>
+                    <p className={`text-xl font-bold ${color}`}>{value}</p>
+                  </div>
+                ))}
+              </div>
+
+              {loadingPlans ? (
+                <div className="p-12 text-center text-slate-500">
+                  <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-amber-400" />
+                  Loading plans...
+                </div>
+              ) : autoTradePlans.length === 0 ? (
+                <div className="p-12 text-center text-slate-500 text-sm">
+                  No auto-trade plans yet. Click <span className="text-amber-400">Assign Plan</span> to create one for a trader.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-800 bg-slate-950/40">
+                        {['Trader', 'Principal', 'Monthly Return', 'Fee', 'Net Profit', 'Started', 'Status', 'Actions'].map(h => (
+                          <th key={h} className="px-5 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {autoTradePlans.map((plan, i) => {
+                        const principal = parseFloat(plan.principal)
+                        const grossPct = parseFloat(plan.grossReturnPct)
+                        const feePct = parseFloat(plan.feePct)
+                        const netPct = parseFloat(plan.netReturnPct)
+                        const monthlyNet = (principal * netPct) / 100
+                        const dailyNet = (principal * netPct / 100) / 30
+                        return (
+                          <tr key={plan.id} className={`border-b border-slate-800/60 hover:bg-slate-800/30 transition-colors ${i % 2 !== 0 ? 'bg-slate-900/20' : ''}`}>
+                            <td className="px-5 py-3.5">
+                              <div>
+                                <p className="text-white font-medium">{plan.user.name || '—'}</p>
+                                <p className="text-slate-500 text-xs">{plan.user.email}</p>
+                              </div>
+                            </td>
+                            <td className="px-5 py-3.5 text-white font-semibold">
+                              ${principal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                            </td>
+                            <td className="px-5 py-3.5">
+                              <span className="text-amber-400 font-bold">{grossPct}%</span>
+                              <span className="text-slate-500 text-xs ml-1">/mo</span>
+                            </td>
+                            <td className="px-5 py-3.5 text-red-400">{feePct}%</td>
+                            <td className="px-5 py-3.5">
+                              <div>
+                                <p className="text-green-400 font-bold">{netPct}%/mo</p>
+                                <p className="text-slate-500 text-xs">${monthlyNet.toFixed(2)}/mo &middot; ${dailyNet.toFixed(4)}/day</p>
+                              </div>
+                            </td>
+                            <td className="px-5 py-3.5 text-slate-400 text-xs">
+                              {new Date(plan.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}
+                            </td>
+                            <td className="px-5 py-3.5">
+                              {plan.status === 'active' && (
+                                <span className="flex items-center gap-1 text-xs font-semibold text-green-400 bg-green-500/10 border border-green-500/20 rounded-full px-2.5 py-1 w-fit">
+                                  <Activity className="w-3 h-3" />Active
+                                </span>
+                              )}
+                              {plan.status === 'paused' && (
+                                <span className="flex items-center gap-1 text-xs font-semibold text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 rounded-full px-2.5 py-1 w-fit">
+                                  <PauseCircle className="w-3 h-3" />Paused
+                                </span>
+                              )}
+                              {plan.status === 'completed' && (
+                                <span className="flex items-center gap-1 text-xs font-semibold text-blue-400 bg-blue-500/10 border border-blue-500/20 rounded-full px-2.5 py-1 w-fit">
+                                  <CheckCircle2 className="w-3 h-3" />Completed
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-5 py-3.5">
+                              {plan.status !== 'completed' && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  disabled={togglingPlanId === plan.id}
+                                  onClick={() => handleTogglePlan(plan.id, plan.status)}
+                                  className={`h-7 px-3 text-xs gap-1 border ${
+                                    plan.status === 'active'
+                                      ? 'border-yellow-500/30 text-yellow-400 hover:bg-yellow-900/20'
+                                      : 'border-green-500/30 text-green-400 hover:bg-green-900/20'
+                                  }`}
+                                >
+                                  {plan.status === 'active'
+                                    ? <><PauseCircle className="w-3.5 h-3.5" />Pause</>
+                                    : <><Activity className="w-3.5 h-3.5" />Resume</>
+                                  }
+                                </Button>
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Card>
+          </div>
+        )}
+
       </main>
 
       {/* Review Modal */}
@@ -681,6 +878,104 @@ export default function AdminClient() {
                 {reviewingId !== null ? 'Processing...' : reviewAction === 'confirmed' ? 'Confirm' : 'Reject'}
               </Button>
             </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Create Auto-Trade Plan Modal */}
+      {showCreatePlan && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <Card className="bg-slate-900 border-slate-700 p-6 w-full max-w-lg space-y-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                  <TrendingUp className="w-5 h-5 text-amber-400" />
+                </div>
+                <div>
+                  <h3 className="text-white font-bold text-lg">Assign Auto-Trade Plan</h3>
+                  <p className="text-slate-500 text-xs">Fixed 10% gross / 2% fee / 8% net monthly return</p>
+                </div>
+              </div>
+              <button onClick={() => setShowCreatePlan(false)} className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-500 hover:text-white transition-colors">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreatePlan} className="space-y-4">
+              <div>
+                <label className="text-slate-400 text-xs font-medium mb-1.5 block">Select Trader</label>
+                <select
+                  value={planTargetUserId}
+                  onChange={e => setPlanTargetUserId(e.target.value)}
+                  required
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-amber-500/50 transition-colors"
+                >
+                  <option value="">-- select a trader --</option>
+                  {users.filter(u => u.role === 'trader').map(u => (
+                    <option key={u.id} value={u.id}>{u.name || u.email} ({u.email})</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-slate-400 text-xs font-medium mb-1.5 block">Principal (USDT)</label>
+                <div className="relative">
+                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <input
+                    type="number"
+                    min="10"
+                    step="0.01"
+                    value={planPrincipal}
+                    onChange={e => setPlanPrincipal(e.target.value)}
+                    required
+                    placeholder="e.g. 1000.00"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-9 pr-3 py-2.5 text-white placeholder-slate-600 text-sm focus:outline-none focus:border-amber-500/50 transition-colors"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-slate-400 text-xs font-medium mb-1.5 block">Start Date</label>
+                <input
+                  type="date"
+                  value={planStartDate}
+                  onChange={e => setPlanStartDate(e.target.value)}
+                  required
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-amber-500/50 transition-colors"
+                />
+              </div>
+              <div>
+                <label className="text-slate-400 text-xs font-medium mb-1.5 block">Note (optional)</label>
+                <input
+                  type="text"
+                  value={planNote}
+                  onChange={e => setPlanNote(e.target.value)}
+                  placeholder="e.g. Phase 1 investment plan"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-white placeholder-slate-600 text-sm focus:outline-none focus:border-amber-500/50 transition-colors"
+                />
+              </div>
+
+              {/* Return preview */}
+              {planPrincipal && parseFloat(planPrincipal) > 0 && (
+                <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl px-4 py-3 grid grid-cols-3 gap-3 text-center">
+                  {[
+                    { label: 'Monthly Gross', value: `$${((parseFloat(planPrincipal) * 10) / 100).toFixed(2)}`, color: 'text-amber-400' },
+                    { label: 'Platform Fee', value: `-$${((parseFloat(planPrincipal) * 2) / 100).toFixed(2)}`, color: 'text-red-400' },
+                    { label: 'Trader Net', value: `+$${((parseFloat(planPrincipal) * 8) / 100).toFixed(2)}`, color: 'text-green-400' },
+                  ].map(({ label, value, color }) => (
+                    <div key={label}>
+                      <p className="text-slate-500 text-xs">{label}</p>
+                      <p className={`font-bold text-sm ${color}`}>{value}/mo</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-1">
+                <Button type="button" onClick={() => setShowCreatePlan(false)} variant="ghost" className="flex-1 border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800">Cancel</Button>
+                <Button type="submit" disabled={creatingPlan} className="flex-1 bg-amber-600 hover:bg-amber-700 text-black font-bold">
+                  {creatingPlan ? 'Creating...' : 'Create Plan'}
+                </Button>
+              </div>
+            </form>
           </Card>
         </div>
       )}

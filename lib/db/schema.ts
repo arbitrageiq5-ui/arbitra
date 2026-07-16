@@ -197,3 +197,34 @@ export const fundRequests = pgTable('fund_requests', {
   createdAt: timestamp('createdAt').notNull().defaultNow(),
   updatedAt: timestamp('updatedAt').notNull().defaultNow(),
 })
+
+// --- Auto Trade Platform ---
+
+export const autoTradePlans = pgTable('auto_trade_plans', {
+  id: serial('id').primaryKey(),
+  userId: text('userId').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  createdBy: text('createdBy').notNull().references(() => user.id),
+  principal: decimal('principal', { precision: 18, scale: 2 }).notNull(),
+  grossReturnPct: decimal('gross_return_pct', { precision: 6, scale: 4 }).notNull().default('10.00'),
+  feePct: decimal('fee_pct', { precision: 6, scale: 4 }).notNull().default('2.00'),
+  netReturnPct: decimal('net_return_pct', { precision: 6, scale: 4 }).notNull().default('8.00'),
+  status: text('status').notNull().default('active'), // 'active' | 'paused' | 'completed'
+  startDate: text('start_date').notNull(), // ISO date string YYYY-MM-DD
+  endDate: text('end_date'),
+  note: text('note'),
+  createdAt: timestamp('createdAt').notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt').notNull().defaultNow(),
+})
+
+export const autoTradeLogs = pgTable('auto_trade_logs', {
+  id: serial('id').primaryKey(),
+  planId: integer('plan_id').notNull().references(() => autoTradePlans.id, { onDelete: 'cascade' }),
+  userId: text('userId').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  tradeDate: text('trade_date').notNull(), // ISO date string YYYY-MM-DD
+  dailyGross: decimal('daily_gross', { precision: 18, scale: 8 }).notNull(),
+  dailyFee: decimal('daily_fee', { precision: 18, scale: 8 }).notNull(),
+  dailyNet: decimal('daily_net', { precision: 18, scale: 8 }).notNull(),
+  runningTotal: decimal('running_total', { precision: 18, scale: 8 }).notNull(),
+  status: text('status').notNull().default('completed'),
+  createdAt: timestamp('createdAt').notNull().defaultNow(),
+})
