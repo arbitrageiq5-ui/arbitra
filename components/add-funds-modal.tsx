@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { X, Copy, CheckCircle2, AlertCircle, Loader2, ChevronDown, Wallet, ArrowRight, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { getDepositAddresses, submitFundRequest, getMyFundRequests } from '@/app/actions/deposits'
+import { copyToClipboard } from '@/lib/utils'
 
 type Network = 'TRC20' | 'BEP20' | 'ERC20'
 
@@ -99,7 +100,7 @@ export function AddFundsModal({ onClose }: { onClose: () => void }) {
   }
 
   const handleCopy = async (address: string) => {
-    await navigator.clipboard.writeText(address)
+    await copyToClipboard(address)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }

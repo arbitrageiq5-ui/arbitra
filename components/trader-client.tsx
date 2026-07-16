@@ -6,6 +6,7 @@ import { authClient } from '@/lib/auth-client'
 import { getMarketOpportunities } from '@/app/actions/arbitrage'
 import { getDepositAddresses, submitFundRequest, getMyFundRequests } from '@/app/actions/deposits'
 import { getWalletSummary } from '@/app/actions/wallet'
+import { copyToClipboard } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import {
@@ -60,7 +61,7 @@ function formatVolume(v: number) {
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false)
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(text)
+    await copyToClipboard(text)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }

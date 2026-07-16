@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { copyToClipboard } from '@/lib/utils'
 import {
   Plus, Trash2, Zap, CheckCircle2, XCircle, AlertCircle,
   Eye, EyeOff, RefreshCw, ExternalLink, Shield, ChevronDown,
@@ -127,7 +128,7 @@ export function ExchangeConnectionManager() {
   }
 
   const copyKey = (key: string, label: string) => {
-    navigator.clipboard.writeText(key)
+    copyToClipboard(key)
     setCopied(label)
     setTimeout(() => setCopied(null), 1500)
   }

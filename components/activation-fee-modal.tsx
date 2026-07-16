@@ -7,6 +7,7 @@ import {
   ChevronRight, AlertTriangle, Wallet, X, RefreshCw,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { copyToClipboard } from '@/lib/utils'
 
 type DepositAddress = {
   id: number
@@ -29,7 +30,7 @@ function CopyBtn({ text }: { text: string }) {
   return (
     <button
       onClick={async () => {
-        await navigator.clipboard.writeText(text)
+        await copyToClipboard(text)
         setCopied(true)
         setTimeout(() => setCopied(false), 2000)
       }}

@@ -8,6 +8,7 @@ import {
   TrendingUp, Gift, ShieldCheck, Clock, CheckCircle2,
   XCircle, Copy, Check, X, AlertCircle, DollarSign, ChevronDown, ChevronUp,
 } from 'lucide-react'
+import { copyToClipboard as copyUtil } from '@/lib/utils'
 import {
   getWalletSummary,
   requestWithdrawal,
@@ -94,7 +95,7 @@ export function TraderWallet() {
   useState(() => { load() })
 
   const copyToClipboard = async (text: string, key: string) => {
-    await navigator.clipboard.writeText(text)
+    await copyUtil(text)
     setCopied(key)
     setTimeout(() => setCopied(null), 2000)
   }

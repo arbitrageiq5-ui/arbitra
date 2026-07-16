@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { getMyReferralData, submitActivationFee } from '@/app/actions/referral'
+import { copyToClipboard } from '@/lib/utils'
 import {
   Copy, Check, Users, DollarSign, Gift, ChevronDown, ChevronUp,
   Clock, CheckCircle2, XCircle, AlertCircle, Share2, ExternalLink,
@@ -78,7 +79,7 @@ export function PassiveIncome() {
 
   const copyCode = () => {
     if (!data?.referralCode) return
-    navigator.clipboard.writeText(data.referralCode)
+    copyToClipboard(data.referralCode)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
@@ -86,7 +87,7 @@ export function PassiveIncome() {
   const copyLink = () => {
     if (!data?.referralCode) return
     const url = `${window.location.origin}/sign-up?ref=${data.referralCode}`
-    navigator.clipboard.writeText(url)
+    copyToClipboard(url)
     setCopiedLink(true)
     setTimeout(() => setCopiedLink(false), 2000)
   }
