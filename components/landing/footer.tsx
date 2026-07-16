@@ -2,7 +2,8 @@
 
 import { motion } from 'framer-motion'
 import Link from 'next/link'
-import { Zap, Send, ExternalLink, Globe, MessageCircle } from 'lucide-react'
+import { Send, ExternalLink, Globe, MessageCircle } from 'lucide-react'
+import { ArbitrageIQLogo } from '@/components/logo'
 
 const links = {
   Product: ['Features', 'Live Markets', 'AI Scanner', 'API', 'Pricing'],
@@ -20,14 +21,8 @@ export function Footer() {
         <div className="grid grid-cols-2 md:grid-cols-6 gap-10 mb-16">
           {/* Brand */}
           <div className="col-span-2">
-            <Link href="/" className="flex items-center gap-2 mb-5">
-              <div className="w-8 h-8 rounded-lg bg-[#00D4FF]/10 border border-[#00D4FF]/30 flex items-center justify-center">
-                <Zap className="w-4 h-4 text-[#00D4FF]" />
-              </div>
-              <span className="text-white font-bold text-lg tracking-tight">
-                Arbi<span className="text-[#00D4FF]">X</span>{' '}
-                <span className="text-[#6C63FF]">AI</span>
-              </span>
+            <Link href="/" className="inline-flex mb-5">
+              <ArbitrageIQLogo size="sm" variant="full" />
             </Link>
             <p className="text-sm text-[#98A2B3] leading-relaxed mb-6 max-w-xs">
               AI-powered crypto arbitrage intelligence. Monitor, compare, and discover
@@ -76,7 +71,7 @@ export function Footer() {
         <div className="border-t border-white/[0.06] pt-8">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <p className="text-xs text-[#98A2B3]/60">
-              &copy; {new Date().getFullYear()} ArbiX AI. All rights reserved.
+              &copy; {new Date().getFullYear()} ArbitrageIQ. All rights reserved.
             </p>
             <p className="text-xs text-[#98A2B3]/40 max-w-lg text-right leading-relaxed">
               Crypto markets involve significant risk. Arbitrage opportunities depend on market conditions, liquidity,

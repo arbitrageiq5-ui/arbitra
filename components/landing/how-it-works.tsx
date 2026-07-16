@@ -22,7 +22,7 @@ const steps = [
     icon: ScanSearch,
     step: '03',
     title: 'Monitor Markets',
-    desc: 'ArbiX AI continuously scans prices across all connected exchanges in real time.',
+    desc: 'ArbitrageIQ continuously scans prices across all connected exchanges in real time.',
     accent: '#00FF99',
   },
   {
@@ -43,7 +43,7 @@ const steps = [
     icon: ArrowRightLeft,
     step: '06',
     title: 'Execute Yourself',
-    desc: 'ArbiX provides intelligence — you retain full control and execute on your own terms.',
+    desc: 'ArbitrageIQ provides intelligence — you retain full control and execute on your own terms.',
     accent: '#00FF99',
   },
   {
@@ -72,7 +72,7 @@ export function HowItWorks() {
             Simple 7-Step Process
           </div>
           <h2 className="text-4xl md:text-5xl font-bold text-white mb-4 text-balance">
-            How ArbiX AI Works
+            How ArbitrageIQ Works
           </h2>
           <p className="text-[#98A2B3] text-lg max-w-xl mx-auto">
             From registration to receiving your first alert in minutes.

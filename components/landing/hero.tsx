@@ -3,6 +3,7 @@
 import { motion, useMotionValue, useTransform, animate } from 'framer-motion'
 import { useEffect, useRef, useState } from 'react'
 import { ArrowRight, Play, TrendingUp, Zap, Globe, Clock } from 'lucide-react'
+import { ArbitrageIQLogo } from '@/components/logo'
 import Link from 'next/link'
 
 function AnimatedCounter({ from, to, suffix = '' }: { from: number; to: number; suffix?: string }) {
@@ -217,8 +218,8 @@ export function Hero() {
             <FloatingExchangeBadge key={name} name={name} index={i} />
           ))}
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-            <div className="w-16 h-16 rounded-2xl bg-[#00D4FF]/10 border border-[#00D4FF]/30 flex items-center justify-center shadow-[0_0_40px_rgba(0,212,255,0.3)]">
-              <Zap className="w-7 h-7 text-[#00D4FF]" />
+            <div className="p-2 rounded-2xl bg-[#0E1324]/90 border border-[#00D4FF]/20 shadow-[0_0_40px_rgba(0,212,255,0.25)]">
+              <ArbitrageIQLogo size="md" variant="icon" />
             </div>
             {/* Connection ring */}
             <motion.div

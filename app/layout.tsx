@@ -6,7 +6,7 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 
 export const metadata: Metadata = {
-  title: 'ArbiX AI — Discover Arbitrage Opportunities Before Everyone Else',
+  title: 'ArbitrageIQ — Discover Arbitrage Opportunities Before Everyone Else',
   description: 'Monitor prices across global exchanges, compare spreads, estimate transaction costs, and identify potential arbitrage opportunities using AI-powered analytics.',
   generator: 'v0.app',
   icons: {

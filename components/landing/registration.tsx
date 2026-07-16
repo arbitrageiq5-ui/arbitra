@@ -47,7 +47,7 @@ export function Registration() {
               Start for Free Today
             </div>
             <h2 className="text-4xl md:text-5xl font-bold text-white mb-6 text-balance">
-              Join 3,200+ Traders Already Using ArbiX AI
+              Join 3,200+ Traders Already Using ArbitrageIQ
             </h2>
             <p className="text-[#98A2B3] text-lg leading-relaxed mb-10">
               Create your free account in under 60 seconds and start discovering
@@ -98,7 +98,7 @@ export function Registration() {
                   </div>
                   <h3 className="text-xl font-bold text-white mb-2">Account Created!</h3>
                   <p className="text-[#98A2B3] text-sm mb-6">
-                    Welcome to ArbiX AI. Check your email to verify your account and start exploring opportunities.
+                    Welcome to ArbitrageIQ. Check your email to verify your account and start exploring opportunities.
                   </p>
                   <button
                     onClick={() => setSubmitted(false)}
@@ -181,7 +181,7 @@ export function Registration() {
                         type="text"
                         value={form.referral}
                         onChange={(e) => setForm({ ...form, referral: e.target.value })}
-                        placeholder="ARBIX2025"
+                        placeholder="ARBRIQ2025"
                         className="w-full px-4 py-2.5 text-sm rounded-xl bg-white/[0.04] border border-white/[0.08] text-white placeholder-[#98A2B3]/50 focus:outline-none focus:border-[#00D4FF]/40 transition-colors"
                       />
                     </div>

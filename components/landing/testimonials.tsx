@@ -10,7 +10,7 @@ const testimonials = [
     company: 'Independent',
     avatar: 'MC',
     stars: 5,
-    text: 'ArbiX AI found a 1.3% net spread on SOL within 2 minutes of me signing up. The AI scoring is genuinely impressive — it flagged a liquidity risk I would have missed manually.',
+    text: 'ArbitrageIQ found a 1.3% net spread on SOL within 2 minutes of me signing up. The AI scoring is genuinely impressive — it flagged a liquidity risk I would have missed manually.',
     accent: '#00D4FF',
   },
   {
@@ -37,7 +37,7 @@ const testimonials = [
     company: 'Vertex Fund',
     avatar: 'SM',
     stars: 5,
-    text: "The API integration let me plug ArbiX data straight into my execution system. Sub-50ms latency is real — I measured it. The role-based access control is perfect for our team.",
+    text: "The API integration let me plug ArbitrageIQ data straight into my execution system. Sub-50ms latency is real — I measured it. The role-based access control is perfect for our team.",
     accent: '#00D4FF',
   },
   {
@@ -77,7 +77,7 @@ export function Testimonials() {
             Trusted by 3,200+ traders
           </div>
           <h2 className="text-4xl md:text-5xl font-bold text-white mb-4 text-balance">
-            Traders Love ArbiX AI
+            Traders Love ArbitrageIQ
           </h2>
           <p className="text-[#98A2B3] text-lg max-w-xl mx-auto">
             From quant funds to independent traders — real results from real users.

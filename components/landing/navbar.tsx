@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
-import { Menu, X, Zap } from 'lucide-react'
+import { Menu, X } from 'lucide-react'
+import { ArbitrageIQLogo } from '@/components/logo'
 
 const navLinks = [
   { label: 'Features', href: '#features' },
@@ -36,14 +37,8 @@ export function Navbar() {
     >
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2 group">
-          <div className="w-8 h-8 rounded-lg bg-[#00D4FF]/10 border border-[#00D4FF]/30 flex items-center justify-center">
-            <Zap className="w-4 h-4 text-[#00D4FF]" />
-          </div>
-          <span className="text-white font-bold text-lg tracking-tight">
-            Arbi<span className="text-[#00D4FF]">X</span>{' '}
-            <span className="text-[#6C63FF]">AI</span>
-          </span>
+        <Link href="/" className="flex items-center group">
+          <ArbitrageIQLogo size="sm" variant="full" />
         </Link>
 
         {/* Desktop nav */}

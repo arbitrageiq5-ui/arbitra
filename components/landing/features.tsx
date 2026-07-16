@@ -23,7 +23,7 @@ const features = [
   { icon: Send, title: 'Telegram Alerts', desc: 'Instant bot alerts the moment a qualifying opportunity appears on your watchlist.', accent: '#00D4FF' },
   { icon: MessageSquare, title: 'WhatsApp Alerts', desc: 'Reach you on WhatsApp Business API when high-score opportunities are detected.', accent: '#6C63FF' },
   { icon: Mail, title: 'Email Notifications', desc: 'Daily digests and real-time alerts straight to your inbox with full opportunity details.', accent: '#00FF99' },
-  { icon: Code2, title: 'API Integration', desc: 'Programmatic REST & WebSocket API to pipe ArbiX data into your own systems.', accent: '#00D4FF' },
+  { icon: Code2, title: 'API Integration', desc: 'Programmatic REST & WebSocket API to pipe ArbitrageIQ data into your own systems.', accent: '#00D4FF' },
   { icon: Wifi, title: 'WebSocket Engine', desc: 'Persistent WebSocket connections ensure zero-latency streaming to your browser.', accent: '#6C63FF' },
   { icon: Moon, title: 'Dark & Light Mode', desc: 'System-aware theme that looks stunning in both dark and light environments.', accent: '#00FF99' },
 ]

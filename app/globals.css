@@ -48,13 +48,13 @@
 
 :root {
   color-scheme: dark;
-  /* ArbiX AI brand palette */
-  --arbix-bg:        #050816;
-  --arbix-card:      #0E1324;
-  --arbix-cyan:      #00D4FF;
-  --arbix-purple:    #6C63FF;
-  --arbix-emerald:   #00FF99;
-  --arbix-muted:     #98A2B3;
+  /* ArbitrageIQ brand palette */
+  --arb-bg:        #050816;
+  --arb-card:      #0E1324;
+  --arb-cyan:      #00D4FF;
+  --arb-purple:    #6C63FF;
+  --arb-emerald:   #00FF99;
+  --arb-muted:     #98A2B3;
 
   --background: #050816;
   --foreground: #FFFFFF;

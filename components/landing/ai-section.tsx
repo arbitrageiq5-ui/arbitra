@@ -35,7 +35,7 @@ interface Message {
 
 export function AISection() {
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'ai', text: 'Hello! I\'m ArbiX AI. Ask me about opportunities, spreads, fees, or market conditions.' },
+    { role: 'ai', text: 'Hello! I\'m ArbitrageIQ. Ask me about opportunities, spreads, fees, or market conditions.' },
   ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -78,12 +78,12 @@ export function AISection() {
             <h2 className="text-4xl md:text-5xl font-bold text-white mb-6 text-balance">
               Meet{' '}
               <span className="text-transparent bg-clip-text" style={{ backgroundImage: 'linear-gradient(90deg, #6C63FF, #00D4FF)' }}>
-                ArbiX AI
-              </span>
+              ArbitrageIQ
+            </span>
             </h2>
             <p className="text-[#98A2B3] text-lg leading-relaxed mb-8">
               Ask anything about markets, opportunities, fees, or spreads in plain English.
-              ArbiX AI understands context, compares exchanges, and surfaces the best insights instantly.
+              ArbitrageIQ understands context, compares exchanges, and surfaces the best insights instantly.
             </p>
 
             <p className="text-sm font-medium text-white mb-4">Try asking:</p>
@@ -115,7 +115,7 @@ export function AISection() {
                 <Sparkles className="w-4 h-4 text-[#6C63FF]" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-white">ArbiX AI</p>
+                <p className="text-sm font-semibold text-white">ArbitrageIQ</p>
                 <div className="flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#00FF99] animate-pulse" />
                   <span className="text-xs text-[#00FF99]">Online</span>

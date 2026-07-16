@@ -11,7 +11,7 @@ const faqs = [
   },
   {
     q: 'How does this platform work?',
-    a: 'ArbiX AI connects to exchange APIs via read-only WebSocket feeds to monitor prices in real time. Our AI engine continuously scans for price discrepancies, calculates estimated fees and transfer costs, assigns a risk score, and ranks opportunities by estimated net spread — giving you a prioritized, actionable list.',
+    a: 'ArbitrageIQ connects to exchange APIs via read-only WebSocket feeds to monitor prices in real time. Our AI engine continuously scans for price discrepancies, calculates estimated fees and transfer costs, assigns a risk score, and ranks opportunities by estimated net spread — giving you a prioritized, actionable list.',
   },
   {
     q: 'Which exchanges are supported?',
@@ -19,7 +19,7 @@ const faqs = [
   },
   {
     q: 'Does this platform execute trades automatically?',
-    a: 'No. ArbiX AI is an intelligence and analytics platform only. We provide you with opportunity data, fee estimates, risk scores, and alerts. You retain full control over whether and how to execute any trade. We never touch your funds.',
+    a: 'No. ArbitrageIQ is an intelligence and analytics platform only. We provide you with opportunity data, fee estimates, risk scores, and alerts. You retain full control over whether and how to execute any trade. We never touch your funds.',
   },
   {
     q: 'How are fees calculated?',
@@ -53,7 +53,7 @@ export function FAQ() {
             Got Questions?
           </h2>
           <p className="text-[#98A2B3] text-lg">
-            Everything you need to know about ArbiX AI.
+            Everything you need to know about ArbitrageIQ.
           </p>
         </motion.div>
 
