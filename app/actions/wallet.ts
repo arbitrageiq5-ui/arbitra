@@ -2,7 +2,7 @@
 
 import { db } from '@/lib/db'
 import { walletTransactions, withdrawals, fundRequests, user, referralCommissions, autoTradeLogs } from '@/lib/db/schema'
-import { eq, desc, sum, sql } from 'drizzle-orm'
+import { eq, desc, sum, sql, and, gte } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 import { headers } from 'next/headers'
 
@@ -37,11 +37,11 @@ export async function computeWalletBalance(userId: string): Promise<number> {
     .where(eq(autoTradeLogs.userId, userId))
   const profits = parseFloat(String(profitRes[0]?.total ?? '0')) || 0
 
-  // 3. Referral commissions (paid status)
+  // 3. Referral commissions (all — pending + paid both accumulate in wallet)
   const commRes = await db
     .select({ total: sum(referralCommissions.amount) })
     .from(referralCommissions)
-    .where(sql`"userId" = ${userId} AND status = 'paid'`)
+    .where(sql`"userId" = ${userId} AND status IN ('pending','paid')`)
   const commissions = parseFloat(String(commRes[0]?.total ?? '0')) || 0
 
   // 4. Approved withdrawals (debit)
@@ -93,19 +93,15 @@ export async function getWalletSummary() {
     .where(eq(autoTradeLogs.userId, userId))
   const tradeProfits = parseFloat(String(profitRes[0]?.total ?? '0')) || 0
 
-  // Referral commissions earned (paid)
+  // Referral commissions — ALL statuses accumulate in wallet (paid + pending)
   const commRes = await db
     .select({ total: sum(referralCommissions.amount) })
     .from(referralCommissions)
-    .where(sql`"userId" = ${userId} AND status = 'paid'`)
+    .where(sql`"userId" = ${userId} AND status IN ('pending','paid')`)
   const referralEarnings = parseFloat(String(commRes[0]?.total ?? '0')) || 0
 
-  // Pending referral commissions
-  const pendCommRes = await db
-    .select({ total: sum(referralCommissions.amount) })
-    .from(referralCommissions)
-    .where(sql`"userId" = ${userId} AND status = 'pending'`)
-  const pendingReferral = parseFloat(String(pendCommRes[0]?.total ?? '0')) || 0
+  // Keep pendingReferral as 0 (already included above, no separate "pending" bucket)
+  const pendingReferral = 0
 
   // Withdrawals
   const withApproved = await db
@@ -136,14 +132,28 @@ export async function getWalletSummary() {
     .from(fundRequests)
     .where(eq(fundRequests.userId, userId))
     .orderBy(desc(fundRequests.createdAt))
-    .limit(5)
+    .limit(10)
 
   const recentWithdrawals = await db
     .select()
     .from(withdrawals)
     .where(eq(withdrawals.userId, userId))
     .orderBy(desc(withdrawals.createdAt))
-    .limit(5)
+    .limit(10)
+
+  // Weekly withdrawal window — find last approved OR pending withdrawal
+  const [lastWithdrawal] = await db
+    .select({ createdAt: withdrawals.createdAt })
+    .from(withdrawals)
+    .where(sql`"userId" = ${userId} AND status IN ('pending','approved')`)
+    .orderBy(desc(withdrawals.createdAt))
+    .limit(1)
+
+  const lastWithdrawalAt = lastWithdrawal?.createdAt ?? null
+  const nextWithdrawalAvailable = lastWithdrawalAt
+    ? new Date(new Date(lastWithdrawalAt).getTime() + 7 * 24 * 60 * 60 * 1000)
+    : null
+  const canWithdrawNow = !nextWithdrawalAvailable || new Date() >= nextWithdrawalAvailable
 
   return {
     available,
@@ -156,6 +166,9 @@ export async function getWalletSummary() {
     pendingWithdrawal,
     activationDebit,
     isActivated: u?.isActivated ?? false,
+    lastWithdrawalAt,
+    nextWithdrawalAvailable,
+    canWithdrawNow,
     recentDeposits,
     recentWithdrawals,
   }
@@ -171,20 +184,31 @@ export async function requestWithdrawal(
   const session = await getSession()
   const userId = session.user.id
 
-  if (amount < 10) throw new Error('Minimum withdrawal is $10')
+  if (amount < 100) throw new Error('Minimum withdrawal is $100')
   if (!walletAddress.trim()) throw new Error('Wallet address is required')
 
   // Check available balance
   const available = await computeWalletBalance(userId)
   if (amount > available) throw new Error(`Insufficient balance. Available: $${available.toFixed(2)}`)
 
-  // Check no duplicate pending withdrawal
-  const pending = await db
-    .select()
+  // Weekly withdrawal gate — only one withdrawal per 7 days
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+  const [recentWithdrawal] = await db
+    .select({ createdAt: withdrawals.createdAt })
     .from(withdrawals)
-    .where(sql`"userId" = ${userId} AND status = 'pending'`)
+    .where(and(
+      eq(withdrawals.userId, userId),
+      sql`status IN ('pending','approved')`,
+      gte(withdrawals.createdAt, sevenDaysAgo),
+    ))
+    .orderBy(desc(withdrawals.createdAt))
     .limit(1)
-  if (pending.length > 0) throw new Error('You already have a pending withdrawal request. Please wait for it to be processed.')
+
+  if (recentWithdrawal) {
+    const nextAvailable = new Date(new Date(recentWithdrawal.createdAt).getTime() + 7 * 24 * 60 * 60 * 1000)
+    const daysLeft = Math.ceil((nextAvailable.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    throw new Error(`Withdrawals are weekly. Next withdrawal available in ${daysLeft} day${daysLeft !== 1 ? 's' : ''} (${nextAvailable.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}).`)
+  }
 
   const [row] = await db.insert(withdrawals).values({
     userId,

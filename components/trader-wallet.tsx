@@ -307,88 +307,156 @@ export function TraderWallet() {
               <ArrowUpCircle className="w-4 h-4 text-red-400" />
               Withdraw USDT
             </h3>
-            <p className="text-slate-500 text-xs mb-4">Available: <span className="text-white font-bold">${available.toFixed(2)}</span> &mdash; Min withdrawal: $10</p>
 
-            <form onSubmit={handleWithdraw} className="space-y-3">
-              {/* Network */}
-              <div>
-                <label className="text-slate-400 text-xs font-medium mb-1.5 block">Network</label>
-                <div className="flex gap-2">
-                  {NETWORKS.map(n => (
-                    <button type="button" key={n}
-                      onClick={() => setWithNetwork(n)}
-                      className={`flex-1 py-2 rounded-lg text-xs font-bold border transition-all ${
-                        withNetwork === n ? NETWORK_COLORS[n] : 'border-slate-700 text-slate-500 hover:border-slate-600'
-                      }`}
-                    >
-                      {n}
-                    </button>
-                  ))}
+            {/* Weekly gate notice */}
+            {s?.canWithdrawNow === false && s.nextWithdrawalAvailable ? (
+              <div className="mt-3 bg-amber-500/5 border border-amber-500/20 rounded-xl px-4 py-4 flex items-start gap-3">
+                <Clock className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-amber-300 text-sm font-semibold">Weekly withdrawal window not yet open</p>
+                  <p className="text-amber-300/70 text-xs mt-0.5 leading-relaxed">
+                    Withdrawals are allowed once per week. Your next withdrawal opens on{' '}
+                    <span className="text-amber-300 font-semibold">
+                      {new Date(s.nextWithdrawalAvailable).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+                    </span>.
+                  </p>
                 </div>
               </div>
+            ) : (
+              <p className="text-slate-500 text-xs mb-4 mt-1">
+                Available: <span className="text-white font-bold">${available.toFixed(2)}</span>
+                {' '}&mdash; Min: <span className="text-white font-bold">$100</span>
+                {' '}&mdash; <span className="text-green-400 font-semibold">Weekly window open</span>
+              </p>
+            )}
 
-              <div>
-                <label className="text-slate-400 text-xs font-medium mb-1.5 block">Amount (USDT)</label>
-                <div className="relative">
-                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+            {/* Only show form when weekly window is open */}
+            {(s?.canWithdrawNow !== false) && (
+              <form onSubmit={handleWithdraw} className="space-y-3 mt-3">
+                {/* Network */}
+                <div>
+                  <label className="text-slate-400 text-xs font-medium mb-1.5 block">Network</label>
+                  <div className="flex gap-2">
+                    {NETWORKS.map(n => (
+                      <button type="button" key={n}
+                        onClick={() => setWithNetwork(n)}
+                        className={`flex-1 py-2 rounded-lg text-xs font-bold border transition-all ${
+                          withNetwork === n ? NETWORK_COLORS[n] : 'border-slate-700 text-slate-500 hover:border-slate-600'
+                        }`}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-slate-400 text-xs font-medium mb-1.5 block">Amount (USDT)</label>
+                  <div className="relative">
+                    <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <input
+                      type="number" min="100" step="0.01" max={available}
+                      value={withAmount} onChange={e => setWithAmount(e.target.value)}
+                      required placeholder="Minimum $100"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-3 py-2.5 text-white placeholder-slate-600 text-sm focus:outline-none focus:border-red-500/50 transition-colors"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between mt-1">
+                    <span className="text-slate-600 text-xs">Minimum withdrawal: $100</span>
+                    <button type="button" onClick={() => setWithAmount(available.toFixed(2))} className="text-xs text-amber-400 hover:text-amber-300 transition-colors">
+                      Use max (${available.toFixed(2)})
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-slate-400 text-xs font-medium mb-1.5 block">Your {withNetwork} Wallet Address</label>
                   <input
-                    type="number" min="10" step="0.01" max={available}
-                    value={withAmount} onChange={e => setWithAmount(e.target.value)}
-                    required placeholder="0.00"
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-3 py-2.5 text-white placeholder-slate-600 text-sm focus:outline-none focus:border-red-500/50 transition-colors"
+                    type="text"
+                    value={withAddress} onChange={e => setWithAddress(e.target.value)}
+                    required placeholder="Your USDT wallet address"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-white placeholder-slate-600 text-sm font-mono focus:outline-none focus:border-red-500/50 transition-colors"
                   />
                 </div>
-                <div className="flex justify-end mt-1">
-                  <button type="button" onClick={() => setWithAmount(available.toFixed(2))} className="text-xs text-amber-400 hover:text-amber-300">
-                    Use max (${available.toFixed(2)})
-                  </button>
+
+                <div className="bg-slate-800/60 border border-slate-700 rounded-lg px-3 py-2.5 space-y-1">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                    <p className="text-slate-400 text-xs leading-relaxed">
+                      Withdrawals are processed within 24 hours. Minimum <span className="text-white font-semibold">$100</span> per request.
+                    </p>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-3.5 h-3.5 text-red-400 shrink-0 mt-0.5" />
+                    <p className="text-slate-400 text-xs leading-relaxed">
+                      Double-check your address — crypto transfers are irreversible.
+                    </p>
+                  </div>
                 </div>
-              </div>
 
-              <div>
-                <label className="text-slate-400 text-xs font-medium mb-1.5 block">Your {withNetwork} Wallet Address</label>
-                <input
-                  type="text"
-                  value={withAddress} onChange={e => setWithAddress(e.target.value)}
-                  required placeholder="Your USDT wallet address"
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-white placeholder-slate-600 text-sm font-mono focus:outline-none focus:border-red-500/50 transition-colors"
-                />
-              </div>
+                <div className="flex gap-2 pt-1">
+                  <Button type="button" variant="ghost" onClick={() => setActivePanel(null)} className="flex-1 border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800">
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={submittingWith || available < 100} className="flex-1 bg-red-700 hover:bg-red-600 text-white font-bold disabled:opacity-50 disabled:cursor-not-allowed">
+                    {submittingWith ? 'Submitting...' : 'Request Withdrawal'}
+                  </Button>
+                </div>
+              </form>
+            )}
 
-              <div className="bg-amber-500/5 border border-amber-500/20 rounded-lg px-3 py-2 flex items-start gap-2">
-                <AlertCircle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
-                <p className="text-amber-300/80 text-xs leading-relaxed">
-                  Withdrawals are processed by admin within 24 hours. Double-check your wallet address — crypto transfers are irreversible.
-                </p>
-              </div>
-
-              <div className="flex gap-2 pt-1">
-                <Button type="button" variant="ghost" onClick={() => setActivePanel(null)} className="flex-1 border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800">
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={submittingWith} className="flex-1 bg-red-700 hover:bg-red-600 text-white font-bold">
-                  {submittingWith ? 'Submitting...' : 'Request Withdrawal'}
+            {s?.canWithdrawNow === false && (
+              <div className="mt-4">
+                <Button type="button" variant="ghost" onClick={() => setActivePanel(null)} className="w-full border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800">
+                  Close
                 </Button>
               </div>
-            </form>
+            )}
           </div>
         )}
       </Card>
 
-      {/* Balance breakdown */}
+      {/* Income source breakdown */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard label="Total Deposited" value={`$${(s?.totalDeposited ?? 0).toFixed(2)}`}
-          sub={s?.pendingDeposit ? `+$${s.pendingDeposit.toFixed(2)} pending` : undefined}
+        <StatCard label="Deposited" value={`$${(s?.totalDeposited ?? 0).toFixed(2)}`}
+          sub={s?.pendingDeposit ? `+$${s.pendingDeposit.toFixed(2)} pending` : 'Confirmed deposits'}
           icon={ArrowDownCircle} color="bg-green-500/10 text-green-400" />
-        <StatCard label="Trade Profits" value={`$${(s?.tradeProfits ?? 0).toFixed(2)}`}
-          sub="Auto-trade net earnings"
+        <StatCard label="Auto-Trade Profit" value={`$${(s?.tradeProfits ?? 0).toFixed(2)}`}
+          sub="8% net monthly return"
           icon={TrendingUp} color="bg-amber-500/10 text-amber-400" />
-        <StatCard label="Referral Earnings" value={`$${(s?.referralEarnings ?? 0).toFixed(2)}`}
-          sub={s?.pendingReferral ? `+$${s.pendingReferral.toFixed(2)} pending` : undefined}
+        <StatCard label="Referral Income" value={`$${(s?.referralEarnings ?? 0).toFixed(2)}`}
+          sub="L1 $30 · L2 $10 · L3 $5"
           icon={Gift} color="bg-purple-500/10 text-purple-400" />
         <StatCard label="Total Withdrawn" value={`$${(s?.totalWithdrawn ?? 0).toFixed(2)}`}
-          sub={s?.pendingWithdrawal ? `$${s.pendingWithdrawal.toFixed(2)} pending` : undefined}
+          sub={s?.pendingWithdrawal ? `$${s.pendingWithdrawal.toFixed(2)} pending` : 'All-time payouts'}
           icon={ArrowUpCircle} color="bg-red-500/10 text-red-400" />
+      </div>
+
+      {/* Weekly withdrawal window status */}
+      <div className={`flex items-center gap-3 rounded-xl px-4 py-3 border ${
+        s?.canWithdrawNow !== false
+          ? 'bg-green-500/5 border-green-500/20'
+          : 'bg-slate-900 border-slate-800'
+      }`}>
+        <Clock className={`w-4 h-4 shrink-0 ${s?.canWithdrawNow !== false ? 'text-green-400' : 'text-slate-500'}`} />
+        <div className="flex-1 min-w-0">
+          {s?.canWithdrawNow !== false ? (
+            <p className="text-sm text-slate-300">
+              <span className="text-green-400 font-semibold">Weekly withdrawal window is open.</span>
+              {' '}Minimum withdrawal: <span className="text-white font-bold">$100 USDT</span>.
+            </p>
+          ) : (
+            <p className="text-sm text-slate-400">
+              Next withdrawal available on{' '}
+              <span className="text-white font-semibold">
+                {s?.nextWithdrawalAvailable
+                  ? new Date(s.nextWithdrawalAvailable).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+                  : '—'}
+              </span>
+              . Withdrawals are once per week, minimum $100.
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Activation fee notice */}
