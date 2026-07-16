@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { authClient } from '@/lib/auth-client'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { getAllUsers, changeUserRole, deleteUser, createAdminUser } from '@/app/actions/users'
+import { getAllUsers, changeUserRole, deleteUser, createAdminUser, resetUserPassword } from '@/app/actions/users'
 import {
   getAllDepositAddresses, upsertDepositAddress,
   getAllFundRequests, reviewFundRequest,
@@ -14,7 +14,7 @@ import { getRoleLabel, UserRole } from '@/lib/roles'
 import {
   LogOut, Users, Trash2, ChevronDown, Wallet, Plus,
   CheckCircle2, XCircle, Clock, AlertCircle, Pencil,
-  Zap, Shield, BarChart3, RefreshCw, UserPlus, X, Eye, EyeOff,
+  Zap, Shield, BarChart3, RefreshCw, UserPlus, X, Eye, EyeOff, KeyRound,
 } from 'lucide-react'
 
 type Tab = 'users' | 'deposit-addresses' | 'fund-requests'
@@ -82,6 +82,14 @@ export default function AdminClient() {
   const [showNewAdminPassword, setShowNewAdminPassword] = useState(false)
   const [creatingAdmin, setCreatingAdmin] = useState(false)
 
+  // Reset Password modal
+  const [resetTarget, setResetTarget] = useState<User | null>(null)
+  const [resetPassword, setResetPassword] = useState('')
+  const [showResetPassword, setShowResetPassword] = useState(false)
+  const [resetting, setResetting] = useState(false)
+  // After a successful reset we store {userId -> plaintext} so admin can see/copy it with show/hide
+  const [revealedPasswords, setRevealedPasswords] = useState<Record<string, { plain: string; visible: boolean }>>({})
+
   useEffect(() => { loadUsers() }, [])
   useEffect(() => {
     if (activeTab === 'deposit-addresses') loadAddresses()
@@ -146,6 +154,32 @@ export default function AdminClient() {
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to create admin', 'error')
     } finally { setCreatingAdmin(false) }
+  }
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!resetTarget) return
+    try {
+      setResetting(true)
+      await resetUserPassword(resetTarget.id, resetPassword)
+      // Store plaintext so admin can see/copy it with toggle
+      setRevealedPasswords(prev => ({
+        ...prev,
+        [resetTarget.id]: { plain: resetPassword, visible: false },
+      }))
+      setResetTarget(null)
+      setResetPassword('')
+      showToast(`Password reset for ${resetTarget.name || resetTarget.email}`)
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to reset password', 'error')
+    } finally { setResetting(false) }
+  }
+
+  const toggleReveal = (userId: string) => {
+    setRevealedPasswords(prev => ({
+      ...prev,
+      [userId]: { ...prev[userId], visible: !prev[userId].visible },
+    }))
   }
 
   const handleStartEdit = (network: Network) => {
@@ -319,7 +353,7 @@ export default function AdminClient() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-slate-800 bg-slate-950/40">
-                      {['Name', 'Email', 'Role', 'Joined', 'Actions'].map(h => (
+                      {['Name', 'Email', 'Role', 'Password', 'Joined', 'Actions'].map(h => (
                         <th key={h} className="px-5 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">{h}</th>
                       ))}
                     </tr>
@@ -349,17 +383,50 @@ export default function AdminClient() {
                             </div>
                           </div>
                         </td>
+                        {/* Password cell */}
+                        <td className="px-5 py-3.5">
+                          {revealedPasswords[u.id] ? (
+                            <div className="flex items-center gap-1.5">
+                              <code className="text-xs bg-slate-800 border border-slate-700 rounded px-2 py-1 text-amber-300 font-mono tracking-wide min-w-[80px]">
+                                {revealedPasswords[u.id].visible ? revealedPasswords[u.id].plain : '••••••••'}
+                              </code>
+                              <button
+                                onClick={() => toggleReveal(u.id)}
+                                className="p-1 rounded hover:bg-slate-700 text-slate-500 hover:text-slate-200 transition-colors"
+                                title={revealedPasswords[u.id].visible ? 'Hide password' : 'Show password'}
+                              >
+                                {revealedPasswords[u.id].visible
+                                  ? <EyeOff className="w-3.5 h-3.5" />
+                                  : <Eye className="w-3.5 h-3.5" />}
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-slate-600 text-xs italic">Not set by admin</span>
+                          )}
+                        </td>
                         <td className="px-5 py-3.5 text-slate-500 text-xs">{new Date(u.createdAt).toLocaleDateString()}</td>
                         <td className="px-5 py-3.5">
-                          <Button
-                            onClick={() => handleDeleteUser(u.id)}
-                            disabled={deletingUserId === u.id}
-                            variant="ghost"
-                            size="sm"
-                            className="text-red-500 hover:text-red-400 hover:bg-red-900/20 h-8 w-8 p-0"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              onClick={() => { setResetTarget(u); setResetPassword(''); setShowResetPassword(false) }}
+                              variant="ghost"
+                              size="sm"
+                              className="text-amber-500 hover:text-amber-400 hover:bg-amber-900/20 h-8 w-8 p-0"
+                              title="Reset password"
+                            >
+                              <KeyRound className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              onClick={() => handleDeleteUser(u.id)}
+                              disabled={deletingUserId === u.id}
+                              variant="ghost"
+                              size="sm"
+                              className="text-red-500 hover:text-red-400 hover:bg-red-900/20 h-8 w-8 p-0"
+                              title="Delete user"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -614,6 +681,80 @@ export default function AdminClient() {
                 {reviewingId !== null ? 'Processing...' : reviewAction === 'confirmed' ? 'Confirm' : 'Reject'}
               </Button>
             </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Reset Password Modal */}
+      {resetTarget && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <Card className="bg-slate-900 border-slate-700 p-6 w-full max-w-md space-y-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                  <KeyRound className="w-5 h-5 text-amber-400" />
+                </div>
+                <div>
+                  <h3 className="text-white font-bold text-lg">Reset Password</h3>
+                  <p className="text-slate-500 text-xs truncate max-w-[220px]">{resetTarget.name || resetTarget.email}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => { setResetTarget(null); setResetPassword('') }}
+                className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-500 hover:text-white transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleResetPassword} className="space-y-4">
+              <div>
+                <label className="text-slate-400 text-xs font-medium mb-1.5 block">New Password</label>
+                <div className="relative">
+                  <input
+                    type={showResetPassword ? 'text' : 'password'}
+                    value={resetPassword}
+                    onChange={e => setResetPassword(e.target.value)}
+                    required
+                    minLength={8}
+                    placeholder="Minimum 8 characters"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 pr-10 text-white placeholder-slate-600 text-sm focus:outline-none focus:border-amber-500/50 transition-colors font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowResetPassword(p => !p)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                  >
+                    {showResetPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-2.5 bg-amber-500/5 border border-amber-500/20 rounded-lg px-3 py-2.5">
+                <AlertCircle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+                <p className="text-amber-300/80 text-xs leading-relaxed">
+                  The new password will be shown in the Users table with a show/hide toggle until you reload. Share it with the user securely.
+                </p>
+              </div>
+
+              <div className="flex gap-3 pt-1">
+                <Button
+                  type="button"
+                  onClick={() => { setResetTarget(null); setResetPassword('') }}
+                  variant="ghost"
+                  className="flex-1 border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={resetting || resetPassword.length < 8}
+                  className="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-bold"
+                >
+                  {resetting ? 'Resetting...' : 'Reset Password'}
+                </Button>
+              </div>
+            </form>
           </Card>
         </div>
       )}

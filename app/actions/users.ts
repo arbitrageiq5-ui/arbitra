@@ -1,7 +1,7 @@
 'use server'
 
 import { auth } from '@/lib/auth'
-import { db } from '@/lib/db'
+import { db, pool } from '@/lib/db'
 import { user } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { headers } from 'next/headers'
@@ -174,6 +174,40 @@ export async function createAdminUser(name: string, email: string, password: str
     action: AuditActions.ADMIN_USER_ROLE_CHANGE,
     resource: 'users',
     details: { createdAdminEmail: email },
+  })
+
+  return { success: true }
+}
+
+// Reset a user's password (admin only) — uses Better Auth's internal hash
+export async function resetUserPassword(userId: string, newPassword: string) {
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session?.user) throw new Error('Unauthorized')
+
+  const currentUser = await db.select().from(user).where(eq(user.id, session.user.id)).limit(1)
+  if (!currentUser[0] || currentUser[0].role !== 'admin') {
+    throw new Error('Only admins can reset passwords')
+  }
+
+  if (newPassword.length < 8) throw new Error('Password must be at least 8 characters')
+
+  // Use Better Auth's internal scrypt hash — same algorithm used during sign-up
+  // @ts-ignore — .mjs path not in TS declarations but exists at runtime
+  const cryptoMod = await import('better-auth/dist/crypto/password.mjs')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const hashed: string = await (cryptoMod as any).hashPassword(newPassword)
+
+  // Update the password in the account table (Better Auth stores credentials there)
+  await pool.query(
+    `UPDATE account SET password = $1, "updatedAt" = NOW() WHERE "userId" = $2 AND "providerId" = 'credential'`,
+    [hashed, userId]
+  )
+
+  await logAudit({
+    userId: session.user.id,
+    action: AuditActions.ADMIN_USER_ROLE_CHANGE,
+    resource: 'users',
+    details: { action: 'password_reset', targetUserId: userId },
   })
 
   return { success: true }
