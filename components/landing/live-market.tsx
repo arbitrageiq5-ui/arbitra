@@ -248,7 +248,7 @@ export function LiveMarket() {
                       <td className="px-4 py-3 whitespace-nowrap"><LiquidityBadge value={row.liquidity} /></td>
                       <td className="px-4 py-3 text-[#98A2B3] whitespace-nowrap text-xs">{row.network}</td>
                       <td className="px-4 py-3 text-[#98A2B3] whitespace-nowrap text-xs">
-                        {new Date(row.updated).toLocaleTimeString()}
+                        {new Date(row.updated).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
                       </td>
                     </motion.tr>
                   )

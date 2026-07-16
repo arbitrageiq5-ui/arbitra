@@ -768,7 +768,7 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
                                     </p>
                                   )}
                                   <p className="text-slate-600 text-xs mt-0.5">
-                                    {new Date(req.createdAt as string | Date).toLocaleString()}
+                                    {new Date(req.createdAt as string | Date).toLocaleString('en-US')}
                                   </p>
                                   {req.note && (
                                     <p className="text-slate-400 text-xs mt-1 italic">&quot;{req.note}&quot;</p>

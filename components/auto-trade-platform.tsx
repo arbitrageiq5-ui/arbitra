@@ -139,6 +139,15 @@ export function AutoTradePlatform() {
   const [loading, setLoading] = useState(true)
   const [showAllLogs, setShowAllLogs] = useState(false)
   const [activeSection, setActiveSection] = useState<'overview' | 'daily' | 'projection'>('overview')
+  // Stable "today" value set client-side only to avoid SSR/client hydration mismatch
+  const [todayStr, setTodayStr] = useState<string>('')
+  const [todayDate, setTodayDate] = useState<Date | null>(null)
+
+  useEffect(() => {
+    const now = new Date()
+    setTodayStr(now.toISOString().split('T')[0])
+    setTodayDate(now)
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -199,12 +208,13 @@ export function AutoTradePlatform() {
   const currentBalance = principal + totalNetProfit
   const daysElapsed = logs.length
 
-  // Monthly progress (% of 8% net target)
-  const today = new Date()
+  // Monthly progress (% of 8% net target) — uses client-only todayDate to avoid hydration mismatch
+  const today = todayDate ?? new Date(0)
   const monthDays = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()
   const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
-  const daysThisMonth = Math.floor((today.getTime() - startOfMonth.getTime()) / 86400000) + 1
+  const daysThisMonth = todayDate ? Math.floor((today.getTime() - startOfMonth.getTime()) / 86400000) + 1 : 0
   const thisMonthLogs = logs.filter(l => {
+    if (!todayDate) return false
     const d = new Date(l.tradeDate)
     return d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear()
   })
@@ -406,7 +416,7 @@ export function AutoTradePlatform() {
                       const fee = parseFloat(log.dailyFee)
                       const net = parseFloat(log.dailyNet)
                       const running = parseFloat(log.runningTotal)
-                      const isToday = log.tradeDate === new Date().toISOString().split('T')[0]
+                      const isToday = !!todayStr && log.tradeDate === todayStr
                       return (
                         <tr key={log.id} className={`border-b border-slate-800/60 transition-colors ${
                           isToday ? 'bg-amber-500/5 border-amber-500/20' : i % 2 !== 0 ? 'bg-slate-900/20' : ''

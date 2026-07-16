@@ -121,7 +121,12 @@ export default function AdminClient() {
   const [showCreatePlan, setShowCreatePlan] = useState(false)
   const [planTargetUserId, setPlanTargetUserId] = useState('')
   const [planPrincipal, setPlanPrincipal] = useState('')
-  const [planStartDate, setPlanStartDate] = useState(new Date().toISOString().split('T')[0])
+  const [planStartDate, setPlanStartDate] = useState('')
+
+  // Set date client-side only to avoid SSR hydration mismatch
+  useEffect(() => {
+    setPlanStartDate(new Date().toISOString().split('T')[0])
+  }, [])
   const [planNote, setPlanNote] = useState('')
   const [creatingPlan, setCreatingPlan] = useState(false)
   const [togglingPlanId, setTogglingPlanId] = useState<number | null>(null)
@@ -258,7 +263,7 @@ export default function AdminClient() {
       await loadAutoTradePlans()
       setShowCreatePlan(false)
       setPlanTargetUserId(''); setPlanPrincipal(''); setPlanNote('')
-      setPlanStartDate(new Date().toISOString().split('T')[0])
+      setPlanStartDate(new Date().toISOString().split('T')[0]) // safe: called in event handler, not render
       showToast('Auto-trade plan created and daily logs generated')
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to create plan', 'error')
@@ -773,7 +778,7 @@ export default function AdminClient() {
                             {req.txHash ? req.txHash.slice(0, 14) + '...' : <span className="text-slate-700">—</span>}
                           </td>
                           <td className="px-5 py-3.5 text-slate-500 text-xs whitespace-nowrap">
-                            {new Date(req.createdAt as string | Date).toLocaleString()}
+                                  {new Date(req.createdAt as string | Date).toLocaleString('en-US')}
                           </td>
                           <td className="px-5 py-3.5">
                             <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border ${meta.bg} ${meta.color}`}>

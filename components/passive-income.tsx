@@ -60,6 +60,11 @@ export function PassiveIncome() {
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
   const [showAllCommissions, setShowAllCommissions] = useState(false)
   const [showAllReferrals, setShowAllReferrals] = useState(false)
+  const [origin, setOrigin] = useState('')
+
+  useEffect(() => {
+    setOrigin(window.location.origin)
+  }, [])
 
   const showMsg = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type })
@@ -120,7 +125,7 @@ export function PassiveIncome() {
   if (!data) return null
 
   const referralLink = data.referralCode
-    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/sign-up?ref=${data.referralCode}`
+    ? `${origin}/sign-up?ref=${data.referralCode}`
     : ''
 
   const visibleCommissions = showAllCommissions ? data.commissions : data.commissions.slice(0, 5)

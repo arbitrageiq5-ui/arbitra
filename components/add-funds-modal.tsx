@@ -428,7 +428,7 @@ export function AddFundsModal({ onClose }: { onClose: () => void }) {
                       <div className="text-slate-400 text-xs font-mono truncate">TX: {req.txHash}</div>
                     )}
                     <div className="text-slate-500 text-xs">
-                      {new Date(req.createdAt).toLocaleString()}
+                      {new Date(req.createdAt).toLocaleString('en-US')}
                     </div>
                   </div>
                 )
