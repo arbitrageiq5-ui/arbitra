@@ -77,7 +77,7 @@ function CopyButton({ text }: { text: string }) {
   )
 }
 
-export function TraderClient({ user }: { user: { id: string; name?: string | null; email?: string } }) {
+export function TraderClient({ user, isActivated }: { user: { id: string; name?: string | null; email?: string }; isActivated: boolean }) {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<Tab>('opportunities')
 
@@ -226,7 +226,7 @@ export function TraderClient({ user }: { user: { id: string; name?: string | nul
   return (
     <div className="flex flex-col min-h-screen bg-slate-950 font-sans">
       {/* Activation Fee Modal — shown on first login until account is activated */}
-      <ActivationFeeModal />
+      <ActivationFeeModal serverIsActivated={isActivated} />
 
       {/* Header */}
       <header className="border-b border-slate-800 bg-slate-900/90 backdrop-blur-sm sticky top-0 z-40">

@@ -44,7 +44,7 @@ function CopyBtn({ text }: { text: string }) {
   )
 }
 
-export function ActivationFeeModal() {
+export function ActivationFeeModal({ serverIsActivated }: { serverIsActivated: boolean }) {
   const router = useRouter()
   const [status, setStatus] = useState<ActivationStatus | null>(null)
   const [loading, setLoading] = useState(true)
@@ -65,8 +65,10 @@ export function ActivationFeeModal() {
   const [submitted, setSubmitted] = useState(false)
 
   useEffect(() => {
+    // If the server already confirmed activated, skip the async fetch entirely
+    if (serverIsActivated) return
     load()
-  }, [])
+  }, [serverIsActivated])
 
   const load = async () => {
     setLoading(true)
@@ -80,28 +82,13 @@ export function ActivationFeeModal() {
     }
   }
 
-  const handleSubmit = async () => {
-    if (!txHash.trim()) {
-      setSubmitError('Please enter your transaction hash.')
-      return
-    }
-    setSubmitting(true)
-    setSubmitError(null)
-    try {
-      await submitActivationFee(txHash.trim())
-      setSubmitted(true)
-      await load()
-    } catch (e) {
-      setSubmitError(e instanceof Error ? e.message : 'Submission failed. Please try again.')
-    } finally {
-      setSubmitting(false)
-    }
-  }
+  // Never show for already-activated traders (server-authoritative check)
+  if (serverIsActivated) return null
 
-  // Don't show if still loading
+  // Don't show while loading
   if (loading) return null
 
-  // Don't show if already activated
+  // Don't show if the fresh DB check also confirms activation
   if (status?.isActivated) return null
 
   // If dismissed after a pending submission, allow dashboard use

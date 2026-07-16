@@ -2,6 +2,9 @@ import { auth } from '@/lib/auth'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { TraderClient } from '@/components/trader-client'
+import { db } from '@/lib/db'
+import { user as userTable } from '@/lib/db/schema'
+import { eq } from 'drizzle-orm'
 
 export const metadata = {
   title: 'Trader Dashboard - Arbitrage IQ',
@@ -17,11 +20,22 @@ export default async function TraderPage() {
   if (role === 'admin') redirect('/admin')
   if (role === 'viewer') redirect('/opportunities')
 
+  // Fetch fresh isActivated directly from DB — the session object does not
+  // include custom fields like isActivated so we always query the DB here.
+  const [dbUser] = await db
+    .select({ isActivated: userTable.isActivated })
+    .from(userTable)
+    .where(eq(userTable.id, session.user.id))
+    .limit(1)
+
   return (
-    <TraderClient user={{
-      id: session.user.id,
-      name: session.user.name,
-      email: session.user.email,
-    }} />
+    <TraderClient
+      user={{
+        id: session.user.id,
+        name: session.user.name,
+        email: session.user.email,
+      }}
+      isActivated={dbUser?.isActivated ?? false}
+    />
   )
 }
