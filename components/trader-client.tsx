@@ -20,6 +20,7 @@ import { TradeExecutionPanel } from '@/components/trade-execution-panel'
 import { AutoTradePlatform } from '@/components/auto-trade-platform'
 import { PassiveIncome } from '@/components/passive-income'
 import { TraderWallet } from '@/components/trader-wallet'
+import { ActivationFeeModal } from '@/components/activation-fee-modal'
 
 type Opportunity = Awaited<ReturnType<typeof getMarketOpportunities>>[number]
 type DepositAddress = Awaited<ReturnType<typeof getDepositAddresses>>[number]
@@ -222,6 +223,9 @@ export function TraderClient({ user }: { user: { id: string; name?: string | nul
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-950 font-sans">
+      {/* Activation Fee Modal — shown on first login until account is activated */}
+      <ActivationFeeModal />
+
       {/* Header */}
       <header className="border-b border-slate-800 bg-slate-900/90 backdrop-blur-sm sticky top-0 z-40">
         <div className="max-w-screen-xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between gap-4">

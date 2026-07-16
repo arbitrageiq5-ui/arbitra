@@ -1,7 +1,7 @@
 'use server'
 
 import { db, pool } from '@/lib/db'
-import { user, activationFees, referralCommissions } from '@/lib/db/schema'
+import { user, activationFees, referralCommissions, depositAddresses as depositAddressesTable } from '@/lib/db/schema'
 import { eq, desc, and, sql } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 import { headers } from 'next/headers'
@@ -140,6 +140,42 @@ export async function getMyReferralData() {
     l1Activated,
     l2Count: Number(l2Count),
     l3Count: Number(l3Count),
+  }
+}
+
+// Get current user's activation status + latest fee submission + deposit addresses
+export async function getActivationStatus() {
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session?.user) throw new Error('Unauthorized')
+
+  const [me] = await db.select({
+    id: user.id,
+    isActivated: user.isActivated,
+    activationPaidAt: user.activationPaidAt,
+  }).from(user).where(eq(user.id, session.user.id)).limit(1)
+
+  if (!me) throw new Error('User not found')
+
+  // Latest activation fee submission (any status)
+  const [latestFee] = await db
+    .select()
+    .from(activationFees)
+    .where(eq(activationFees.userId, session.user.id))
+    .orderBy(desc(activationFees.createdAt))
+    .limit(1)
+
+  // Admin-configured deposit addresses
+  const addresses = await db
+    .select()
+    .from(depositAddressesTable)
+    .where(eq(depositAddressesTable.isActive, true))
+    .orderBy(depositAddressesTable.network)
+
+  return {
+    isActivated: me.isActivated,
+    activationPaidAt: me.activationPaidAt,
+    latestFee: latestFee ?? null,
+    depositAddresses: addresses,
   }
 }
 
