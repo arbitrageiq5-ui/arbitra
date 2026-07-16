@@ -3,10 +3,33 @@
 import { auth } from '@/lib/auth'
 import { db, pool } from '@/lib/db'
 import { user } from '@/lib/db/schema'
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { headers } from 'next/headers'
 import { UserRole } from '@/lib/roles'
 import { logAudit, AuditActions } from '@/lib/audit'
+
+// Store referredBy after sign-up (called client-side right after account creation)
+export async function storeReferredBy(referralCode: string) {
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session?.user) throw new Error('Unauthorized')
+
+  // Find referrer by code
+  const [referrer] = await db
+    .select({ id: user.id })
+    .from(user)
+    .where(sql`referral_code = ${referralCode.toUpperCase()}`)
+    .limit(1)
+  if (!referrer) return // invalid code — fail silently
+
+  // Prevent self-referral
+  if (referrer.id === session.user.id) return
+
+  // Only store if not already set
+  const [me] = await db.select().from(user).where(eq(user.id, session.user.id)).limit(1)
+  if (me?.referredBy) return // already set
+
+  await db.update(user).set({ referredBy: referrer.id }).where(eq(user.id, session.user.id))
+}
 
 // Get all users (admin only)
 export async function getAllUsers() {

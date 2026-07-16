@@ -1,48 +1,88 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { authClient } from '@/lib/auth-client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card } from '@/components/ui/card'
 import { getRoleLabel, getRoleDescription, UserRole } from '@/lib/roles'
+import { validateReferralCode } from '@/app/actions/referral'
+import { storeReferredBy } from '@/app/actions/users'
 
 export function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [selectedRole, setSelectedRole] = useState<UserRole>('viewer')
+  const [referralCode, setReferralCode] = useState('')
+  const [referralValid, setReferralValid] = useState<boolean | null>(null)
+  const [referralChecking, setReferralChecking] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
   const isSignUp = mode === 'sign-up'
+
+  // Pre-fill referral code from URL param e.g. /sign-up?ref=ABCD1234
+  useEffect(() => {
+    const ref = searchParams.get('ref')
+    if (ref) setReferralCode(ref.toUpperCase())
+  }, [searchParams])
+
+  // Validate referral code with debounce
+  useEffect(() => {
+    if (!referralCode || referralCode.length < 6) {
+      setReferralValid(null)
+      return
+    }
+    const timer = setTimeout(async () => {
+      setReferralChecking(true)
+      const referrerId = await validateReferralCode(referralCode)
+      setReferralValid(referrerId !== null)
+      setReferralChecking(false)
+    }, 600)
+    return () => clearTimeout(timer)
+  }, [referralCode])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
     setLoading(true)
 
-    const { error } = isSignUp
-      ? await authClient.signUp.email({
-          email,
-          password,
-          name,
-          role: selectedRole,
-        })
-      : await authClient.signIn.email({ email, password })
+    if (isSignUp) {
+      const { error } = await authClient.signUp.email({
+        email,
+        password,
+        name,
+        role: selectedRole,
+      })
+      if (error) {
+        setError(error.message ?? 'Something went wrong')
+        setLoading(false)
+        return
+      }
+
+      // After sign-up: store referredBy if a valid code was entered
+      if (referralCode && referralValid) {
+        try {
+          await storeReferredBy(referralCode)
+        } catch { /* non-fatal */ }
+      }
+    } else {
+      const { error } = await authClient.signIn.email({ email, password })
+      if (error) {
+        setError(error.message ?? 'Something went wrong')
+        setLoading(false)
+        return
+      }
+    }
 
     setLoading(false)
 
-    if (error) {
-      setError(error.message ?? 'Something went wrong')
-      return
-    }
-
-    // Fetch session to get role, then redirect to role-specific dashboard
     const session = await authClient.getSession()
     const role = (session?.data?.user as unknown as { role?: string })?.role ?? 'viewer'
     if (role === 'admin') router.push('/admin')
@@ -106,8 +146,49 @@ export function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
                   ))}
                 </div>
               </div>
+              {/* Referral code */}
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="referralCode">
+                  Referral Code{' '}
+                  <span className="text-muted-foreground font-normal">(optional)</span>
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="referralCode"
+                    value={referralCode}
+                    onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                    placeholder="e.g. ABC12345"
+                    maxLength={12}
+                    className={`pr-8 font-mono tracking-widest uppercase ${
+                      referralValid === true
+                        ? 'border-green-500 focus-visible:ring-green-500'
+                        : referralValid === false
+                        ? 'border-red-400 focus-visible:ring-red-400'
+                        : ''
+                    }`}
+                  />
+                  {referralCode.length >= 6 && (
+                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-sm">
+                      {referralChecking ? (
+                        <span className="text-muted-foreground animate-pulse">...</span>
+                      ) : referralValid === true ? (
+                        <span className="text-green-500">&#10003;</span>
+                      ) : referralValid === false ? (
+                        <span className="text-red-400">&#10007;</span>
+                      ) : null}
+                    </span>
+                  )}
+                </div>
+                {referralValid === true && (
+                  <p className="text-xs text-green-600">Valid referral code applied.</p>
+                )}
+                {referralValid === false && referralCode.length >= 6 && (
+                  <p className="text-xs text-red-500">Referral code not found.</p>
+                )}
+              </div>
             </>
           )}
+
           <div className="flex flex-col gap-2">
             <Label htmlFor="email">Email</Label>
             <Input

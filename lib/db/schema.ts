@@ -10,6 +10,11 @@ export const user = pgTable('user', {
   emailVerified: boolean('emailVerified').notNull().default(false),
   image: text('image'),
   role: text('role').default('viewer').notNull(), // 'viewer' | 'trader' | 'admin'
+  // Referral & activation system
+  referralCode: text('referral_code').unique(),
+  referredBy: text('referred_by'), // userId of referrer (no FK to avoid circular)
+  isActivated: boolean('is_activated').notNull().default(false),
+  activationPaidAt: timestamp('activation_paid_at'),
   createdAt: timestamp('createdAt').notNull().defaultNow(),
   updatedAt: timestamp('updatedAt').notNull().defaultNow(),
 })
@@ -214,6 +219,33 @@ export const autoTradePlans = pgTable('auto_trade_plans', {
   note: text('note'),
   createdAt: timestamp('createdAt').notNull().defaultNow(),
   updatedAt: timestamp('updatedAt').notNull().defaultNow(),
+})
+
+// --- Activation Fee & Referral Commissions ---
+
+export const activationFees = pgTable('activation_fees', {
+  id: serial('id').primaryKey(),
+  userId: text('userId').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  amount: decimal('amount', { precision: 10, scale: 2 }).notNull().default('100.00'),
+  txHash: text('tx_hash'),
+  status: text('status').notNull().default('pending'), // 'pending' | 'confirmed' | 'rejected'
+  reviewedBy: text('reviewed_by').references(() => user.id),
+  reviewedAt: timestamp('reviewed_at'),
+  note: text('note'),
+  createdAt: timestamp('createdAt').notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt').notNull().defaultNow(),
+})
+
+export const referralCommissions = pgTable('referral_commissions', {
+  id: serial('id').primaryKey(),
+  userId: text('userId').notNull().references(() => user.id, { onDelete: 'cascade' }), // earner
+  fromUserId: text('fromUserId').notNull().references(() => user.id, { onDelete: 'cascade' }), // who paid the activation fee
+  level: integer('level').notNull(), // 1=$30, 2=$10, 3=$5
+  amount: decimal('amount', { precision: 10, scale: 2 }).notNull(),
+  status: text('status').notNull().default('pending'), // 'pending' | 'paid'
+  paidAt: timestamp('paid_at'),
+  note: text('note'),
+  createdAt: timestamp('createdAt').notNull().defaultNow(),
 })
 
 export const autoTradeLogs = pgTable('auto_trade_logs', {

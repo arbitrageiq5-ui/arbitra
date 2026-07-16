@@ -12,14 +12,15 @@ import {
 } from '@/app/actions/deposits'
 import { getRoleLabel, UserRole } from '@/lib/roles'
 import { getAllAutoTradePlans, createAutoTradePlan, updateAutoTradePlanStatus } from '@/app/actions/auto-trade'
+import { getActivationFeeRequests, approveActivationFee, rejectActivationFee } from '@/app/actions/referral'
 import {
   LogOut, Users, Trash2, ChevronDown, Wallet, Plus,
   CheckCircle2, XCircle, Clock, AlertCircle, Pencil,
   Zap, Shield, BarChart3, RefreshCw, UserPlus, X, Eye, EyeOff, KeyRound,
-  TrendingUp, Activity, PauseCircle, StopCircle, DollarSign,
+  TrendingUp, Activity, PauseCircle, StopCircle, DollarSign, Gift,
 } from 'lucide-react'
 
-type Tab = 'users' | 'deposit-addresses' | 'fund-requests' | 'auto-trade'
+type Tab = 'users' | 'deposit-addresses' | 'fund-requests' | 'auto-trade' | 'activation-fees'
 type Network = 'TRC20' | 'BEP20' | 'ERC20'
 
 interface User { id: string; name: string | null; email: string; role: string; createdAt: Date }
@@ -34,6 +35,11 @@ interface AutoTradePlan {
   netReturnPct: string; status: string; startDate: string; endDate: string | null
   note: string | null; createdAt: Date
   user: { id: string; name: string | null; email: string }
+}
+interface ActivationFeeReq {
+  id: number; userId: string; amount: string; txHash: string | null
+  status: string; note: string | null; createdAt: Date; reviewedAt: Date | null
+  trader: { name: string | null; email: string; referredBy: string | null } | null
 }
 
 const NETWORK_META: Record<Network, { color: string; bg: string; border: string; chain: string }> = {
@@ -109,11 +115,19 @@ export default function AdminClient() {
   const [creatingPlan, setCreatingPlan] = useState(false)
   const [togglingPlanId, setTogglingPlanId] = useState<number | null>(null)
 
+  // Activation Fees
+  const [activationFeeReqs, setActivationFeeReqs] = useState<ActivationFeeReq[]>([])
+  const [loadingFeeReqs, setLoadingFeeReqs] = useState(false)
+  const [reviewingFeeId, setReviewingFeeId] = useState<number | null>(null)
+  const [rejectNote, setRejectNote] = useState('')
+  const [showRejectModal, setShowRejectModal] = useState<number | null>(null)
+
   useEffect(() => { loadUsers() }, [])
   useEffect(() => {
     if (activeTab === 'deposit-addresses') loadAddresses()
     if (activeTab === 'fund-requests') loadFundRequests()
     if (activeTab === 'auto-trade') loadAutoTradePlans()
+    if (activeTab === 'activation-fees') loadActivationFeeReqs()
   }, [activeTab])
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
@@ -238,6 +252,39 @@ export default function AdminClient() {
     } finally { setTogglingPlanId(null) }
   }
 
+  const loadActivationFeeReqs = async () => {
+    setLoadingFeeReqs(true)
+    try {
+      const data = await getActivationFeeRequests()
+      setActivationFeeReqs(data as ActivationFeeReq[])
+    } catch { /* ignore */ }
+    finally { setLoadingFeeReqs(false) }
+  }
+
+  const handleApproveFee = async (feeId: number) => {
+    try {
+      setReviewingFeeId(feeId)
+      await approveActivationFee(feeId)
+      await loadActivationFeeReqs()
+      showToast('Activation fee approved. Account activated and commissions distributed.')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to approve', 'error')
+    } finally { setReviewingFeeId(null) }
+  }
+
+  const handleRejectFee = async (feeId: number) => {
+    try {
+      setReviewingFeeId(feeId)
+      await rejectActivationFee(feeId, rejectNote || undefined)
+      await loadActivationFeeReqs()
+      setShowRejectModal(null)
+      setRejectNote('')
+      showToast('Activation fee rejected.')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to reject', 'error')
+    } finally { setReviewingFeeId(null) }
+  }
+
   const handleStartEdit = (network: Network) => {
     const existing = addresses.find(a => a.network === network && a.isActive)
     setEditNetwork(network)
@@ -350,6 +397,7 @@ export default function AdminClient() {
             { key: 'deposit-addresses' as Tab,    label: 'Deposit Addresses', icon: Wallet,     badge: activeAddressNetworks.length },
             { key: 'fund-requests' as Tab,        label: 'Fund Requests',     icon: Clock,      badge: pendingCount },
             { key: 'auto-trade' as Tab,           label: 'Auto Trade',        icon: TrendingUp, badge: autoTradePlans.filter(p => p.status === 'active').length },
+            { key: 'activation-fees' as Tab,      label: 'Activations',       icon: Gift,       badge: activationFeeReqs.filter(f => f.status === 'pending').length },
           ]).map(tab => (
             <button
               key={tab.key}
@@ -838,7 +886,164 @@ export default function AdminClient() {
           </div>
         )}
 
+        {/* ── ACTIVATION FEES TAB ── */}
+        {activeTab === 'activation-fees' && (
+          <div className="space-y-6">
+            <Card className="bg-slate-900 border-slate-800 overflow-hidden">
+              <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+                <h2 className="text-white font-bold text-lg flex items-center gap-2">
+                  <Gift className="w-5 h-5 text-amber-400" />
+                  Activation Fee Requests
+                </h2>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-slate-500 bg-slate-800 px-2.5 py-1 rounded-full">
+                    {activationFeeReqs.filter(f => f.status === 'pending').length} pending
+                  </span>
+                  <button onClick={loadActivationFeeReqs} className="p-2 rounded-lg hover:bg-slate-800 text-slate-500 hover:text-white transition-colors">
+                    <RefreshCw className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Summary */}
+              <div className="grid grid-cols-3 gap-4 px-6 py-4 border-b border-slate-800">
+                {[
+                  { label: 'Total Requests', value: activationFeeReqs.length, color: 'text-white' },
+                  { label: 'Confirmed', value: activationFeeReqs.filter(f => f.status === 'confirmed').length, color: 'text-green-400' },
+                  { label: 'Total Collected', value: '$' + (activationFeeReqs.filter(f => f.status === 'confirmed').length * 100).toLocaleString(), color: 'text-amber-400' },
+                ].map(({ label, value, color }) => (
+                  <div key={label}>
+                    <p className="text-slate-500 text-xs">{label}</p>
+                    <p className={`text-xl font-bold ${color}`}>{value}</p>
+                  </div>
+                ))}
+              </div>
+
+              {loadingFeeReqs ? (
+                <div className="p-12 text-center text-slate-500">
+                  <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-amber-400" />
+                  Loading...
+                </div>
+              ) : activationFeeReqs.length === 0 ? (
+                <div className="p-12 text-center text-slate-500 text-sm">No activation fee requests yet.</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-800 bg-slate-950/40">
+                        {['Trader', 'Amount', 'TX Hash', 'Referred By', 'Status', 'Submitted', 'Actions'].map(h => (
+                          <th key={h} className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {activationFeeReqs.map((fee, i) => (
+                        <tr key={fee.id} className={`border-b border-slate-800/60 hover:bg-slate-800/30 ${i % 2 !== 0 ? 'bg-slate-900/20' : ''}`}>
+                          <td className="px-4 py-3.5">
+                            <p className="text-white font-medium text-xs">{fee.trader?.name || '—'}</p>
+                            <p className="text-slate-500 text-xs">{fee.trader?.email}</p>
+                          </td>
+                          <td className="px-4 py-3.5 text-amber-400 font-bold">${parseFloat(fee.amount).toFixed(2)}</td>
+                          <td className="px-4 py-3.5">
+                            <code className="text-slate-400 text-xs font-mono">
+                              {fee.txHash ? `${fee.txHash.slice(0, 16)}...` : '—'}
+                            </code>
+                          </td>
+                          <td className="px-4 py-3.5 text-slate-500 text-xs">
+                            {fee.trader?.referredBy ? (
+                              <span className="text-blue-400">Yes</span>
+                            ) : '—'}
+                          </td>
+                          <td className="px-4 py-3.5">
+                            {fee.status === 'pending' && (
+                              <span className="flex items-center gap-1 text-xs font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-full px-2.5 py-1 w-fit">
+                                <Clock className="w-3 h-3" />Pending
+                              </span>
+                            )}
+                            {fee.status === 'confirmed' && (
+                              <span className="flex items-center gap-1 text-xs font-semibold text-green-400 bg-green-500/10 border border-green-500/20 rounded-full px-2.5 py-1 w-fit">
+                                <CheckCircle2 className="w-3 h-3" />Confirmed
+                              </span>
+                            )}
+                            {fee.status === 'rejected' && (
+                              <span className="flex items-center gap-1 text-xs font-semibold text-red-400 bg-red-500/10 border border-red-500/20 rounded-full px-2.5 py-1 w-fit">
+                                <XCircle className="w-3 h-3" />Rejected
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3.5 text-slate-500 text-xs">
+                            {new Date(fee.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}
+                          </td>
+                          <td className="px-4 py-3.5">
+                            {fee.status === 'pending' && (
+                              <div className="flex items-center gap-1.5">
+                                <Button
+                                  size="sm"
+                                  disabled={reviewingFeeId === fee.id}
+                                  onClick={() => handleApproveFee(fee.id)}
+                                  className="h-7 px-3 text-xs bg-green-700 hover:bg-green-600 text-white gap-1 font-semibold"
+                                >
+                                  <CheckCircle2 className="w-3 h-3" />Approve
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  disabled={reviewingFeeId === fee.id}
+                                  onClick={() => setShowRejectModal(fee.id)}
+                                  variant="ghost"
+                                  className="h-7 px-3 text-xs border border-red-500/30 text-red-400 hover:bg-red-900/20 gap-1"
+                                >
+                                  <XCircle className="w-3 h-3" />Reject
+                                </Button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Card>
+          </div>
+        )}
+
       </main>
+
+      {/* Reject Activation Fee Modal */}
+      {showRejectModal !== null && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <Card className="bg-slate-900 border-slate-700 p-6 w-full max-w-sm space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-white font-bold flex items-center gap-2">
+                <XCircle className="w-5 h-5 text-red-400" />Reject Activation Fee
+              </h3>
+              <button onClick={() => { setShowRejectModal(null); setRejectNote('') }} className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-500 hover:text-white transition-colors">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div>
+              <label className="text-slate-400 text-xs font-medium mb-1.5 block">Reason (optional)</label>
+              <input
+                type="text"
+                value={rejectNote}
+                onChange={e => setRejectNote(e.target.value)}
+                placeholder="e.g. Transaction not found on chain"
+                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-white placeholder-slate-600 text-sm focus:outline-none focus:border-red-500/50 transition-colors"
+              />
+            </div>
+            <div className="flex gap-3">
+              <Button onClick={() => { setShowRejectModal(null); setRejectNote('') }} variant="ghost" className="flex-1 border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800">Cancel</Button>
+              <Button
+                onClick={() => handleRejectFee(showRejectModal)}
+                disabled={reviewingFeeId === showRejectModal}
+                className="flex-1 bg-red-700 hover:bg-red-600 text-white font-bold"
+              >
+                {reviewingFeeId === showRejectModal ? 'Rejecting...' : 'Reject'}
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
 
       {/* Review Modal */}
       {reviewModalId !== null && (
