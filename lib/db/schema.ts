@@ -60,10 +60,14 @@ export const exchangeAccounts = pgTable('exchange_accounts', {
   id: serial('id').primaryKey(),
   userId: text('userId').notNull().references(() => user.id, { onDelete: 'cascade' }),
   exchange: text('exchange').notNull(),
+  label: text('label'),
   apiKey: text('apiKey').notNull(),
   apiSecret: text('apiSecret').notNull(),
   passphrase: text('passphrase'),
+  tradeMode: text('trade_mode').notNull().default('read_only'), // 'read_only' | 'live'
   isActive: boolean('isActive').default(true),
+  lastTestedAt: timestamp('last_tested_at'),
+  testStatus: text('test_status'), // 'ok' | 'error' | message
   createdAt: timestamp('createdAt').defaultNow(),
   updatedAt: timestamp('updatedAt').defaultNow(),
 })
