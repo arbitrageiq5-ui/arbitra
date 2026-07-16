@@ -7,9 +7,16 @@ import { headers } from 'next/headers'
 import { eq, and, desc } from 'drizzle-orm'
 import { OpenAI } from 'openai'
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
+let openai: OpenAI | null = null
+
+function getOpenAIClient() {
+  if (!openai && process.env.OPENAI_API_KEY) {
+    openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    })
+  }
+  return openai
+}
 
 async function getUserId() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -61,6 +68,11 @@ export async function getArbitrageOpportunities(limit: number = 50) {
 
 export async function scoreOpportunityWithAI(opportunityId: number) {
   const userId = await getUserId()
+  const client = getOpenAIClient()
+
+  if (!client) {
+    throw new Error('OpenAI API key not configured')
+  }
 
   const opp = await db
     .select()
@@ -89,7 +101,7 @@ Consider: exchange reliability, liquidity, withdrawal fees, market volatility, a
 Respond with JSON: {"score": number, "reasoning": string}`
 
   try {
-    const response = await openai.chat.completions.create({
+    const response = await client.chat.completions.create({
       model: 'gpt-4-turbo',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.7,
