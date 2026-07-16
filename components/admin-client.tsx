@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { authClient } from '@/lib/auth-client'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { getAllUsers, changeUserRole, deleteUser } from '@/app/actions/users'
+import { getAllUsers, changeUserRole, deleteUser, createAdminUser } from '@/app/actions/users'
 import {
   getAllDepositAddresses, upsertDepositAddress,
   getAllFundRequests, reviewFundRequest,
@@ -14,7 +14,7 @@ import { getRoleLabel, UserRole } from '@/lib/roles'
 import {
   LogOut, Users, Trash2, ChevronDown, Wallet, Plus,
   CheckCircle2, XCircle, Clock, AlertCircle, Pencil,
-  Zap, Shield, BarChart3, RefreshCw,
+  Zap, Shield, BarChart3, RefreshCw, UserPlus, X, Eye, EyeOff,
 } from 'lucide-react'
 
 type Tab = 'users' | 'deposit-addresses' | 'fund-requests'
@@ -74,6 +74,14 @@ export default function AdminClient() {
 
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
 
+  // Create Admin modal
+  const [showCreateAdmin, setShowCreateAdmin] = useState(false)
+  const [newAdminName, setNewAdminName] = useState('')
+  const [newAdminEmail, setNewAdminEmail] = useState('')
+  const [newAdminPassword, setNewAdminPassword] = useState('')
+  const [showNewAdminPassword, setShowNewAdminPassword] = useState(false)
+  const [creatingAdmin, setCreatingAdmin] = useState(false)
+
   useEffect(() => { loadUsers() }, [])
   useEffect(() => {
     if (activeTab === 'deposit-addresses') loadAddresses()
@@ -124,6 +132,20 @@ export default function AdminClient() {
     } catch (e) {
       showToast(e instanceof Error ? e.message : 'Failed to delete user', 'error')
     } finally { setDeletingUserId(null) }
+  }
+
+  const handleCreateAdmin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      setCreatingAdmin(true)
+      await createAdminUser(newAdminName, newAdminEmail, newAdminPassword)
+      await loadUsers()
+      setShowCreateAdmin(false)
+      setNewAdminName(''); setNewAdminEmail(''); setNewAdminPassword('')
+      showToast('Admin account created successfully')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to create admin', 'error')
+    } finally { setCreatingAdmin(false) }
   }
 
   const handleStartEdit = (network: Network) => {
@@ -273,9 +295,19 @@ export default function AdminClient() {
                 <Users className="w-5 h-5 text-blue-400" />
                 All Users
               </h2>
-              <button onClick={loadUsers} className="p-2 rounded-lg hover:bg-slate-800 text-slate-500 hover:text-white transition-colors">
-                <RefreshCw className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => setShowCreateAdmin(true)}
+                  className="bg-red-600 hover:bg-red-700 text-white gap-2 h-8 text-xs font-semibold"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  Create Admin
+                </Button>
+                <button onClick={loadUsers} className="p-2 rounded-lg hover:bg-slate-800 text-slate-500 hover:text-white transition-colors">
+                  <RefreshCw className="w-4 h-4" />
+                </button>
+              </div>
             </div>
             {loadingUsers ? (
               <div className="p-12 text-center text-slate-500">
@@ -582,6 +614,102 @@ export default function AdminClient() {
                 {reviewingId !== null ? 'Processing...' : reviewAction === 'confirmed' ? 'Confirm' : 'Reject'}
               </Button>
             </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Create Admin Modal */}
+      {showCreateAdmin && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <Card className="bg-slate-900 border-slate-700 p-6 w-full max-w-md space-y-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-red-500/20 flex items-center justify-center">
+                  <UserPlus className="w-5 h-5 text-red-400" />
+                </div>
+                <div>
+                  <h3 className="text-white font-bold text-lg">Create Admin Account</h3>
+                  <p className="text-slate-500 text-xs">Only admins can create other admin accounts</p>
+                </div>
+              </div>
+              <button
+                onClick={() => { setShowCreateAdmin(false); setNewAdminName(''); setNewAdminEmail(''); setNewAdminPassword('') }}
+                className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-500 hover:text-white transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateAdmin} className="space-y-4">
+              <div>
+                <label className="text-slate-400 text-xs font-medium mb-1.5 block">Full Name</label>
+                <input
+                  type="text"
+                  value={newAdminName}
+                  onChange={e => setNewAdminName(e.target.value)}
+                  required
+                  placeholder="e.g. John Smith"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-white placeholder-slate-600 text-sm focus:outline-none focus:border-red-500/50 transition-colors"
+                />
+              </div>
+              <div>
+                <label className="text-slate-400 text-xs font-medium mb-1.5 block">Email Address</label>
+                <input
+                  type="email"
+                  value={newAdminEmail}
+                  onChange={e => setNewAdminEmail(e.target.value)}
+                  required
+                  placeholder="admin@example.com"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-white placeholder-slate-600 text-sm focus:outline-none focus:border-red-500/50 transition-colors"
+                />
+              </div>
+              <div>
+                <label className="text-slate-400 text-xs font-medium mb-1.5 block">Password</label>
+                <div className="relative">
+                  <input
+                    type={showNewAdminPassword ? 'text' : 'password'}
+                    value={newAdminPassword}
+                    onChange={e => setNewAdminPassword(e.target.value)}
+                    required
+                    minLength={8}
+                    placeholder="Minimum 8 characters"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 pr-10 text-white placeholder-slate-600 text-sm focus:outline-none focus:border-red-500/50 transition-colors"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewAdminPassword(p => !p)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                  >
+                    {showNewAdminPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-2.5 bg-red-500/5 border border-red-500/20 rounded-lg px-3 py-2.5">
+                <Shield className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
+                <p className="text-red-300/80 text-xs leading-relaxed">
+                  This account will have full admin access — user management, deposit addresses, and fund approvals. Share credentials securely.
+                </p>
+              </div>
+
+              <div className="flex gap-3 pt-1">
+                <Button
+                  type="button"
+                  onClick={() => { setShowCreateAdmin(false); setNewAdminName(''); setNewAdminEmail(''); setNewAdminPassword('') }}
+                  variant="ghost"
+                  className="flex-1 border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={creatingAdmin}
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold"
+                >
+                  {creatingAdmin ? 'Creating...' : 'Create Admin'}
+                </Button>
+              </div>
+            </form>
           </Card>
         </div>
       )}

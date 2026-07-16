@@ -37,7 +37,7 @@ const EXCHANGE_LOGOS: Record<string, string> = {
 
 export function ExchangeConnectionManager() {
   const [accounts, setAccounts] = useState<Account[]>([])
-  const supportedExchanges: Record<string, ExchangeMeta> = SUPPORTED_EXCHANGES
+  const supportedExchanges: Record<string, { name: string; hasPassphrase: boolean; docsUrl: string }> = SUPPORTED_EXCHANGES
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [testingId, setTestingId] = useState<number | null>(null)

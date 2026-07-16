@@ -145,6 +145,40 @@ export async function deleteUser(userId: string) {
   return { success: true }
 }
 
+// Create a new admin user (admin only — not available through public sign-up)
+export async function createAdminUser(name: string, email: string, password: string) {
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session?.user) throw new Error('Unauthorized')
+
+  const currentUser = await db.select().from(user).where(eq(user.id, session.user.id)).limit(1)
+  if (!currentUser[0] || currentUser[0].role !== 'admin') {
+    throw new Error('Only admins can create admin accounts')
+  }
+
+  // Check email not already taken
+  const existing = await db.select().from(user).where(eq(user.email, email)).limit(1)
+  if (existing[0]) throw new Error('An account with this email already exists')
+
+  // Use Better Auth's sign-up endpoint server-side to get proper password hashing
+  const result = await auth.api.signUpEmail({
+    body: { name, email, password, role: 'admin' },
+  })
+
+  if (!result?.user) throw new Error('Failed to create admin account')
+
+  // Ensure role is set to admin (in case additionalFields didn't apply)
+  await db.update(user).set({ role: 'admin' }).where(eq(user.email, email))
+
+  await logAudit({
+    userId: session.user.id,
+    action: AuditActions.ADMIN_USER_ROLE_CHANGE,
+    resource: 'users',
+    details: { createdAdminEmail: email },
+  })
+
+  return { success: true }
+}
+
 // Update user profile
 export async function updateUserProfile(name: string, email?: string) {
   const session = await auth.api.getSession({ headers: await headers() })
