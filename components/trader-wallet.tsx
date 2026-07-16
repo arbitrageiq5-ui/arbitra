@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import {
   Wallet, ArrowDownCircle, ArrowUpCircle, RefreshCw,
   TrendingUp, Gift, ShieldCheck, Clock, CheckCircle2,
-  XCircle, Copy, Check, X, AlertCircle, DollarSign, ChevronDown, ChevronUp,
+  XCircle, Copy, Check, X, AlertCircle, DollarSign, ChevronDown, ChevronUp, Zap,
 } from 'lucide-react'
 import { copyToClipboard as copyUtil } from '@/lib/utils'
 import {
@@ -14,6 +14,7 @@ import {
   requestWithdrawal,
   cancelWithdrawal,
 } from '@/app/actions/wallet'
+import { selfFundAutoTrade } from '@/app/actions/auto-trade'
 import {
   submitFundRequest,
   getDepositAddresses,
@@ -59,7 +60,7 @@ export function TraderWallet() {
   const [copied, setCopied] = useState<string | null>(null)
 
   // Panel state
-  const [activePanel, setActivePanel] = useState<'deposit' | 'withdraw' | null>(null)
+  const [activePanel, setActivePanel] = useState<'deposit' | 'withdraw' | 'shift' | null>(null)
 
   // Deposit form
   const [depNetwork, setDepNetwork] = useState<Network>('TRC20')
@@ -67,6 +68,10 @@ export function TraderWallet() {
   const [depTxHash, setDepTxHash] = useState('')
   const [submittingDep, setSubmittingDep] = useState(false)
   const [showAllDeposits, setShowAllDeposits] = useState(false)
+
+  // Shift to auto-trade form
+  const [shiftAmount, setShiftAmount] = useState('')
+  const [submittingShift, setSubmittingShift] = useState(false)
 
   // Withdraw form
   const [withNetwork, setWithNetwork] = useState<Network>('TRC20')
@@ -138,6 +143,21 @@ export function TraderWallet() {
     }
   }
 
+  const handleShift = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const amt = parseFloat(shiftAmount)
+    try {
+      setSubmittingShift(true)
+      await selfFundAutoTrade(amt)
+      await load()
+      setShiftAmount('')
+      setActivePanel(null)
+      showToast(`$${amt.toFixed(2)} shifted to Auto-Trade successfully! Your plan is now active.`)
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to shift funds', 'error')
+    } finally { setSubmittingShift(false) }
+  }
+
   const depositAddr = addresses.find(a => a.network === depNetwork)
 
   if (loading && !summary) {
@@ -195,28 +215,42 @@ export function TraderWallet() {
           </div>
 
           {/* Action buttons */}
-          <div className="flex gap-3">
+          <div className="grid grid-cols-3 gap-2">
             <button
               onClick={() => setActivePanel(activePanel === 'deposit' ? null : 'deposit')}
-              className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm transition-all ${
+              className={`flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm transition-all ${
                 activePanel === 'deposit'
                   ? 'bg-green-600 text-white'
                   : 'bg-green-900/30 border border-green-700/40 text-green-400 hover:bg-green-900/50'
               }`}
             >
               <ArrowDownCircle className="w-4 h-4" />
-              Deposit
+              <span className="hidden sm:inline">Deposit</span>
+              <span className="sm:hidden text-xs">Deposit</span>
+            </button>
+            <button
+              onClick={() => setActivePanel(activePanel === 'shift' ? null : 'shift')}
+              className={`flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm transition-all ${
+                activePanel === 'shift'
+                  ? 'bg-amber-500 text-black'
+                  : 'bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20'
+              }`}
+            >
+              <Zap className="w-4 h-4" />
+              <span className="hidden sm:inline">Auto-Trade</span>
+              <span className="sm:hidden text-xs">Auto-Trade</span>
             </button>
             <button
               onClick={() => setActivePanel(activePanel === 'withdraw' ? null : 'withdraw')}
-              className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm transition-all ${
+              className={`flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm transition-all ${
                 activePanel === 'withdraw'
                   ? 'bg-red-600 text-white'
                   : 'bg-red-900/30 border border-red-700/40 text-red-400 hover:bg-red-900/50'
               }`}
             >
               <ArrowUpCircle className="w-4 h-4" />
-              Withdraw
+              <span className="hidden sm:inline">Withdraw</span>
+              <span className="sm:hidden text-xs">Withdraw</span>
             </button>
           </div>
         </div>
@@ -294,6 +328,107 @@ export function TraderWallet() {
                 </Button>
                 <Button type="submit" disabled={submittingDep} className="flex-1 bg-green-700 hover:bg-green-600 text-white font-bold">
                   {submittingDep ? 'Submitting...' : 'Submit Deposit'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* Shift to Auto-Trade panel */}
+        {activePanel === 'shift' && (
+          <div className="border-t border-slate-800 px-6 py-6 bg-slate-950/40">
+            <h3 className="text-white font-bold mb-1 flex items-center gap-2">
+              <Zap className="w-4 h-4 text-amber-400" />
+              Shift Balance to Auto-Trade
+            </h3>
+            <p className="text-slate-500 text-xs mb-4 mt-1">
+              Available: <span className="text-white font-bold">${available.toFixed(2)}</span>
+              {' '}&mdash; Min: <span className="text-white font-bold">$100</span>
+              {' '}&mdash; Max: <span className="text-white font-bold">$5,000</span>
+            </p>
+
+            {/* Info strip */}
+            <div className="grid grid-cols-3 gap-2 mb-4">
+              {[
+                { label: 'Gross Return', value: '10%/mo', color: 'text-amber-400', bg: 'bg-amber-500/5 border-amber-500/20' },
+                { label: 'Platform Fee', value: '2%/mo',  color: 'text-red-400',   bg: 'bg-red-500/5 border-red-500/20' },
+                { label: 'Net Profit',   value: '8%/mo',  color: 'text-green-400', bg: 'bg-green-500/5 border-green-500/20' },
+              ].map(item => (
+                <div key={item.label} className={`rounded-lg border ${item.bg} px-3 py-2 text-center`}>
+                  <p className="text-slate-500 text-xs">{item.label}</p>
+                  <p className={`font-bold text-sm ${item.color}`}>{item.value}</p>
+                </div>
+              ))}
+            </div>
+
+            <form onSubmit={handleShift} className="space-y-3">
+              <div>
+                <label className="text-slate-400 text-xs font-medium mb-1.5 block">Amount to shift (USDT)</label>
+                <div className="relative">
+                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <input
+                    type="number"
+                    min="100"
+                    max={Math.min(5000, available)}
+                    step="0.01"
+                    value={shiftAmount}
+                    onChange={e => setShiftAmount(e.target.value)}
+                    required
+                    placeholder="100 – 5,000"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-3 py-2.5 text-white placeholder-slate-600 text-sm focus:outline-none focus:border-amber-500/50 transition-colors"
+                  />
+                </div>
+                <div className="flex items-center justify-between mt-1">
+                  <span className="text-slate-600 text-xs">Min $100 &mdash; Max $5,000</span>
+                  <button
+                    type="button"
+                    onClick={() => setShiftAmount(String(Math.min(5000, available).toFixed(2)))}
+                    className="text-xs text-amber-400 hover:text-amber-300 transition-colors"
+                  >
+                    Use max (${Math.min(5000, available).toFixed(2)})
+                  </button>
+                </div>
+                {/* Live profit preview */}
+                {shiftAmount && !isNaN(parseFloat(shiftAmount)) && parseFloat(shiftAmount) >= 100 && (
+                  <div className="mt-2 bg-amber-500/5 border border-amber-500/20 rounded-lg px-3 py-2 flex items-center justify-between">
+                    <span className="text-slate-400 text-xs">Est. monthly profit at 8%</span>
+                    <span className="text-amber-400 font-bold text-sm">
+                      +${((parseFloat(shiftAmount) * 8) / 100).toFixed(2)} / month
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-slate-800/60 border border-slate-700 rounded-lg px-3 py-2.5 space-y-1.5">
+                <div className="flex items-start gap-2">
+                  <Zap className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                  <p className="text-slate-400 text-xs leading-relaxed">
+                    Funds shift instantly to a new auto-trade plan. Profits accumulate daily back into your wallet.
+                  </p>
+                </div>
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="w-3.5 h-3.5 text-slate-500 shrink-0 mt-0.5" />
+                  <p className="text-slate-400 text-xs leading-relaxed">
+                    Only one active plan allowed at a time. Shifted amount is locked as principal.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => { setActivePanel(null); setShiftAmount('') }}
+                  className="flex-1 border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={submittingShift || available < 100}
+                  className="flex-1 bg-amber-500 hover:bg-amber-400 text-black font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {submittingShift ? 'Shifting...' : 'Shift to Auto-Trade'}
                 </Button>
               </div>
             </form>
@@ -417,7 +552,7 @@ export function TraderWallet() {
       </Card>
 
       {/* Income source breakdown */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
         <StatCard label="Deposited" value={`$${(s?.totalDeposited ?? 0).toFixed(2)}`}
           sub={s?.pendingDeposit ? `+$${s.pendingDeposit.toFixed(2)} pending` : 'Confirmed deposits'}
           icon={ArrowDownCircle} color="bg-green-500/10 text-green-400" />
@@ -427,6 +562,9 @@ export function TraderWallet() {
         <StatCard label="Referral Income" value={`$${(s?.referralEarnings ?? 0).toFixed(2)}`}
           sub="L1 $30 · L2 $10 · L3 $5"
           icon={Gift} color="bg-purple-500/10 text-purple-400" />
+        <StatCard label="Shifted to Auto-Trade" value={`-$${(s?.autoTradeShifted ?? 0).toFixed(2)}`}
+          sub="Principal locked in plan"
+          icon={Zap} color="bg-amber-500/10 text-amber-400" />
         <StatCard label="Total Withdrawn" value={`$${(s?.totalWithdrawn ?? 0).toFixed(2)}`}
           sub={s?.pendingWithdrawal ? `$${s.pendingWithdrawal.toFixed(2)} pending` : 'All-time payouts'}
           icon={ArrowUpCircle} color="bg-red-500/10 text-red-400" />

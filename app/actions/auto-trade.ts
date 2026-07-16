@@ -186,6 +186,70 @@ async function syncTodayLog(plan: typeof autoTradePlans.$inferSelect) {
   })
 }
 
+// ─── Trader: shift wallet balance to auto-trade ───────────────────────────────
+
+export async function selfFundAutoTrade(amount: number) {
+  const session = await getAnySession()
+  const userId = session.user.id
+
+  // Validate amount range
+  if (amount < 100) throw new Error('Minimum auto-trade amount is $100')
+  if (amount > 5000) throw new Error('Maximum auto-trade amount is $5,000')
+
+  // Check already has active plan
+  const existing = await db
+    .select()
+    .from(autoTradePlans)
+    .where(and(eq(autoTradePlans.userId, userId), eq(autoTradePlans.status, 'active')))
+    .limit(1)
+  if (existing.length) throw new Error('You already have an active auto-trade plan. Complete or close it first.')
+
+  // Check wallet balance (import dynamically to avoid circular deps)
+  const { computeWalletBalance } = await import('@/app/actions/wallet')
+  const available = await computeWalletBalance(userId)
+  if (amount > available) throw new Error(`Insufficient wallet balance. Available: $${available.toFixed(2)}`)
+
+  const GROSS = 10, FEE = 2, NET = 8
+  const startDate = new Date().toISOString().split('T')[0]
+
+  // Create the plan (using userId as createdBy — trader self-funded)
+  const [plan] = await db.insert(autoTradePlans).values({
+    userId,
+    createdBy: userId,
+    principal: String(amount),
+    grossReturnPct: String(GROSS),
+    feePct: String(FEE),
+    netReturnPct: String(NET),
+    status: 'active',
+    startDate,
+    note: `Self-funded from wallet balance on ${startDate}`,
+  }).returning()
+
+  // Pre-generate today's first log entry
+  const rows = generateDailyLogs(plan.id, userId, amount, GROSS, FEE, NET, startDate)
+  if (rows.length) {
+    await db.insert(autoTradeLogs).values(rows)
+  }
+
+  // Record the wallet debit — we insert a "pending" fund_request with negative-like
+  // treatment: mark a special wallet_transaction debit instead.
+  // We store it in wallet_transactions directly.
+  const { walletTransactions } = await import('@/lib/db/schema')
+  const bal = await computeWalletBalance(userId)
+  await db.insert(walletTransactions).values({
+    userId,
+    type: 'auto_trade_principal',
+    amount: String(-amount), // debit
+    balanceAfter: String(Math.max(0, bal - amount)),
+    refId: String(plan.id),
+    refTable: 'auto_trade_plans',
+    description: `Shifted $${amount.toFixed(2)} to Auto-Trade Plan #${plan.id}`,
+    status: 'completed',
+  })
+
+  return plan
+}
+
 // ─── Trader actions ────────────────────────────────────────────────────────────
 
 export async function getMyAutoTradePlan() {

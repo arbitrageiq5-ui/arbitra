@@ -62,7 +62,15 @@ export async function computeWalletBalance(userId: string): Promise<number> {
   const userRow = await db.select({ isActivated: user.isActivated }).from(user).where(eq(user.id, userId)).limit(1)
   const activationDebit = userRow[0]?.isActivated ? 100 : 0
 
-  const available = deposits + profits + commissions - withdrawn - pendingWithdrawn - activationDebit
+  // 7. Wallet-to-auto-trade shifts (debit)
+  const shiftRes = await db
+    .select({ total: sum(walletTransactions.amount) })
+    .from(walletTransactions)
+    .where(sql`"userId" = ${userId} AND type = 'auto_trade_principal' AND status = 'completed'`)
+  // amount is stored as negative, so sum is negative — negate to get the debit magnitude
+  const autoTradeShifted = Math.abs(parseFloat(String(shiftRes[0]?.total ?? '0')) || 0)
+
+  const available = deposits + profits + commissions - withdrawn - pendingWithdrawn - activationDebit - autoTradeShifted
   return Math.max(0, parseFloat(available.toFixed(2)))
 }
 
@@ -120,10 +128,17 @@ export async function getWalletSummary() {
   const [u] = await db.select().from(user).where(eq(user.id, userId)).limit(1)
   const activationDebit = u?.isActivated ? 100 : 0
 
+  // Wallet-to-auto-trade shifts (debit)
+  const shiftRes = await db
+    .select({ total: sum(walletTransactions.amount) })
+    .from(walletTransactions)
+    .where(sql`"userId" = ${userId} AND type = 'auto_trade_principal' AND status = 'completed'`)
+  const autoTradeShifted = Math.abs(parseFloat(String(shiftRes[0]?.total ?? '0')) || 0)
+
   // Available balance
   const available = Math.max(
     0,
-    parseFloat((totalDeposited + tradeProfits + referralEarnings - totalWithdrawn - pendingWithdrawal - activationDebit).toFixed(2))
+    parseFloat((totalDeposited + tradeProfits + referralEarnings - totalWithdrawn - pendingWithdrawal - activationDebit - autoTradeShifted).toFixed(2))
   )
 
   // Recent transactions (deposits + withdrawals)
@@ -165,6 +180,7 @@ export async function getWalletSummary() {
     totalWithdrawn,
     pendingWithdrawal,
     activationDebit,
+    autoTradeShifted,
     isActivated: u?.isActivated ?? false,
     lastWithdrawalAt,
     nextWithdrawalAvailable,
