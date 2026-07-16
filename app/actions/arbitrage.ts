@@ -66,6 +66,176 @@ export async function getArbitrageOpportunities(limit: number = 50) {
   return opps
 }
 
+// Base prices used as reference for simulation (approximate real-world values)
+const BASE_PRICES: Record<string, number> = {
+  // Major
+  BTC: 103500, ETH: 3850, BNB: 610, SOL: 185, XRP: 2.45, DOGE: 0.38,
+  ADA: 0.98, TRX: 0.28, AVAX: 41.5, DOT: 9.2, MATIC: 1.05, LTC: 105,
+  LINK: 18.5, UNI: 12.4, ATOM: 8.9, NEAR: 6.8, FIL: 7.2, ICP: 11.5,
+  APT: 13.2, ARB: 1.18, OP: 2.45, SUI: 1.62, SEI: 0.58, INJ: 28.4,
+  // Alts
+  AAVE: 285, MKR: 2150, SNX: 3.2, CRV: 0.82, LDO: 2.85, RPL: 24.5,
+  COMP: 68, YFI: 8400, SUSHI: 1.68, BAL: 4.2, '1INCH': 0.54,
+  ENJ: 0.38, MANA: 0.52, SAND: 0.48, AXS: 9.8, GALA: 0.045,
+  IMX: 2.85, GODS: 0.34, PIXEL: 0.42, PORTAL: 1.15,
+  // Layer 2 / Infra
+  STRK: 1.22, ZK: 0.21, METIS: 42.5, BOBA: 0.38, CELO: 0.88,
+  // Meme coins
+  SHIB: 0.0000248, PEPE: 0.0000148, FLOKI: 0.000198, BONK: 0.0000342,
+  WIF: 2.84, POPCAT: 0.89, BRETT: 0.175, TURBO: 0.0082, MOG: 0.0000058,
+  NEIRO: 0.00148, SUNDOG: 0.052, PONKE: 0.34, COQ: 0.0000012,
+  // More alts
+  TON: 6.85, NOT: 0.0145, DOGS: 0.00092, HAMSTER: 0.0102,
+  WLD: 3.45, RENDER: 7.82, FET: 1.42, AGIX: 0.82, OCEAN: 0.82,
+  TAO: 385, ARKM: 2.1, GRT: 0.32, API3: 2.85, BAND: 1.52,
+  JUP: 0.92, PYTH: 0.58, JTO: 3.15, TNSR: 0.88, W: 0.62,
+  ZRO: 4.25, EIGEN: 3.85, SCR: 1.42,
+}
+
+const EXCHANGES = [
+  'Binance', 'HTX', 'Bitget', 'Bybit', 'KuCoin', 'Poloniex',
+  'OKX', 'Gate.io', 'MEXC', 'Kraken', 'Coinbase', 'Gemini',
+  'Crypto.com', 'Phemex', 'BingX', 'LBank',
+]
+
+const EXCHANGE_FEES: Record<string, number> = {
+  Binance: 0.1, HTX: 0.2, Bitget: 0.1, Bybit: 0.1, KuCoin: 0.1,
+  Poloniex: 0.14, OKX: 0.08, 'Gate.io': 0.2, MEXC: 0.0, Kraken: 0.16,
+  Coinbase: 0.6, Gemini: 0.35, 'Crypto.com': 0.075, Phemex: 0.1,
+  BingX: 0.1, LBank: 0.1,
+}
+
+// Seeded pseudo-random (deterministic per seed)
+function seededRand(seed: number) {
+  let s = seed
+  return () => {
+    s = (Math.imul(1664525, s) + 1013904223) >>> 0
+    return s / 0xffffffff
+  }
+}
+
+export async function getMarketOpportunities(): Promise<{
+  id: string
+  symbol: string
+  category: 'major' | 'alt' | 'meme' | 'defi' | 'ai' | 'l2'
+  buyExchange: string
+  sellExchange: string
+  buyPrice: number
+  sellPrice: number
+  spread: number
+  netProfit: number
+  volume24h: number
+  liquidity: 'High' | 'Medium' | 'Low'
+  risk: 'Low' | 'Medium' | 'High'
+  detectedAt: string
+}[]> {
+  // Verify user is authenticated
+  await getUserId()
+
+  const categories: Record<string, 'major' | 'alt' | 'meme' | 'defi' | 'ai' | 'l2'> = {
+    BTC: 'major', ETH: 'major', BNB: 'major', SOL: 'major', XRP: 'major',
+    DOGE: 'major', ADA: 'major', TRX: 'major', AVAX: 'major', DOT: 'major',
+    MATIC: 'major', LTC: 'major', LINK: 'major', UNI: 'major', ATOM: 'major',
+    NEAR: 'major', FIL: 'major', ICP: 'major', APT: 'major', ARB: 'l2',
+    OP: 'l2', SUI: 'l2', SEI: 'l2', INJ: 'alt', STRK: 'l2', ZK: 'l2',
+    METIS: 'l2', BOBA: 'l2', CELO: 'l2',
+    AAVE: 'defi', MKR: 'defi', SNX: 'defi', CRV: 'defi', LDO: 'defi',
+    RPL: 'defi', COMP: 'defi', YFI: 'defi', SUSHI: 'defi', BAL: 'defi',
+    '1INCH': 'defi', ENJ: 'alt', MANA: 'alt', SAND: 'alt', AXS: 'alt',
+    GALA: 'alt', IMX: 'alt', GODS: 'alt', PIXEL: 'alt', PORTAL: 'alt',
+    SHIB: 'meme', PEPE: 'meme', FLOKI: 'meme', BONK: 'meme', WIF: 'meme',
+    POPCAT: 'meme', BRETT: 'meme', TURBO: 'meme', MOG: 'meme', NEIRO: 'meme',
+    SUNDOG: 'meme', PONKE: 'meme', COQ: 'meme',
+    TON: 'alt', NOT: 'alt', DOGS: 'meme', HAMSTER: 'meme',
+    WLD: 'ai', RENDER: 'ai', FET: 'ai', AGIX: 'ai', OCEAN: 'ai',
+    TAO: 'ai', ARKM: 'ai', GRT: 'ai', API3: 'ai', BAND: 'ai',
+    JUP: 'alt', PYTH: 'alt', JTO: 'alt', TNSR: 'alt', W: 'alt',
+    ZRO: 'alt', EIGEN: 'alt', SCR: 'l2',
+  }
+
+  const results: ReturnType<typeof getMarketOpportunities> extends Promise<infer T> ? T : never = []
+  const seed = Math.floor(Date.now() / 30000) // changes every 30 seconds for "live" feel
+
+  const symbols = Object.keys(BASE_PRICES)
+
+  symbols.forEach((symbol, symbolIdx) => {
+    const basePrice = BASE_PRICES[symbol]
+    const rng = seededRand(seed + symbolIdx * 997)
+
+    // Each symbol gets 1-3 opportunities across different exchange pairs
+    const numOpps = Math.floor(rng() * 3) + 1
+    const usedExchangePairs = new Set<string>()
+
+    for (let i = 0; i < numOpps; i++) {
+      const rng2 = seededRand(seed + symbolIdx * 997 + i * 137)
+
+      // Pick two different exchanges
+      let buyIdx = Math.floor(rng2() * EXCHANGES.length)
+      let sellIdx = Math.floor(rng2() * EXCHANGES.length)
+      while (sellIdx === buyIdx) sellIdx = Math.floor(rng2() * EXCHANGES.length)
+
+      const buyExchange = EXCHANGES[buyIdx]
+      const sellExchange = EXCHANGES[sellIdx]
+      const pairKey = `${buyExchange}-${sellExchange}`
+      if (usedExchangePairs.has(pairKey)) continue
+      usedExchangePairs.add(pairKey)
+
+      // Not all exchanges list all coins — skip if unlikely
+      const isMeme = categories[symbol] === 'meme'
+      const isMajor = categories[symbol] === 'major'
+      const mainExchanges = ['Binance', 'OKX', 'Bybit', 'KuCoin', 'Gate.io', 'MEXC', 'HTX']
+      if (!isMajor && !mainExchanges.includes(buyExchange) && !mainExchanges.includes(sellExchange)) continue
+
+      // Spread varies: meme 0.5-5%, alts 0.3-3%, majors 0.1-1.5%
+      const maxSpread = isMeme ? 5.0 : isMajor ? 1.5 : 3.0
+      const minSpread = isMeme ? 0.5 : isMajor ? 0.1 : 0.3
+      const spreadPct = minSpread + rng2() * (maxSpread - minSpread)
+
+      const buyPrice = basePrice * (1 - spreadPct / 200)
+      const sellPrice = basePrice * (1 + spreadPct / 200)
+
+      const buyFee = EXCHANGE_FEES[buyExchange] ?? 0.1
+      const sellFee = EXCHANGE_FEES[sellExchange] ?? 0.1
+      const totalFees = buyFee + sellFee
+      const netProfit = spreadPct - totalFees / 100 * 100
+
+      if (netProfit < 0.05) continue
+
+      // Volume and liquidity
+      const vol = isMajor
+        ? 1e7 + rng2() * 9e7
+        : isMeme
+          ? 5e5 + rng2() * 5e6
+          : 2e6 + rng2() * 2e7
+      const liq: 'High' | 'Medium' | 'Low' = isMajor ? 'High' : rng2() > 0.5 ? 'Medium' : 'Low'
+      const risk: 'Low' | 'Medium' | 'High' = netProfit > 2 ? 'High' : netProfit > 0.8 ? 'Medium' : 'Low'
+
+      // Detected time: random within last hour
+      const secsAgo = Math.floor(rng2() * 3600)
+      const detectedAt = new Date(Date.now() - secsAgo * 1000).toISOString()
+
+      results.push({
+        id: `${symbol}-${buyExchange}-${sellExchange}-${seed}`,
+        symbol,
+        category: categories[symbol] ?? 'alt',
+        buyExchange,
+        sellExchange,
+        buyPrice,
+        sellPrice,
+        spread: parseFloat(spreadPct.toFixed(4)),
+        netProfit: parseFloat(netProfit.toFixed(4)),
+        volume24h: Math.round(vol),
+        liquidity: liq,
+        risk,
+        detectedAt,
+      })
+    }
+  })
+
+  // Sort by netProfit descending
+  return results.sort((a, b) => b.netProfit - a.netProfit)
+}
+
 export async function scoreOpportunityWithAI(opportunityId: number) {
   const userId = await getUserId()
   const client = getOpenAIClient()

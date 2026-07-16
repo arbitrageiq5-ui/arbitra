@@ -17,7 +17,11 @@ export default async function OpportunitiesPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-      <OpportunitiesClient user={session.user} />
+      <OpportunitiesClient user={{
+        name: session.user.name,
+        email: session.user.email,
+        role: (session.user as unknown as { role?: string }).role ?? 'viewer',
+      }} />
     </div>
   )
 }
