@@ -1,7 +1,7 @@
 'use client'
 
 import { motion, useMotionValue, useTransform, animate } from 'framer-motion'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowRight, Play, TrendingUp, Zap, Globe, Clock } from 'lucide-react'
 import { ArbitrageIQLogo } from '@/components/logo'
 import Link from 'next/link'
@@ -30,16 +30,34 @@ const stats = [
   { icon: Clock, label: 'Response Speed', value: 47, suffix: 'ms' },
 ]
 
+// Stable seeded PRNG so particles are identical on every render of the same component tree
+function seededRand(seed: number) {
+  let s = seed
+  return () => {
+    s = (s * 1664525 + 1013904223) & 0xffffffff
+    return (s >>> 0) / 0xffffffff
+  }
+}
+
 // Animated floating particle dots for background
 function ParticleField() {
-  const particles = Array.from({ length: 40 }, (_, i) => ({
-    id: i,
-    x: Math.random() * 100,
-    y: Math.random() * 100,
-    size: Math.random() * 2 + 1,
-    delay: Math.random() * 4,
-    duration: Math.random() * 6 + 4,
-  }))
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
+
+  // Generate deterministic particles using a fixed seed — same on server and client
+  const particles = useMemo(() => {
+    const rand = seededRand(42)
+    return Array.from({ length: 40 }, (_, i) => ({
+      id: i,
+      x: rand() * 100,
+      y: rand() * 100,
+      size: rand() * 2 + 1,
+      delay: rand() * 4,
+      duration: rand() * 6 + 4,
+    }))
+  }, [])
+
+  if (!mounted) return null
 
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">

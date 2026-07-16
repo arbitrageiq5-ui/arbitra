@@ -51,12 +51,13 @@ function generateRow(id: number): Opportunity {
     netSpread: spread - fee,
     liquidity: LIQUIDITY[Math.floor(Math.random() * 3)],
     network: NETWORKS[Math.floor(Math.random() * NETWORKS.length)],
-    updated: Date.now(),
+    updated: 0,
   }
 }
 
 function buildData(): Opportunity[] {
-  return Array.from({ length: 48 }, (_, i) => generateRow(i))
+  const now = Date.now()
+  return Array.from({ length: 48 }, (_, i) => ({ ...generateRow(i), updated: now }))
 }
 
 function SpreadBadge({ value }: { value: number }) {
@@ -81,10 +82,15 @@ function LiquidityBadge({ value }: { value: 'High' | 'Medium' | 'Low' }) {
 const PAGE_SIZE = 8
 
 export function LiveMarket() {
-  const [data, setData] = useState<Opportunity[]>(() => buildData())
+  const [data, setData] = useState<Opportunity[]>([])
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(0)
   const [pulse, setPulse] = useState<number[]>([])
+
+  // Populate data only on the client to avoid SSR/client Math.random() mismatch
+  useEffect(() => {
+    setData(buildData())
+  }, [])
 
   // Simulate live ticks
   useEffect(() => {
@@ -198,6 +204,15 @@ export function LiveMarket() {
                 </tr>
               </thead>
               <tbody>
+                {pageData.length === 0 && data.length === 0 && Array.from({ length: 8 }, (_, i) => (
+                  <tr key={i} className="border-b border-white/[0.04]">
+                    {Array.from({ length: 11 }, (_, j) => (
+                      <td key={j} className="px-4 py-3">
+                        <div className="h-4 rounded bg-white/[0.05] animate-pulse" style={{ width: `${40 + (j * 13) % 40}%` }} />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
                 {pageData.map((row, i) => {
                   const isUpdating = pulse.includes(data.indexOf(row))
                   return (
