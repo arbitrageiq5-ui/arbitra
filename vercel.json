@@ -1,0 +1,18 @@
+{
+  "buildCommand": "pnpm build",
+  "devCommand": "pnpm dev",
+  "installCommand": "pnpm install",
+  "framework": "nextjs",
+  "outputDirectory": ".next",
+  "env": {
+    "NEXT_PUBLIC_APP_URL": {
+      "description": "Public app URL for OAuth callbacks"
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/check-arbitrage",
+      "schedule": "*/5 * * * *"
+    }
+  ]
+}
