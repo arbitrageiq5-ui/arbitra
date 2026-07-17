@@ -13,7 +13,7 @@ import { validateReferralCode } from '@/app/actions/referral'
 import { storeReferredBy } from '@/app/actions/users'
 import { registerWithCaptcha, saveRegistrationProfile } from '@/app/actions/secure-registration'
 import { recordUserLogin } from '@/app/actions/user-session'
-import { RefreshCw, Shield, Eye, EyeOff, Home } from 'lucide-react'
+import { RefreshCw, Shield, Eye, EyeOff, ArrowLeft } from 'lucide-react'
 
 // ── Math captcha helpers ───────────────────────────────────────────────────────
 type CaptchaChallenge = { question: string; answer: number }
@@ -185,10 +185,10 @@ export function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
         <div className="mb-6">
           <Link
             href="/"
-            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-5 group"
           >
-            <Home className="w-3.5 h-3.5" />
-            Home
+            <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" />
+            Back to Home
           </Link>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">
             {isSignUp ? 'Create an account' : 'Welcome back'}
