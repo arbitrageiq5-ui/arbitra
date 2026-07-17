@@ -97,13 +97,18 @@ export function LiveMarket() {
   // Simulate live ticks
   useEffect(() => {
     const interval = setInterval(() => {
-      const updateCount = 2 + Math.floor(Math.random() * 4)
-      const indices = Array.from({ length: updateCount }, () => Math.floor(Math.random() * data.length))
-      setPulse(indices)
       setData((prev) => {
+        if (prev.length === 0) return prev
+        const updateCount = 2 + Math.floor(Math.random() * 4)
+        const indices = Array.from({ length: updateCount }, () =>
+          Math.floor(Math.random() * prev.length)
+        )
+        setPulse(indices)
+        setTimeout(() => setPulse([]), 600)
         const next = [...prev]
         indices.forEach((i) => {
           const row = next[i]
+          if (!row) return
           const drift = (Math.random() - 0.5) * 0.002
           next[i] = {
             ...row,
@@ -115,10 +120,9 @@ export function LiveMarket() {
         })
         return next
       })
-      setTimeout(() => setPulse([]), 600)
     }, 1800)
     return () => clearInterval(interval)
-  }, [data.length])
+  }, [])
 
   const filtered = data.filter((r) =>
     r.coin.toLowerCase().includes(query.toLowerCase()) ||
