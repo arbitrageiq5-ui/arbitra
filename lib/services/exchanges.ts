@@ -9,6 +9,11 @@ const EXCHANGES = {
   kucoin: 'https://api.kucoin.com',
   huobi: 'https://api.huobi.pro',
   coingecko: 'https://api.coingecko.com/api/v3',
+  bitfinex: 'https://api.bitfinex.com/v1',
+  okx: 'https://www.okx.com/api/v5',
+  gateio: 'https://api.gateio.ws/api/v4',
+  gemini: 'https://api.gemini.com/v1',
+  cryptocom: 'https://api.crypto.com/v2',
 }
 
 const SYMBOL_TO_COINGECKO_ID: Record<string, string> = {
@@ -198,33 +203,151 @@ async function getCoinGeckoPrice(symbol: string): Promise<ExchangePrice | null> 
   }
 }
 
-// Get prices from all exchanges (LIVE rates)
+// Bitfinex Price Fetcher
+async function getBitfinexPrice(symbol: string): Promise<ExchangePrice | null> {
+  try {
+    const response = await axios.get(`${EXCHANGES.bitfinex}/pubticker/${symbol.toUpperCase()}USD`, {
+      timeout: 5000,
+    })
+    return {
+      symbol,
+      exchange: 'bitfinex',
+      price: parseFloat(response.data.last_price),
+      timestamp: Date.now(),
+    }
+  } catch {
+    return null
+  }
+}
+
+// OKX Price Fetcher
+async function getOkxPrice(symbol: string): Promise<ExchangePrice | null> {
+  try {
+    const response = await axios.get(`${EXCHANGES.okx}/market/ticker`, {
+      params: {
+        instId: `${symbol.toUpperCase()}-USD`,
+      },
+      timeout: 5000,
+    })
+    const data = response.data.data[0]
+    return {
+      symbol,
+      exchange: 'okx',
+      price: parseFloat(data.last),
+      timestamp: Date.now(),
+    }
+  } catch {
+    return null
+  }
+}
+
+// Gate.io Price Fetcher
+async function getGateioPrice(symbol: string): Promise<ExchangePrice | null> {
+  try {
+    const response = await axios.get(`${EXCHANGES.gateio}/spot/tickers`, {
+      params: {
+        currency_pair: `${symbol.toUpperCase()}_USDT`,
+      },
+      timeout: 5000,
+    })
+    const data = response.data[0]
+    return {
+      symbol,
+      exchange: 'gate.io',
+      price: parseFloat(data.last),
+      timestamp: Date.now(),
+    }
+  } catch {
+    return null
+  }
+}
+
+// Gemini Price Fetcher
+async function getGeminiPrice(symbol: string): Promise<ExchangePrice | null> {
+  try {
+    const response = await axios.get(`${EXCHANGES.gemini}/pubticker/${symbol.toUpperCase()}USD`, {
+      timeout: 5000,
+    })
+    return {
+      symbol,
+      exchange: 'gemini',
+      price: parseFloat(response.data.last),
+      timestamp: Date.now(),
+    }
+  } catch {
+    return null
+  }
+}
+
+// Crypto.com Price Fetcher
+async function getCryptocomPrice(symbol: string): Promise<ExchangePrice | null> {
+  try {
+    const response = await axios.get(`${EXCHANGES.cryptocom}/public/instrument-detail`, {
+      params: {
+        instrument_name: `${symbol.toUpperCase()}_USD`,
+      },
+      timeout: 5000,
+    })
+    const data = response.data.result[0]
+    return {
+      symbol,
+      exchange: 'crypto.com',
+      price: parseFloat(data.index_price || data.mark_price),
+      timestamp: Date.now(),
+    }
+  } catch {
+    return null
+  }
+}
+
+// Get prices from all exchanges (LIVE rates from 11 sources)
 export async function getPricesAcrossExchanges(
   symbols: string[]
 ): Promise<ExchangePrice[]> {
   const prices: ExchangePrice[] = []
 
   for (const symbol of symbols) {
-    // Always fetch from CoinGecko first as it's most reliable and doesn't require auth
-    const coingeckoPrice = await getCoinGeckoPrice(symbol)
-    if (coingeckoPrice) prices.push(coingeckoPrice)
-
-    // Fetch from exchange APIs in parallel for cross-exchange comparison
-    const [binance, kraken, coinbase, bybit, kucoin, huobi] = await Promise.all([
+    // Fetch from all 11 sources in parallel for maximum coverage
+    const [
+      coingecko,
+      binance,
+      kraken,
+      coinbase,
+      bybit,
+      kucoin,
+      huobi,
+      bitfinex,
+      okx,
+      gateio,
+      gemini,
+      cryptocom,
+    ] = await Promise.all([
+      getCoinGeckoPrice(symbol),
       getBinancePrice(symbol),
       getKrakenPrice(symbol),
       getCoinbasePrice(symbol),
       getBybitPrice(symbol),
       getKucoinPrice(symbol),
       getHuobiPrice(symbol),
+      getBitfinexPrice(symbol),
+      getOkxPrice(symbol),
+      getGateioPrice(symbol),
+      getGeminiPrice(symbol),
+      getCryptocomPrice(symbol),
     ])
 
+    if (coingecko) prices.push(coingecko)
     if (binance) prices.push(binance)
     if (kraken) prices.push(kraken)
     if (coinbase) prices.push(coinbase)
     if (bybit) prices.push(bybit)
     if (kucoin) prices.push(kucoin)
     if (huobi) prices.push(huobi)
+    if (bitfinex) prices.push(bitfinex)
+    if (okx) prices.push(okx)
+    if (gateio) prices.push(gateio)
+    if (gemini) prices.push(gemini)
+    if (cryptocom) prices.push(cryptocom)
   }
 
   return prices

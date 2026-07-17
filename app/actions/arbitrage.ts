@@ -155,20 +155,29 @@ export async function getMarketOpportunities(): Promise<{
   }
 
   try {
-    // Fetch LIVE prices from CoinGecko and real exchanges
+    // Fetch LIVE prices from 11 real-time sources for maximum coverage and opportunities
     const topSymbols = [
-      'BTC', 'ETH', 'BNB', 'SOL', 'XRP', 'DOGE', 'ADA', 'AVAX',
-      'LINK', 'MATIC', 'DOT', 'ATOM', 'UNI', 'LTC', 'NEAR', 'AAVE',
-      'CRV', 'SHIB', 'PEPE', 'TON', 'FET', 'RENDER', 'JUP', 'PYTH',
+      // Major coins
+      'BTC', 'ETH', 'BNB', 'SOL', 'XRP', 'DOGE', 'ADA', 'AVAX', 'LTC', 'LINK',
+      // L2 & Layer 2
+      'ARB', 'OP', 'SUI', 'APT',
+      // DeFi
+      'AAVE', 'CRV', 'UNI', 'ATOM', 'DOT', 'NEAR',
+      // AI & Tech
+      'FET', 'RENDER', 'TAO',
+      // Meme
+      'SHIB', 'PEPE', 'FLOKI', 'BONK',
+      // Others
+      'MATIC', 'JUP', 'PYTH', 'TON', 'INJ', 'FIL', 'ICP',
     ]
 
-    console.log('[v0] Fetching LIVE rates from CoinGecko and exchanges...')
+    console.log('[v0] Fetching LIVE rates from 11 sources: CoinGecko, Binance, Kraken, Coinbase, Bybit, KuCoin, Huobi, Bitfinex, OKX, Gate.io, Gemini, Crypto.com...')
     const livePrices = await getPricesAcrossExchanges(topSymbols)
-    console.log('[v0] Fetched', livePrices.length, 'LIVE price points')
+    console.log('[v0] Fetched', livePrices.length, 'LIVE price points across 11 exchanges')
 
     // Detect arbitrage opportunities from live prices
     const opportunities = detectArbitrageOpportunities(livePrices, 0.5) // min 0.5% profit
-    console.log('[v0] Detected', opportunities.length, 'live arbitrage opportunities')
+    console.log('[v0] Detected', opportunities.length, 'arbitrage opportunities from live data')
 
     // Enrich with metadata and convert to display format
     return opportunities.map((opp, idx) => {
