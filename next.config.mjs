@@ -38,7 +38,7 @@ const nextConfig = {
       },
       // Icons — cache for 1 month
       {
-        source: '/icon-*.png',
+        source: '/icon-:param*.png',
         headers: [
           {
             key: 'Cache-Control',
