@@ -87,7 +87,8 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
   const [refreshing, setRefreshing] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [minProfit, setMinProfit] = useState(0)
-  const [selectedExchanges, setSelectedExchanges] = useState<string[]>([])
+  const [selectedBuyExchanges, setSelectedBuyExchanges] = useState<string[]>([])
+  const [selectedSellExchanges, setSelectedSellExchanges] = useState<string[]>([])
   const [selectedRisks, setSelectedRisks] = useState<string[]>([])
   const [minVolume, setMinVolume] = useState(0)
   const [sortKey, setSortKey] = useState<SortKey>('netProfit')
@@ -178,8 +179,11 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
       data = data.filter(o => o.symbol.includes(q) || o.buyExchange.toUpperCase().includes(q) || o.sellExchange.toUpperCase().includes(q))
     }
     if (minProfit > 0) data = data.filter(o => o.netProfit >= minProfit)
-    if (selectedExchanges.length > 0) {
-      data = data.filter(o => selectedExchanges.includes(o.buyExchange) || selectedExchanges.includes(o.sellExchange))
+    if (selectedBuyExchanges.length > 0) {
+      data = data.filter(o => selectedBuyExchanges.includes(o.buyExchange))
+    }
+    if (selectedSellExchanges.length > 0) {
+      data = data.filter(o => selectedSellExchanges.includes(o.sellExchange))
     }
     if (selectedRisks.length > 0) {
       data = data.filter(o => selectedRisks.includes(o.risk))
@@ -191,7 +195,7 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
       if (typeof va === 'string') return sortDir === 'asc' ? va.localeCompare(vb as string) : (vb as string).localeCompare(va)
       return sortDir === 'asc' ? (va as number) - (vb as number) : (vb as number) - (va as number)
     })
-  }, [opportunities, searchQuery, minProfit, selectedExchanges, selectedRisks, minVolume, sortKey, sortDir])
+  }, [opportunities, searchQuery, minProfit, selectedBuyExchanges, selectedSellExchanges, selectedRisks, minVolume, sortKey, sortDir])
 
   const paginated = filtered.slice(oppPage * OPP_PAGE_SIZE, (oppPage + 1) * OPP_PAGE_SIZE)
   const totalPages = Math.ceil(filtered.length / OPP_PAGE_SIZE)
@@ -398,7 +402,7 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
               <button
                 onClick={() => setShowFilters(!showFilters)}
                 className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-medium transition-colors shrink-0 ${
-                  showFilters || minProfit > 0 || selectedExchanges.length > 0 || selectedRisks.length > 0 || minVolume > 0
+                  showFilters || minProfit > 0 || selectedBuyExchanges.length > 0 || selectedSellExchanges.length > 0 || selectedRisks.length > 0 || minVolume > 0
                     ? 'bg-amber-500/10 border-amber-500/40 text-amber-400'
                     : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
                 }`}
@@ -413,9 +417,9 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
               >
                 <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin text-amber-400' : ''}`} />
               </button>
-              {(searchQuery || minProfit > 0 || selectedExchanges.length > 0 || selectedRisks.length > 0 || minVolume > 0) && (
+              {(searchQuery || minProfit > 0 || selectedBuyExchanges.length > 0 || selectedSellExchanges.length > 0 || selectedRisks.length > 0 || minVolume > 0) && (
                 <button
-                  onClick={() => { setSearchQuery(''); setMinProfit(0); setSelectedExchanges([]); setSelectedRisks([]); setMinVolume(0); setOppPage(0) }}
+                  onClick={() => { setSearchQuery(''); setMinProfit(0); setSelectedBuyExchanges([]); setSelectedSellExchanges([]); setSelectedRisks([]); setMinVolume(0); setOppPage(0) }}
                   className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-white transition-colors shrink-0"
                 >
                   <X className="w-3.5 h-3.5" /> Clear
@@ -488,15 +492,38 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
                     </select>
                   </div>
 
-                  {/* Exchanges */}
+                  {/* Buy Exchange */}
                   <div>
-                    <label className="text-xs text-slate-400 mb-1.5 block font-medium">Exchange</label>
+                    <label className="text-xs text-slate-400 mb-1.5 block font-medium">Buy From</label>
                     <select
                       multiple
-                      value={selectedExchanges}
+                      value={selectedBuyExchanges}
                       onChange={e => {
                         const selected = Array.from(e.target.selectedOptions, opt => opt.value)
-                        setSelectedExchanges(selected)
+                        setSelectedBuyExchanges(selected)
+                        setOppPage(0)
+                      }}
+                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-amber-500/50"
+                      size={3}
+                    >
+                      {['Binance', 'OKX', 'Bybit', 'KuCoin', 'Gate.io', 'MEXC', 'HTX', 'Kraken', 'Coinbase', 'Gemini', 'Crypto.com', 'BingX'].map(exchange => (
+                        <option key={exchange} value={exchange}>
+                          {exchange}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-[10px] text-slate-500 mt-1">Hold Ctrl/Cmd to select multiple</p>
+                  </div>
+
+                  {/* Sell Exchange */}
+                  <div>
+                    <label className="text-xs text-slate-400 mb-1.5 block font-medium">Sell To</label>
+                    <select
+                      multiple
+                      value={selectedSellExchanges}
+                      onChange={e => {
+                        const selected = Array.from(e.target.selectedOptions, opt => opt.value)
+                        setSelectedSellExchanges(selected)
                         setOppPage(0)
                       }}
                       className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-amber-500/50"
