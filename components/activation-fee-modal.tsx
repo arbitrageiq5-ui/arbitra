@@ -70,7 +70,7 @@ export function ActivationFeeModal({ serverIsActivated }: { serverIsActivated: b
     setSubmitting(true)
     setSubmitError(null)
     try {
-      await submitActivationFee({ txHash: txHash.trim(), network: selectedNetwork })
+      await submitActivationFee(txHash.trim())
       setSubmitted(true)
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Submission failed. Please try again.')
