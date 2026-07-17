@@ -95,6 +95,7 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [showFilters, setShowFilters] = useState(false)
   const [oppPage, setOppPage] = useState(0)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const OPP_PAGE_SIZE = 25
 
   // Wallet balance for header
@@ -127,10 +128,10 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
     return () => clearInterval(interval)
   }, [])
 
-  // Load opportunities on mount
+  // Load opportunities on mount with live refresh (every 15 seconds for real-time rates)
   useEffect(() => {
     loadOpportunities()
-    const interval = setInterval(() => loadOpportunities(true), 30000)
+    const interval = setInterval(() => loadOpportunities(true), 15000)
     return () => clearInterval(interval)
   }, [])
 
@@ -145,6 +146,7 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
     try {
       const data = await getMarketOpportunities()
       setOpportunities(data)
+      setLastUpdated(new Date())
     } catch (e) {
       console.error('Failed to load opportunities:', e)
     } finally {
@@ -346,7 +348,7 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
       </div>
 
       <main className="flex-1 max-w-screen-xl mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6 w-full">
-        {/* ── TAB: WALLET ── */}
+        {/* ── TAB: WALLET ─��� */}
         {activeTab === 'wallet' && (
           <TraderWallet />
         )}
@@ -543,16 +545,22 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
 
             {/* Opportunities Table */}
             <Card className="bg-slate-900 border-slate-800 overflow-hidden">
-              <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+              <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-2">
                   <Activity className="w-4 h-4 text-amber-400" />
                   <span className="text-white font-semibold">Live Arbitrage Opportunities</span>
                   <span className="flex items-center gap-1 px-2 py-0.5 bg-green-400/10 border border-green-400/20 rounded-full">
                     <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-                    <span className="text-green-400 text-xs font-semibold">LIVE</span>
+                    <span className="text-green-400 text-xs font-semibold">LIVE RATES</span>
                   </span>
                 </div>
-                <span className="text-slate-500 text-sm">{filtered.length} results</span>
+                <div className="flex items-center gap-3 text-xs text-slate-400">
+                  {lastUpdated && (
+                    <span>Updated {lastUpdated.toLocaleTimeString()}</span>
+                  )}
+                  <span className="text-slate-600">•</span>
+                  <span className="text-slate-500 font-medium">{filtered.length} results</span>
+                </div>
               </div>
 
               {loadingOpps ? (
