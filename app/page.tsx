@@ -1,14 +1,24 @@
+import dynamic from 'next/dynamic'
 import { Navbar } from '@/components/landing/navbar'
 import { Hero } from '@/components/landing/hero'
-import { LiveMarket } from '@/components/landing/live-market'
-import { Features } from '@/components/landing/features'
-import { HowItWorks } from '@/components/landing/how-it-works'
-import { AISection } from '@/components/landing/ai-section'
-import { WhyChooseUs } from '@/components/landing/why-choose-us'
-import { Testimonials } from '@/components/landing/testimonials'
-import { FAQ } from '@/components/landing/faq'
-import { Registration } from '@/components/landing/registration'
-import { Footer } from '@/components/landing/footer'
+
+// Skeleton placeholder shown while below-fold sections load
+function SectionSkeleton({ height = 'h-64' }: { height?: string }) {
+  return (
+    <div className={`w-full ${height} bg-white/[0.02] animate-pulse`} />
+  )
+}
+
+// Lazy-load everything below the fold so the hero renders immediately
+const LiveMarket   = dynamic(() => import('@/components/landing/live-market').then(m => ({ default: m.LiveMarket })),   { loading: () => <SectionSkeleton height="h-96" />, ssr: false })
+const Features     = dynamic(() => import('@/components/landing/features').then(m => ({ default: m.Features })),         { loading: () => <SectionSkeleton />, ssr: false })
+const HowItWorks   = dynamic(() => import('@/components/landing/how-it-works').then(m => ({ default: m.HowItWorks })),   { loading: () => <SectionSkeleton />, ssr: false })
+const AISection    = dynamic(() => import('@/components/landing/ai-section').then(m => ({ default: m.AISection })),       { loading: () => <SectionSkeleton />, ssr: false })
+const WhyChooseUs  = dynamic(() => import('@/components/landing/why-choose-us').then(m => ({ default: m.WhyChooseUs })), { loading: () => <SectionSkeleton />, ssr: false })
+const Testimonials = dynamic(() => import('@/components/landing/testimonials').then(m => ({ default: m.Testimonials })), { loading: () => <SectionSkeleton />, ssr: false })
+const FAQ          = dynamic(() => import('@/components/landing/faq').then(m => ({ default: m.FAQ })),                   { loading: () => <SectionSkeleton />, ssr: false })
+const Registration = dynamic(() => import('@/components/landing/registration').then(m => ({ default: m.Registration })), { loading: () => <SectionSkeleton />, ssr: false })
+const Footer       = dynamic(() => import('@/components/landing/footer').then(m => ({ default: m.Footer })),             { loading: () => <SectionSkeleton height="h-32" />, ssr: false })
 
 export default function Home() {
   return (

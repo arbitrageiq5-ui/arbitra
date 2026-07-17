@@ -1,7 +1,8 @@
 'use client'
 
-import { motion, useMotionValue, useTransform, animate } from 'framer-motion'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import dynamic from 'next/dynamic'
+import { motion, useMotionValue, animate } from 'framer-motion'
+import { useEffect, useMemo, useState } from 'react'
 import { ArrowRight, Play, TrendingUp, Zap, Globe, Clock } from 'lucide-react'
 import { ArbitrageIQLogo } from '@/components/logo'
 import Link from 'next/link'
