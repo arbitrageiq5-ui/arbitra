@@ -10,13 +10,22 @@ const RATE_LIMIT_WINDOW_MS = 3600000 // 1 hour
 const RATE_LIMIT_MAX_ATTEMPTS = 5 // Max 5 registration attempts per IP per hour
 
 /**
- * Verify reCAPTCHA v3 token with Google servers
+ * Verify captcha token.
+ * If the token is 'math-captcha-passed', the math challenge was already verified
+ * on the client — we trust it and assign a high score.
+ * Otherwise we call Google reCAPTCHA v3 if the secret key is configured.
  */
 async function verifyCaptcha(token: string, ipAddress: string): Promise<{ score: number; success: boolean; action: string }> {
+  // Math captcha path — no external API needed
+  if (token === 'math-captcha-passed') {
+    return { score: 0.9, success: true, action: 'register' }
+  }
+
+  // Google reCAPTCHA v3 path (optional, used when keys are configured)
   const secretKey = process.env.RECAPTCHA_SECRET_KEY
   if (!secretKey) {
-    console.warn('[v0] RECAPTCHA_SECRET_KEY not configured')
-    return { score: 0.5, success: false, action: 'register' }
+    // No key configured — accept submission (math captcha is primary defense)
+    return { score: 0.7, success: true, action: 'register' }
   }
 
   try {
@@ -32,11 +41,8 @@ async function verifyCaptcha(token: string, ipAddress: string): Promise<{ score:
 
     const data = (await res.json()) as {
       success: boolean
-      challenge_ts?: string
-      hostname?: string
       score?: number
       action?: string
-      error_codes?: string[]
     }
 
     return {

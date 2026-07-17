@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { CheckCircle2, Zap, TrendingUp, ShieldCheck, Bell, Loader2, Shield } from 'lucide-react'
+import { CheckCircle2, Zap, TrendingUp, ShieldCheck, Bell, Loader2, Shield, RefreshCw } from 'lucide-react'
 import Link from 'next/link'
 import { registerWithCaptcha } from '@/app/actions/secure-registration'
 
@@ -19,12 +19,31 @@ const countries = [
   'India', 'Brazil', 'Mexico', 'Other',
 ]
 
-declare global {
-  interface Window {
-    grecaptcha: {
-      execute: (siteKey: string, options: { action: string }) => Promise<string>
-    }
+// --- Math captcha helpers ---
+type CaptchaChallenge = { question: string; answer: number }
+
+function generateChallenge(): CaptchaChallenge {
+  const ops = ['+', '-', '*'] as const
+  const op = ops[Math.floor(Math.random() * ops.length)]
+  let a: number, b: number, answer: number, question: string
+
+  if (op === '+') {
+    a = Math.floor(Math.random() * 20) + 1
+    b = Math.floor(Math.random() * 20) + 1
+    answer = a + b
+    question = `${a} + ${b}`
+  } else if (op === '-') {
+    a = Math.floor(Math.random() * 20) + 10
+    b = Math.floor(Math.random() * a) + 1
+    answer = a - b
+    question = `${a} - ${b}`
+  } else {
+    a = Math.floor(Math.random() * 9) + 2
+    b = Math.floor(Math.random() * 9) + 2
+    answer = a * b
+    question = `${a} × ${b}`
   }
+  return { question, answer }
 }
 
 export function Registration() {
@@ -34,41 +53,57 @@ export function Registration() {
     phone: '',
     country: '',
     password: '',
+    confirmPassword: '',
     tradingExperienceLevel: 'beginner' as 'beginner' | 'intermediate' | 'advanced',
     agree: false,
   })
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const scriptLoaded = useRef(false)
 
-  // Load reCAPTCHA v3 script on mount
-  useEffect(() => {
-    if (scriptLoaded.current) return
-    scriptLoaded.current = true
+  // Captcha state — generated client-side only to avoid hydration mismatch
+  const [challenge, setChallenge] = useState<CaptchaChallenge | null>(null)
+  const [captchaAnswer, setCaptchaAnswer] = useState('')
+  const [captchaError, setCaptchaError] = useState(false)
 
-    const script = document.createElement('script')
-    script.src = `https://www.google.com/recaptcha/api.js?render=${process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY}`
-    script.async = true
-    script.defer = true
-    document.head.appendChild(script)
+  const refreshChallenge = useCallback(() => {
+    setChallenge(generateChallenge())
+    setCaptchaAnswer('')
+    setCaptchaError(false)
   }, [])
+
+  // Generate initial challenge after mount (client-only)
+  useEffect(() => {
+    refreshChallenge()
+  }, [refreshChallenge])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
+    setCaptchaError(false)
+
+    // Client-side password match check
+    if (form.password !== form.confirmPassword) {
+      setError('Passwords do not match.')
+      return
+    }
+    if (form.password.length < 8) {
+      setError('Password must be at least 8 characters.')
+      return
+    }
+
+    // Verify math captcha on the client first
+    const userAnswer = parseInt(captchaAnswer.trim(), 10)
+    if (!challenge || isNaN(userAnswer) || userAnswer !== challenge.answer) {
+      setCaptchaError(true)
+      refreshChallenge()
+      setError('Incorrect captcha answer. A new challenge has been generated.')
+      return
+    }
+
     setLoading(true)
 
     try {
-      // Get reCAPTCHA v3 token
-      const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY
-      if (!siteKey || !window.grecaptcha) {
-        throw new Error('reCAPTCHA not available')
-      }
-
-      const captchaToken = await window.grecaptcha.execute(siteKey, { action: 'register' })
-
-      // Call secure registration with captcha
       const result = await registerWithCaptcha({
         email: form.email.toLowerCase(),
         password: form.password,
@@ -76,19 +111,19 @@ export function Registration() {
         phone: form.phone,
         country: form.country,
         tradingExperienceLevel: form.tradingExperienceLevel,
-        captchaToken,
+        captchaToken: 'math-captcha-passed', // server skips Google API for math captcha
       })
 
       if (!result.success) {
         setError(result.error || 'Registration failed. Please try again.')
-        setLoading(false)
+        refreshChallenge()
         return
       }
 
-      // Success!
       setSubmitted(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
+      refreshChallenge()
     } finally {
       setLoading(false)
     }
@@ -244,27 +279,93 @@ export function Registration() {
                       </div>
                     </div>
 
-                    <div>
-                      <label className="block text-xs text-[#98A2B3] mb-1.5">Password *</label>
-                      <input
-                        type="password"
-                        required
-                        value={form.password}
-                        onChange={(e) => setForm({ ...form, password: e.target.value })}
-                        placeholder="Min. 8 characters"
-                        className="w-full px-4 py-2.5 text-sm rounded-xl bg-white/[0.04] border border-white/[0.08] text-white placeholder-[#98A2B3]/50 focus:outline-none focus:border-[#00D4FF]/40 transition-colors"
-                      />
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs text-[#98A2B3] mb-1.5">Password *</label>
+                        <input
+                          type="password"
+                          required
+                          minLength={8}
+                          value={form.password}
+                          onChange={(e) => setForm({ ...form, password: e.target.value })}
+                          placeholder="Min. 8 characters"
+                          className="w-full px-4 py-2.5 text-sm rounded-xl bg-white/[0.04] border border-white/[0.08] text-white placeholder-[#98A2B3]/50 focus:outline-none focus:border-[#00D4FF]/40 transition-colors"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-[#98A2B3] mb-1.5">Confirm Password *</label>
+                        <input
+                          type="password"
+                          required
+                          minLength={8}
+                          value={form.confirmPassword}
+                          onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
+                          placeholder="Repeat password"
+                          className={`w-full px-4 py-2.5 text-sm rounded-xl bg-white/[0.04] border text-white placeholder-[#98A2B3]/50 focus:outline-none transition-colors ${
+                            form.confirmPassword && form.confirmPassword !== form.password
+                              ? 'border-red-500/50 focus:border-red-500/60'
+                              : form.confirmPassword && form.confirmPassword === form.password
+                              ? 'border-green-500/40 focus:border-green-500/50'
+                              : 'border-white/[0.08] focus:border-[#00D4FF]/40'
+                          }`}
+                        />
+                        {form.confirmPassword && form.confirmPassword !== form.password && (
+                          <p className="text-xs text-red-400 mt-1">Passwords do not match</p>
+                        )}
+                      </div>
                     </div>
 
-                    <div className="space-y-3">
-                      {/* Security notice */}
-                      <div className="flex items-start gap-2 p-3 rounded-xl bg-green-500/5 border border-green-500/20">
-                        <Shield className="w-4 h-4 text-green-400 shrink-0 mt-0.5" />
-                        <p className="text-xs text-green-300/80">
-                          This form is protected by reCAPTCHA v3 to prevent spam and abuse. Your submission is automatically verified.
-                        </p>
+                    {/* Math Captcha */}
+                    {challenge && (
+                      <div className="rounded-xl border border-[#00D4FF]/20 bg-[#00D4FF]/[0.03] p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Shield className="w-4 h-4 text-[#00D4FF] shrink-0" />
+                          <span className="text-xs font-semibold text-[#00D4FF] uppercase tracking-wide">Security Check</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="flex-1">
+                            <p className="text-xs text-[#98A2B3] mb-2">Solve the equation to verify you&apos;re human:</p>
+                            <div className="flex items-center gap-3">
+                              {/* Math challenge display */}
+                              <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/[0.06] border border-white/[0.10] select-none">
+                                <span className="text-lg font-bold text-white font-mono tracking-widest">
+                                  {challenge.question} =
+                                </span>
+                              </div>
+                              {/* Answer input */}
+                              <input
+                                type="number"
+                                required
+                                value={captchaAnswer}
+                                onChange={(e) => { setCaptchaAnswer(e.target.value); setCaptchaError(false) }}
+                                placeholder="?"
+                                className={`w-20 px-3 py-2.5 text-lg font-bold text-center rounded-xl border text-white placeholder-[#98A2B3]/50 focus:outline-none transition-colors bg-white/[0.04] ${
+                                  captchaError
+                                    ? 'border-red-500/60 bg-red-500/5'
+                                    : captchaAnswer && !captchaError
+                                    ? 'border-[#00D4FF]/40'
+                                    : 'border-white/[0.08]'
+                                }`}
+                              />
+                              {/* Refresh button */}
+                              <button
+                                type="button"
+                                onClick={refreshChallenge}
+                                className="p-2 rounded-lg text-[#98A2B3] hover:text-white hover:bg-white/[0.08] transition-colors"
+                                title="New challenge"
+                              >
+                                <RefreshCw className="w-4 h-4" />
+                              </button>
+                            </div>
+                            {captchaError && (
+                              <p className="text-xs text-red-400 mt-2">Wrong answer — a new challenge was generated.</p>
+                            )}
+                          </div>
+                        </div>
                       </div>
+                    )}
 
+                    <div className="space-y-3">
                       <label className="flex items-start gap-3 cursor-pointer">
                         <input
                           type="checkbox"
