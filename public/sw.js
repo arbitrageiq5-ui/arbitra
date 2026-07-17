@@ -35,13 +35,32 @@ self.addEventListener('activate', event => {
   )
 })
 
-// Fetch event — network-first with fallback to cache
+// Fetch event — network-first for JS, cache-first for static assets
 self.addEventListener('fetch', event => {
   const { request } = event
   const url = new URL(request.url)
 
   // Skip non-GET requests and external URLs
   if (request.method !== 'GET' || !url.origin.includes(self.location.origin)) {
+    return
+  }
+
+  // Next.js JS chunks — always fetch fresh to avoid stale code
+  if (url.pathname.includes('/_next/static/')) {
+    event.respondWith(
+      fetch(request)
+        .then(response => {
+          if (!response || response.status !== 200 || response.type !== 'basic') {
+            return response
+          }
+          const responseClone = response.clone()
+          caches.open(RUNTIME_CACHE).then(cache => {
+            cache.put(request, responseClone)
+          })
+          return response
+        })
+        .catch(() => caches.match(request))
+    )
     return
   }
 
