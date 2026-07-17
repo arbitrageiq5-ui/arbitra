@@ -64,6 +64,21 @@ export function ActivationFeeModal({ serverIsActivated }: { serverIsActivated: b
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitted, setSubmitted] = useState(false)
 
+  const handleSubmit = async () => {
+    if (!txHash.trim()) return
+    if (!selectedNetwork) { setSubmitError('Please select a network first.'); return }
+    setSubmitting(true)
+    setSubmitError(null)
+    try {
+      await submitActivationFee({ txHash: txHash.trim(), network: selectedNetwork })
+      setSubmitted(true)
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Submission failed. Please try again.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   useEffect(() => {
     // If the server already confirmed activated, skip the async fetch entirely
     if (serverIsActivated) return
