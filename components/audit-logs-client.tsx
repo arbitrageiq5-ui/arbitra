@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { getAllAuditLogs } from '@/lib/audit'
+import { fetchAllAuditLogs } from '@/app/actions/audit'
 import { ArrowLeft, Filter } from 'lucide-react'
 
 interface AuditLog {
@@ -32,7 +32,7 @@ export default function AuditLogsClient() {
   const loadLogs = async () => {
     try {
       setLoading(true)
-      const data = await getAllAuditLogs(200)
+      const data = await fetchAllAuditLogs(200)
       setLogs(data)
     } catch (error) {
       console.error('Failed to load audit logs:', error)
