@@ -15,6 +15,8 @@ import {
   getExchangeAccounts,
   deleteExchangeAccount,
 } from '@/app/actions/exchanges'
+import { getUserLoginIp } from '@/app/actions/user-session'
+import { getSession } from '@/lib/auth-client'
 import { SUPPORTED_EXCHANGES } from '@/lib/exchange-constants'
 
 type Account = {
@@ -40,6 +42,8 @@ export function ExchangeConnectionManager() {
   const [accounts, setAccounts] = useState<Account[]>([])
   const supportedExchanges: Record<string, { name: string; hasPassphrase: boolean; docsUrl: string }> = SUPPORTED_EXCHANGES
   const [loading, setLoading] = useState(true)
+  const [userIp, setUserIp] = useState<string | null>(null)
+  const [loginTimestamp, setLoginTimestamp] = useState<Date | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [testingId, setTestingId] = useState<number | null>(null)
   const [deletingId, setDeletingId] = useState<number | null>(null)
@@ -71,7 +75,25 @@ export function ExchangeConnectionManager() {
     }
   }, [])
 
-  useEffect(() => { loadAccounts() }, [loadAccounts])
+  // Load user's login IP on mount
+  useEffect(() => {
+    const fetchUserIp = async () => {
+      try {
+        const session = await getSession()
+        if (session?.data?.user?.id) {
+          const ipData = await getUserLoginIp(session.data.user.id)
+          if (ipData) {
+            setUserIp(ipData.ip)
+            setLoginTimestamp(ipData.timestamp)
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load user IP:', err)
+      }
+    }
+    fetchUserIp()
+    loadAccounts()
+  }, [loadAccounts])
 
   const selectedExchangeMeta = supportedExchanges[form.exchangeId]
 
@@ -162,6 +184,22 @@ export function ExchangeConnectionManager() {
             </h3>
             <button onClick={() => setShowForm(false)} className="text-slate-500 hover:text-slate-300 text-xl leading-none">&times;</button>
           </div>
+
+          {/* Security Info — User IP */}
+          {userIp && (
+            <div className="rounded-xl border border-green-500/30 bg-green-500/5 p-3 flex items-start gap-3">
+              <Shield className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
+              <div className="text-xs text-green-300">
+                <p className="font-semibold">Secure Connection Detected</p>
+                <p className="text-green-300/80 mt-1">
+                  Your login IP: <span className="font-mono font-bold">{userIp}</span>
+                  {loginTimestamp && (
+                    <> • Last login: {new Date(loginTimestamp).toLocaleString()}</>
+                  )}
+                </p>
+              </div>
+            </div>
+          )}
 
           <form onSubmit={handleSave} className="space-y-4">
             {/* Exchange picker */}

@@ -20,6 +20,9 @@ export const user = pgTable('user', {
   country: text('country'),
   // 'beginner' | 'intermediate' | 'advanced'
   tradingExperienceLevel: text('trading_experience_level').default('beginner'),
+  // Security tracking
+  lastLoginIp: text('last_login_ip'),
+  lastLoginAt: timestamp('last_login_at'),
   createdAt: timestamp('createdAt').notNull().defaultNow(),
   updatedAt: timestamp('updatedAt').notNull().defaultNow(),
 })

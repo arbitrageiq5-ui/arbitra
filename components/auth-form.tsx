@@ -12,6 +12,7 @@ import { getRoleLabel, getRoleDescription, UserRole } from '@/lib/roles'
 import { validateReferralCode } from '@/app/actions/referral'
 import { storeReferredBy } from '@/app/actions/users'
 import { registerWithCaptcha, saveRegistrationProfile } from '@/app/actions/secure-registration'
+import { recordUserLogin } from '@/app/actions/user-session'
 import { RefreshCw, Shield } from 'lucide-react'
 
 // ── Math captcha helpers ───────────────────────────────────────────────────────
@@ -158,6 +159,18 @@ export function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
     setLoading(false)
 
     const session = await authClient.getSession()
+    const userId = session?.data?.user?.id
+    
+    // Record login IP for security tracking
+    if (userId) {
+      try {
+        await recordUserLogin(userId)
+      } catch (err) {
+        console.error('Failed to record login IP:', err)
+        // non-fatal — continue with login
+      }
+    }
+
     const role = (session?.data?.user as unknown as { role?: string })?.role ?? 'viewer'
     if (role === 'admin') router.push('/admin')
     else if (role === 'trader') router.push('/trader')
