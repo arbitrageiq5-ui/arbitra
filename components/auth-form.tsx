@@ -54,8 +54,6 @@ export function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
-  const [mounted, setMounted] = useState(false)
-  useEffect(() => setMounted(true), [])
 
   // Math captcha — generated client-side only to avoid SSR hydration mismatch
   const [challenge, setChallenge] = useState<CaptchaChallenge | null>(null)
@@ -292,28 +290,25 @@ export function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="password">Password</Label>
-            <div className="relative" suppressHydrationWarning>
+            <div className="relative">
               <Input
                 id="password"
-                type={mounted && showPassword ? 'text' : 'password'}
+                type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 minLength={8}
                 autoComplete={isSignUp ? 'new-password' : 'current-password'}
-                className={mounted ? 'pr-10' : ''}
-                suppressHydrationWarning
+                className="pr-10"
               />
-              {mounted && (
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => setShowPassword(v => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
             </div>
           </div>
 
