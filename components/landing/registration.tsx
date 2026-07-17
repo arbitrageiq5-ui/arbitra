@@ -104,14 +104,10 @@ export function Registration() {
     setLoading(true)
 
     try {
+      // Pre-flight check: captcha + rate limit
       const result = await registerWithCaptcha({
         email: form.email.toLowerCase(),
-        password: form.password,
-        name: form.name,
-        phone: form.phone,
-        country: form.country,
-        tradingExperienceLevel: form.tradingExperienceLevel,
-        captchaToken: 'math-captcha-passed', // server skips Google API for math captcha
+        captchaToken: 'math-captcha-passed',
       })
 
       if (!result.success) {

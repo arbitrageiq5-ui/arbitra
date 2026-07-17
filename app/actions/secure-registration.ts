@@ -128,9 +128,9 @@ export async function registerWithCaptcha({
     if (!captchaResult.success) {
       await db.insert(registrationAudits).values({
         email,
-        ipAddress,
-        userAgent,
-        captchaScore: parseFloat(captchaResult.score.toFixed(2)),
+        ipAddress: ipAddress || null,
+        userAgent: userAgent || null,
+        captchaScore: captchaResult.score.toFixed(2),
         captchaPassed: false,
         registrationStatus: 'rejected',
         rejectionReason: `Captcha failed: score ${captchaResult.score.toFixed(2)}`,
@@ -148,9 +148,9 @@ export async function registerWithCaptcha({
     if (existingUser.length > 0) {
       await db.insert(registrationAudits).values({
         email,
-        ipAddress,
-        userAgent,
-        captchaScore: parseFloat(captchaResult.score.toFixed(2)),
+        ipAddress: ipAddress || null,
+        userAgent: userAgent || null,
+        captchaScore: captchaResult.score.toFixed(2),
         captchaPassed: true,
         registrationStatus: 'rejected',
         rejectionReason: 'Email already registered',
@@ -161,9 +161,9 @@ export async function registerWithCaptcha({
     // Pre-flight passed — log pending, client will complete via Better Auth
     await db.insert(registrationAudits).values({
       email,
-      ipAddress,
-      userAgent,
-      captchaScore: parseFloat(captchaResult.score.toFixed(2)),
+      ipAddress: ipAddress || null,
+      userAgent: userAgent || null,
+      captchaScore: captchaResult.score.toFixed(2),
       captchaPassed: true,
       registrationStatus: 'pending',
     })

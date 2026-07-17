@@ -1,5 +1,6 @@
 import { db } from '@/lib/db'
 import { auditLogs } from '@/lib/db/schema'
+import { eq, and } from 'drizzle-orm'
 import { headers } from 'next/headers'
 
 export interface AuditLogEntry {
@@ -38,7 +39,7 @@ export async function getUserAuditLogs(userId: string, limit = 50) {
     const logs = await db
       .select()
       .from(auditLogs)
-      .where((al) => al.userId === userId)
+      .where(eq(auditLogs.userId, userId))
       .orderBy((al) => al.createdAt)
       .limit(limit)
 
@@ -75,13 +76,16 @@ export async function getAllAuditLogs(limit = 100, offset = 0) {
 // Get audit logs for a specific resource
 export async function getResourceAuditLogs(resource: string, resourceId?: number) {
   try {
-    let query = db.select().from(auditLogs).where((al) => al.resource === resource)
-
+    const conditions = [eq(auditLogs.resource, resource)]
     if (resourceId) {
-      query = query.where((al) => al.resourceId === resourceId)
+      conditions.push(eq(auditLogs.resourceId, resourceId))
     }
 
-    const logs = await query.orderBy((al) => al.createdAt)
+    const logs = await db
+      .select()
+      .from(auditLogs)
+      .where(and(...conditions))
+      .orderBy((al) => al.createdAt)
 
     return logs.map((log) => ({
       ...log,
