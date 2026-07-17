@@ -8,6 +8,36 @@ const EXCHANGES = {
   bybit: 'https://api.bybit.com',
   kucoin: 'https://api.kucoin.com',
   huobi: 'https://api.huobi.pro',
+  coingecko: 'https://api.coingecko.com/api/v3',
+}
+
+const SYMBOL_TO_COINGECKO_ID: Record<string, string> = {
+  BTC: 'bitcoin',
+  ETH: 'ethereum',
+  BNB: 'binancecoin',
+  SOL: 'solana',
+  XRP: 'ripple',
+  DOGE: 'dogecoin',
+  ADA: 'cardano',
+  AVAX: 'avalanche-2',
+  LINK: 'chainlink',
+  MATIC: 'matic-network',
+  DOT: 'polkadot',
+  ATOM: 'cosmos',
+  UNI: 'uniswap',
+  LTC: 'litecoin',
+  NEAR: 'near',
+  FIL: 'filecoin',
+  ICP: 'internet-computer',
+  APT: 'aptos',
+  ARB: 'arbitrum',
+  OP: 'optimism',
+  SUI: 'sui',
+  AAVE: 'aave',
+  CRV: 'curve-dao-token',
+  SHIB: 'shiba-inu',
+  PEPE: 'pepe',
+  TON: 'the-open-network',
 }
 
 export interface ExchangePrice {
@@ -138,13 +168,48 @@ async function getHuobiPrice(symbol: string): Promise<ExchangePrice | null> {
   }
 }
 
-// Get prices from all exchanges
+// CoinGecko Price Fetcher (free, reliable, no auth needed)
+async function getCoinGeckoPrice(symbol: string): Promise<ExchangePrice | null> {
+  try {
+    const coinGeckoId = SYMBOL_TO_COINGECKO_ID[symbol.toUpperCase()]
+    if (!coinGeckoId) return null
+
+    const response = await axios.get(`${EXCHANGES.coingecko}/simple/price`, {
+      params: {
+        ids: coinGeckoId,
+        vs_currencies: 'usd',
+        include_market_cap: false,
+        include_24hr_vol: false,
+      },
+      timeout: 5000,
+    })
+
+    const price = response.data[coinGeckoId]?.usd
+    if (!price) return null
+
+    return {
+      symbol,
+      exchange: 'coingecko',
+      price,
+      timestamp: Date.now(),
+    }
+  } catch {
+    return null
+  }
+}
+
+// Get prices from all exchanges (LIVE rates)
 export async function getPricesAcrossExchanges(
   symbols: string[]
 ): Promise<ExchangePrice[]> {
   const prices: ExchangePrice[] = []
 
   for (const symbol of symbols) {
+    // Always fetch from CoinGecko first as it's most reliable and doesn't require auth
+    const coingeckoPrice = await getCoinGeckoPrice(symbol)
+    if (coingeckoPrice) prices.push(coingeckoPrice)
+
+    // Fetch from exchange APIs in parallel for cross-exchange comparison
     const [binance, kraken, coinbase, bybit, kucoin, huobi] = await Promise.all([
       getBinancePrice(symbol),
       getKrakenPrice(symbol),
