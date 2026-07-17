@@ -16,7 +16,7 @@ import {
   deleteExchangeAccount,
 } from '@/app/actions/exchanges'
 import { getUserLoginIp } from '@/app/actions/user-session'
-import { getSession } from '@/lib/auth-client'
+import { useSession } from '@/lib/auth-client'
 import { SUPPORTED_EXCHANGES } from '@/lib/exchange-constants'
 
 type Account = {
@@ -39,6 +39,7 @@ const EXCHANGE_LOGOS: Record<string, string> = {
 }
 
 export function ExchangeConnectionManager() {
+  const { data: session } = useSession()
   const [accounts, setAccounts] = useState<Account[]>([])
   const supportedExchanges: Record<string, { name: string; hasPassphrase: boolean; docsUrl: string }> = SUPPORTED_EXCHANGES
   const [loading, setLoading] = useState(true)
@@ -75,13 +76,12 @@ export function ExchangeConnectionManager() {
     }
   }, [])
 
-  // Load user's login IP on mount
+  // Load user's login IP when session is available
   useEffect(() => {
     const fetchUserIp = async () => {
       try {
-        const session = await getSession()
-        if (session?.data?.user?.id) {
-          const ipData = await getUserLoginIp(session.data.user.id)
+        if (session?.user?.id) {
+          const ipData = await getUserLoginIp(session.user.id)
           if (ipData) {
             setUserIp(ipData.ip)
             setLoginTimestamp(ipData.timestamp)
@@ -93,7 +93,7 @@ export function ExchangeConnectionManager() {
     }
     fetchUserIp()
     loadAccounts()
-  }, [loadAccounts])
+  }, [session?.user?.id, loadAccounts])
 
   const selectedExchangeMeta = supportedExchanges[form.exchangeId]
 
