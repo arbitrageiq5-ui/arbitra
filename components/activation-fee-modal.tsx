@@ -298,7 +298,7 @@ export function ActivationFeeModal({ serverIsActivated }: { serverIsActivated: b
                   {/* Submit */}
                   <Button
                     onClick={handleSubmit}
-                    disabled={submitting || !txHash.trim()}
+                    disabled={submitting || !txHash || typeof txHash !== 'string' || !txHash.trim()}
                     className="w-full h-11 bg-amber-600 hover:bg-amber-500 text-white font-bold text-sm gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     {submitting ? (
