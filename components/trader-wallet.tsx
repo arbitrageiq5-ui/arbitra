@@ -189,15 +189,15 @@ export function TraderWallet() {
       {/* Balance Hero */}
       <Card className="bg-slate-900 border-slate-800 overflow-hidden relative">
         <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 via-transparent to-transparent pointer-events-none" />
-        <div className="px-6 py-6">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
-                <Wallet className="w-5 h-5 text-amber-400" />
+        <div className="px-4 sm:px-6 py-4 sm:py-6">
+          <div className="flex items-center justify-between mb-4 sm:mb-6">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
+                <Wallet className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />
               </div>
               <div>
                 <p className="text-slate-400 text-sm">My Wallet</p>
-                <p className="text-slate-600 text-xs">USDT balance across all sources</p>
+                <p className="text-slate-600 text-xs hidden sm:block">USDT balance across all sources</p>
               </div>
             </div>
             <button onClick={load} className="p-2 rounded-lg hover:bg-slate-800 text-slate-500 hover:text-white transition-colors">
@@ -206,9 +206,9 @@ export function TraderWallet() {
           </div>
 
           {/* Big balance */}
-          <div className="mb-6 text-center">
-            <p className="text-slate-500 text-sm mb-1">Available Balance</p>
-            <p className="text-5xl font-black text-white tracking-tight">
+          <div className="mb-4 sm:mb-6 text-center">
+            <p className="text-slate-500 text-xs sm:text-sm mb-1">Available Balance</p>
+            <p className="text-4xl sm:text-5xl font-black text-white tracking-tight">
               <span className="text-amber-400">$</span>{available.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </p>
             <p className="text-slate-600 text-xs mt-1">USDT</p>
@@ -218,46 +218,43 @@ export function TraderWallet() {
           <div className="grid grid-cols-3 gap-2">
             <button
               onClick={() => setActivePanel(activePanel === 'deposit' ? null : 'deposit')}
-              className={`flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm transition-all ${
+              className={`flex items-center justify-center gap-1.5 py-2.5 sm:py-3 rounded-xl font-semibold text-xs sm:text-sm transition-all ${
                 activePanel === 'deposit'
                   ? 'bg-green-600 text-white'
                   : 'bg-green-900/30 border border-green-700/40 text-green-400 hover:bg-green-900/50'
               }`}
             >
-              <ArrowDownCircle className="w-4 h-4" />
-              <span className="hidden sm:inline">Deposit</span>
-              <span className="sm:hidden text-xs">Deposit</span>
+              <ArrowDownCircle className="w-4 h-4 shrink-0" />
+              <span>Deposit</span>
             </button>
             <button
               onClick={() => setActivePanel(activePanel === 'shift' ? null : 'shift')}
-              className={`flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm transition-all ${
+              className={`flex items-center justify-center gap-1.5 py-2.5 sm:py-3 rounded-xl font-semibold text-xs sm:text-sm transition-all ${
                 activePanel === 'shift'
                   ? 'bg-amber-500 text-black'
                   : 'bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20'
               }`}
             >
-              <Zap className="w-4 h-4" />
-              <span className="hidden sm:inline">Auto-Trade</span>
-              <span className="sm:hidden text-xs">Auto-Trade</span>
+              <Zap className="w-4 h-4 shrink-0" />
+              <span>Auto-Trade</span>
             </button>
             <button
               onClick={() => setActivePanel(activePanel === 'withdraw' ? null : 'withdraw')}
-              className={`flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm transition-all ${
+              className={`flex items-center justify-center gap-1.5 py-2.5 sm:py-3 rounded-xl font-semibold text-xs sm:text-sm transition-all ${
                 activePanel === 'withdraw'
                   ? 'bg-red-600 text-white'
                   : 'bg-red-900/30 border border-red-700/40 text-red-400 hover:bg-red-900/50'
               }`}
             >
-              <ArrowUpCircle className="w-4 h-4" />
-              <span className="hidden sm:inline">Withdraw</span>
-              <span className="sm:hidden text-xs">Withdraw</span>
+              <ArrowUpCircle className="w-4 h-4 shrink-0" />
+              <span>Withdraw</span>
             </button>
           </div>
         </div>
 
         {/* Deposit panel */}
         {activePanel === 'deposit' && (
-          <div className="border-t border-slate-800 px-6 py-6 bg-slate-950/40">
+          <div className="border-t border-slate-800 px-4 sm:px-6 py-4 sm:py-6 bg-slate-950/40">
             <h3 className="text-white font-bold mb-4 flex items-center gap-2">
               <ArrowDownCircle className="w-4 h-4 text-green-400" />
               Deposit USDT
@@ -336,7 +333,7 @@ export function TraderWallet() {
 
         {/* Shift to Auto-Trade panel */}
         {activePanel === 'shift' && (
-          <div className="border-t border-slate-800 px-6 py-6 bg-slate-950/40">
+          <div className="border-t border-slate-800 px-4 sm:px-6 py-4 sm:py-6 bg-slate-950/40">
             <h3 className="text-white font-bold mb-1 flex items-center gap-2">
               <Zap className="w-4 h-4 text-amber-400" />
               Shift Balance to Auto-Trade
@@ -437,7 +434,7 @@ export function TraderWallet() {
 
         {/* Withdraw panel */}
         {activePanel === 'withdraw' && (
-          <div className="border-t border-slate-800 px-6 py-6 bg-slate-950/40">
+          <div className="border-t border-slate-800 px-4 sm:px-6 py-4 sm:py-6 bg-slate-950/40">
             <h3 className="text-white font-bold mb-1 flex items-center gap-2">
               <ArrowUpCircle className="w-4 h-4 text-red-400" />
               Withdraw USDT
@@ -552,7 +549,7 @@ export function TraderWallet() {
       </Card>
 
       {/* Income source breakdown */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3">
         <StatCard label="Deposited" value={`$${(s?.totalDeposited ?? 0).toFixed(2)}`}
           sub={s?.pendingDeposit ? `+$${s.pendingDeposit.toFixed(2)} pending` : 'Confirmed deposits'}
           icon={ArrowDownCircle} color="bg-green-500/10 text-green-400" />

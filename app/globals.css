@@ -106,3 +106,14 @@
   ::-webkit-scrollbar-thumb { background: rgba(0,212,255,0.2); border-radius: 3px; }
   ::-webkit-scrollbar-thumb:hover { background: rgba(0,212,255,0.4); }
 }
+
+@layer utilities {
+  /* Hide scrollbar while keeping scroll functionality (for tab nav on mobile) */
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+}

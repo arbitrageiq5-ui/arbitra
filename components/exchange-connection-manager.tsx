@@ -158,25 +158,25 @@ export function ExchangeConnectionManager() {
   const maskKey = (key: string) => key.slice(0, 6) + '••••••••••••' + key.slice(-4)
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-white font-bold text-lg">Exchange API Connections</h2>
-          <p className="text-slate-400 text-sm mt-0.5">Connect exchange accounts to enable live trading and balance monitoring</p>
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-white font-bold text-base sm:text-lg">Exchange API Connections</h2>
+          <p className="text-slate-400 text-xs sm:text-sm mt-0.5 hidden sm:block">Connect exchange accounts to enable live trading and balance monitoring</p>
         </div>
         <Button
           onClick={() => setShowForm(v => !v)}
-          className="bg-amber-500 hover:bg-amber-600 text-black font-semibold gap-2"
+          className="bg-amber-500 hover:bg-amber-600 text-black font-semibold gap-1.5 text-xs sm:text-sm shrink-0 px-3 sm:px-4"
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           Add Exchange
         </Button>
       </div>
 
       {/* Add Exchange Form */}
       {showForm && (
-        <Card className="bg-slate-900 border-amber-500/30 p-6 space-y-5">
+        <Card className="bg-slate-900 border-amber-500/30 p-4 sm:p-6 space-y-4 sm:space-y-5">
           <div className="flex items-center justify-between">
             <h3 className="text-white font-bold text-base flex items-center gap-2">
               <Shield className="w-4 h-4 text-amber-400" />
@@ -201,9 +201,9 @@ export function ExchangeConnectionManager() {
             </div>
           )}
 
-          <form onSubmit={handleSave} className="space-y-4">
+          <form onSubmit={handleSave} className="space-y-3 sm:space-y-4">
             {/* Exchange picker */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
                 <label className="text-slate-400 text-xs uppercase tracking-wider mb-1.5 block">Exchange <span className="text-red-400">*</span></label>
                 <div className="relative">
@@ -302,7 +302,7 @@ export function ExchangeConnectionManager() {
             {/* Trade Mode */}
             <div>
               <label className="text-slate-400 text-xs uppercase tracking-wider mb-2 block">Trade Mode</label>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                 {([
                   { value: 'read_only', label: 'Read Only', desc: 'View balances and prices. No orders placed.', icon: Eye, color: 'border-blue-500/40 bg-blue-500/5 text-blue-400' },
                   { value: 'live', label: 'Live Trading', desc: 'Place real orders. Use with caution.', icon: Zap, color: 'border-amber-500/40 bg-amber-500/5 text-amber-400' },
@@ -372,43 +372,43 @@ export function ExchangeConnectionManager() {
             const lastTest = acc.testStatus
 
             return (
-              <Card key={acc.id} className="bg-slate-900 border-slate-800 p-5">
-                <div className="flex items-start justify-between gap-4">
+              <Card key={acc.id} className="bg-slate-900 border-slate-800 p-4 sm:p-5">
+                <div className="flex items-start justify-between gap-3">
                   {/* Left: info */}
-                  <div className="flex items-start gap-4 min-w-0">
+                  <div className="flex items-start gap-3 min-w-0">
                     {/* Exchange dot */}
-                    <div className="w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center text-xs font-black border border-slate-700"
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex-shrink-0 flex items-center justify-center text-xs font-black border border-slate-700"
                       style={{ background: `${color}18`, color }}>
                       {(meta?.name ?? acc.exchange).slice(0, 2).toUpperCase()}
                     </div>
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-white font-bold">{acc.label ?? meta?.name ?? acc.exchange}</span>
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-white font-bold text-sm">{acc.label ?? meta?.name ?? acc.exchange}</span>
+                        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-semibold border ${
                           isLive ? 'border-amber-500/30 bg-amber-500/10 text-amber-400' : 'border-blue-500/30 bg-blue-500/10 text-blue-400'
                         }`}>
                           {isLive ? <Zap className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
                           {isLive ? 'Live' : 'Read Only'}
                         </span>
                         {lastTest === 'ok' && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border border-green-500/30 bg-green-500/10 text-green-400">
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-semibold border border-green-500/30 bg-green-500/10 text-green-400">
                             <Wifi className="w-3 h-3" /> Connected
                           </span>
                         )}
                         {lastTest && lastTest !== 'ok' && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border border-red-500/30 bg-red-500/10 text-red-400">
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-semibold border border-red-500/30 bg-red-500/10 text-red-400">
                             <WifiOff className="w-3 h-3" /> Error
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-slate-500 text-xs font-mono">{maskKey(acc.apiKey)}</span>
-                        <button onClick={() => copyKey(acc.apiKey, `key-${acc.id}`)} className="text-slate-600 hover:text-slate-400 transition-colors">
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <span className="text-slate-500 text-xs font-mono truncate max-w-[140px] sm:max-w-none">{maskKey(acc.apiKey)}</span>
+                        <button onClick={() => copyKey(acc.apiKey, `key-${acc.id}`)} className="text-slate-600 hover:text-slate-400 transition-colors shrink-0">
                           {copied === `key-${acc.id}` ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />}
                         </button>
                       </div>
                       {acc.lastTestedAt && (
-                        <p className="text-slate-600 text-xs mt-0.5">
+                        <p className="text-slate-600 text-xs mt-0.5 hidden sm:block">
                           Last tested: {new Date(acc.lastTestedAt).toLocaleString()}
                         </p>
                       )}
@@ -416,13 +416,13 @@ export function ExchangeConnectionManager() {
                   </div>
 
                   {/* Right: actions */}
-                  <div className="flex items-center gap-2 flex-shrink-0">
+                  <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
                     <Button
                       size="sm"
                       variant="ghost"
                       onClick={() => handleTest(acc.id)}
                       disabled={testingId === acc.id}
-                      className="border border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white gap-1.5"
+                      className="border border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white gap-1 px-2 sm:px-3 text-xs sm:text-sm"
                     >
                       {testingId === acc.id
                         ? <RefreshCw className="w-3.5 h-3.5 animate-spin" />
@@ -434,7 +434,7 @@ export function ExchangeConnectionManager() {
                       variant="ghost"
                       onClick={() => handleDelete(acc.id)}
                       disabled={deletingId === acc.id}
-                      className="border border-red-900/40 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                      className="border border-red-900/40 text-red-400 hover:bg-red-500/10 hover:text-red-300 px-2 sm:px-3"
                     >
                       {deletingId === acc.id
                         ? <RefreshCw className="w-3.5 h-3.5 animate-spin" />
@@ -487,12 +487,12 @@ export function ExchangeConnectionManager() {
       )}
 
       {/* Security note */}
-      <div className="flex items-start gap-3 p-4 rounded-xl bg-slate-800/50 border border-slate-700">
-        <Shield className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
-        <div>
+      <div className="flex items-start gap-3 p-3 sm:p-4 rounded-xl bg-slate-800/50 border border-slate-700">
+        <Shield className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+        <div className="min-w-0">
           <p className="text-slate-300 text-sm font-semibold">API Key Security</p>
           <p className="text-slate-500 text-xs mt-0.5 leading-relaxed">
-            Keys are stored encrypted in your database. For extra security, create API keys with IP whitelisting and disable withdrawal permissions unless you need the transfer feature. Never share your secret keys.
+            Keys are stored encrypted. Create API keys with IP whitelisting and disable withdrawal permissions unless needed. Never share your secret keys.
           </p>
         </div>
       </div>

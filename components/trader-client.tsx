@@ -230,35 +230,36 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
 
       {/* Header */}
       <header className="border-b border-slate-800 bg-slate-900/90 backdrop-blur-sm sticky top-0 z-40">
-        <div className="max-w-screen-xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center">
-                <Zap className="w-5 h-5 text-amber-400" />
-              </div>
-              <span className="text-white font-bold text-lg tracking-tight">Arbitrage IQ</span>
+        <div className="max-w-screen-xl mx-auto px-3 sm:px-4 md:px-6 h-14 sm:h-16 flex items-center justify-between gap-2">
+          {/* Left: logo */}
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-amber-500/20 flex items-center justify-center shrink-0">
+              <Zap className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />
             </div>
+            <span className="text-white font-bold text-base sm:text-lg tracking-tight truncate">Arbitrage IQ</span>
             <span className="hidden sm:block text-slate-700">|</span>
-            <span className="hidden sm:block text-slate-400 text-sm font-medium">Trader Dashboard</span>
+            <span className="hidden sm:block text-slate-400 text-sm font-medium whitespace-nowrap">Trader Dashboard</span>
           </div>
-          <div className="flex items-center gap-2.5">
+
+          {/* Right: balance + actions */}
+          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
             {/* Wallet Balance Chip */}
             <button
               onClick={() => setActiveTab('wallet')}
-              className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg border border-slate-700 hover:border-amber-500/40 transition-all group"
+              className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg border border-slate-700 hover:border-amber-500/40 transition-all"
               title="Go to Wallet"
             >
               <Wallet className="w-3.5 h-3.5 text-amber-400 shrink-0" />
               <div className="flex flex-col items-start leading-none">
-                <span className="text-slate-500 text-[10px] font-medium uppercase tracking-wide">Balance</span>
+                <span className="text-slate-500 text-[9px] sm:text-[10px] font-medium uppercase tracking-wide">Bal</span>
                 {walletBalance == null ? (
-                  <span className="text-slate-500 text-xs mt-0.5 animate-pulse">Loading...</span>
+                  <span className="text-slate-500 text-xs mt-0.5 animate-pulse">...</span>
                 ) : walletBalanceVisible ? (
-                  <span className="text-amber-400 font-bold text-sm font-mono">
+                  <span className="text-amber-400 font-bold text-xs sm:text-sm font-mono">
                     ${walletBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 ) : (
-                  <span className="text-amber-400 font-bold text-sm tracking-widest">••••••</span>
+                  <span className="text-amber-400 font-bold text-xs sm:text-sm tracking-widest">••••</span>
                 )}
               </div>
               <span
@@ -266,29 +267,26 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
                 tabIndex={0}
                 onClick={e => { e.stopPropagation(); setWalletBalanceVisible(v => !v) }}
                 onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); setWalletBalanceVisible(v => !v) } }}
-                className="ml-1 text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
-                title={walletBalanceVisible ? 'Hide balance' : 'Show balance'}
+                className="ml-0.5 text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
               >
-                {walletBalanceVisible
-                  ? <EyeOff className="w-3.5 h-3.5" />
-                  : <Eye className="w-3.5 h-3.5" />
-                }
+                {walletBalanceVisible ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
               </span>
             </button>
 
-            {/* User Badge */}
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-slate-800 rounded-lg border border-slate-700">
+            {/* User Badge — desktop only */}
+            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-slate-800 rounded-lg border border-slate-700">
               <div className="w-2 h-2 rounded-full bg-amber-400" />
-              <span className="text-slate-300 text-sm">{user.name ?? user.email}</span>
+              <span className="text-slate-300 text-sm truncate max-w-[120px]">{user.name ?? user.email}</span>
               <span className="px-1.5 py-0.5 rounded text-xs bg-amber-500/10 text-amber-400 font-semibold border border-amber-500/20">
                 TRADER
               </span>
             </div>
+
             <Button
               variant="ghost"
               size="sm"
               onClick={handleLogout}
-              className="text-slate-400 hover:text-white hover:bg-slate-800 gap-2"
+              className="text-slate-400 hover:text-white hover:bg-slate-800 gap-1.5 px-2 sm:px-3"
             >
               <LogOut className="w-4 h-4" />
               <span className="hidden sm:block">Sign Out</span>
@@ -297,41 +295,43 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
         </div>
       </header>
 
-      {/* Tab Navigation */}
+      {/* Tab Navigation — horizontally scrollable on mobile */}
       <div className="border-b border-slate-800 bg-slate-900/60">
-        <div className="max-w-screen-xl mx-auto px-4 md:px-6 flex gap-1">
-          {([
-        { key: 'wallet' as Tab, label: 'Wallet', icon: Wallet, count: null },
-          { key: 'auto-trade' as Tab, label: 'Auto Trade', icon: Zap, count: null },
-          { key: 'trading-bot' as Tab, label: 'Trading Bots', icon: Bot, count: null },
-          { key: 'passive-income' as Tab, label: 'Passive Income', icon: Gift, count: null },
-          { key: 'opportunities' as Tab, label: 'Opportunities', icon: TrendingUp, count: null },
-          { key: 'trade' as Tab, label: 'Trade & Transfer', icon: ArrowRightLeft, count: null },
-          { key: 'exchanges' as Tab, label: 'Exchanges', icon: Link2, count: null },
-          { key: 'funds' as Tab, label: 'Deposits', icon: ArrowDownCircle, count: pendingCount || null },
-          ]).map(tab => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`flex items-center gap-2 px-4 py-3.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
-                activeTab === tab.key
-                  ? 'border-amber-500 text-amber-400'
-                  : 'border-transparent text-slate-500 hover:text-slate-300'
-              }`}
-            >
-              <tab.icon className="w-4 h-4" />
-              {tab.label}
-              {tab.count !== null && (
-                <span className="px-1.5 py-0.5 rounded-full text-xs font-bold bg-amber-500 text-black">
-                  {tab.count}
-                </span>
-              )}
-            </button>
-          ))}
+        <div className="max-w-screen-xl mx-auto px-0 sm:px-4 md:px-6 overflow-x-auto scrollbar-none">
+          <div className="flex gap-0 sm:gap-1 min-w-max sm:min-w-0 px-3 sm:px-0">
+            {([
+              { key: 'wallet' as Tab, label: 'Wallet', icon: Wallet, count: null },
+              { key: 'auto-trade' as Tab, label: 'Auto Trade', icon: Zap, count: null },
+              { key: 'trading-bot' as Tab, label: 'Bots', icon: Bot, count: null },
+              { key: 'passive-income' as Tab, label: 'Passive', icon: Gift, count: null },
+              { key: 'opportunities' as Tab, label: 'Markets', icon: TrendingUp, count: null },
+              { key: 'trade' as Tab, label: 'Trade', icon: ArrowRightLeft, count: null },
+              { key: 'exchanges' as Tab, label: 'Exchanges', icon: Link2, count: null },
+              { key: 'funds' as Tab, label: 'Deposits', icon: ArrowDownCircle, count: pendingCount || null },
+            ]).map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`flex items-center gap-1.5 px-3 sm:px-4 py-3 sm:py-3.5 text-xs sm:text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${
+                  activeTab === tab.key
+                    ? 'border-amber-500 text-amber-400'
+                    : 'border-transparent text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                <tab.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                <span>{tab.label}</span>
+                {tab.count !== null && (
+                  <span className="px-1.5 py-0.5 rounded-full text-xs font-bold bg-amber-500 text-black">
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      <main className="flex-1 max-w-screen-xl mx-auto px-4 md:px-6 py-6 w-full">
+      <main className="flex-1 max-w-screen-xl mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6 w-full">
         {/* ── TAB: WALLET ── */}
         {activeTab === 'wallet' && (
           <TraderWallet />
@@ -354,29 +354,29 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
 
         {/* ── TAB: TRADE OPPORTUNITIES ── */}
         {activeTab === 'opportunities' && (
-          <div className="space-y-5">
-            {/* Stats */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="space-y-4">
+            {/* Stats — 3-col on sm+, compact row on mobile */}
+            <div className="grid grid-cols-3 gap-2 sm:gap-4">
               {[
-                { label: 'Total Opportunities', value: stats.total.toLocaleString(), icon: TrendingUp, color: 'text-amber-400' },
-                { label: 'Avg Net Profit', value: `${stats.avgProfit.toFixed(2)}%`, icon: BarChart3, color: 'text-green-400' },
-                { label: 'Best Opportunity', value: `${stats.topProfit.toFixed(2)}%`, icon: Zap, color: 'text-cyan-400' },
+                { label: 'Opportunities', value: stats.total.toLocaleString(), icon: TrendingUp, color: 'text-amber-400' },
+                { label: 'Avg Profit', value: `${stats.avgProfit.toFixed(2)}%`, icon: BarChart3, color: 'text-green-400' },
+                { label: 'Best', value: `${stats.topProfit.toFixed(2)}%`, icon: Zap, color: 'text-cyan-400' },
               ].map(({ label, value, icon: Icon, color }) => (
-                <Card key={label} className="bg-slate-900 border-slate-800 p-4 flex items-center gap-4">
-                  <div className="p-2.5 rounded-xl bg-slate-800">
-                    <Icon className={`w-5 h-5 ${color}`} />
+                <Card key={label} className="bg-slate-900 border-slate-800 p-3 sm:p-4 flex flex-col sm:flex-row items-center sm:items-center gap-2 sm:gap-4">
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-slate-800 shrink-0">
+                    <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${color}`} />
                   </div>
-                  <div>
-                    <p className="text-slate-500 text-xs">{label}</p>
-                    <p className={`text-2xl font-bold ${color}`}>{value}</p>
+                  <div className="text-center sm:text-left">
+                    <p className="text-slate-500 text-[10px] sm:text-xs leading-tight">{label}</p>
+                    <p className={`text-lg sm:text-2xl font-bold ${color} leading-tight`}>{value}</p>
                   </div>
                 </Card>
               ))}
             </div>
 
             {/* Search + filters */}
-            <div className="flex items-center gap-3 flex-wrap">
-              <div className="relative flex-1 min-w-48">
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="relative flex-1 min-w-0">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                 <input
                   value={searchQuery}
@@ -387,26 +387,26 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
               </div>
               <button
                 onClick={() => setShowFilters(!showFilters)}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-medium transition-colors shrink-0 ${
                   showFilters || minProfit > 0
                     ? 'bg-amber-500/10 border-amber-500/40 text-amber-400'
                     : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
                 }`}
               >
                 <Filter className="w-4 h-4" />
-                Filter
+                <span className="hidden sm:inline">Filter</span>
               </button>
               <button
                 onClick={() => loadOpportunities(true)}
                 disabled={refreshing}
-                className="p-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-white transition-colors"
+                className="shrink-0 p-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-white transition-colors"
               >
                 <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin text-amber-400' : ''}`} />
               </button>
               {(searchQuery || minProfit > 0) && (
                 <button
                   onClick={() => { setSearchQuery(''); setMinProfit(0); setOppPage(0) }}
-                  className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-white transition-colors"
+                  className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-white transition-colors shrink-0"
                 >
                   <X className="w-3.5 h-3.5" /> Clear
                 </button>
@@ -452,7 +452,8 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
                 </div>
               ) : (
                 <>
-                  <div className="overflow-x-auto">
+                  {/* Desktop table */}
+                  <div className="hidden md:block overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b border-slate-800 bg-slate-950/40">
@@ -495,7 +496,7 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
                               <td className="px-4 py-3">
                                 <div className="flex items-center gap-2">
                                   <span className="font-bold text-white">{opp.symbol}</span>
-                                  <span className={`px-1.5 py-0.5 rounded text-xs font-medium bg-slate-800 text-slate-400`}>
+                                  <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-slate-800 text-slate-400">
                                     {opp.category.toUpperCase()}
                                   </span>
                                 </div>
@@ -504,17 +505,12 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
                               <td className="px-4 py-3 text-slate-400 font-mono text-xs">{formatPrice(opp.buyPrice)}</td>
                               <td className="px-4 py-3 text-slate-300 font-medium">{opp.sellExchange}</td>
                               <td className="px-4 py-3 text-slate-400 font-mono text-xs">{formatPrice(opp.sellPrice)}</td>
-                              <td className="px-4 py-3 text-right">
-                                <span className="text-cyan-400 font-semibold">{opp.spread.toFixed(2)}%</span>
-                              </td>
-                              <td className="px-4 py-3 text-right">
-                                <span className="text-green-400 font-bold">{opp.netProfit.toFixed(2)}%</span>
-                              </td>
+                              <td className="px-4 py-3 text-right"><span className="text-cyan-400 font-semibold">{opp.spread.toFixed(2)}%</span></td>
+                              <td className="px-4 py-3 text-right"><span className="text-green-400 font-bold">{opp.netProfit.toFixed(2)}%</span></td>
                               <td className="px-4 py-3 text-right text-slate-400 text-xs">{formatVolume(opp.volume24h)}</td>
                               <td className="px-4 py-3">
                                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${riskColor}`}>
-                                  <RiskIcon className="w-3 h-3" />
-                                  {opp.risk}
+                                  <RiskIcon className="w-3 h-3" />{opp.risk}
                                 </span>
                               </td>
                             </tr>
@@ -524,9 +520,59 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
                     </table>
                   </div>
 
+                  {/* Mobile cards */}
+                  <div className="md:hidden divide-y divide-slate-800">
+                    {paginated.map(opp => {
+                      const riskColor = opp.risk === 'Low' ? 'text-green-400 bg-green-400/10 border-green-400/20' : opp.risk === 'Medium' ? 'text-amber-400 bg-amber-400/10 border-amber-400/20' : 'text-red-400 bg-red-400/10 border-red-400/20'
+                      const RiskIcon = opp.risk === 'Low' ? Shield : AlertTriangle
+                      return (
+                        <div key={opp.id} className="p-4 space-y-3">
+                          {/* Top row: symbol + profit */}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-white text-base">{opp.symbol}</span>
+                              <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-slate-800 text-slate-400">{opp.category.toUpperCase()}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${riskColor}`}>
+                                <RiskIcon className="w-3 h-3" />{opp.risk}
+                              </span>
+                              <span className="text-green-400 font-black text-base">{opp.netProfit.toFixed(2)}%</span>
+                            </div>
+                          </div>
+                          {/* Exchange route */}
+                          <div className="flex items-center gap-2 text-xs">
+                            <div className="flex-1 bg-slate-800 rounded-lg px-3 py-2">
+                              <p className="text-slate-500 mb-0.5">Buy on</p>
+                              <p className="text-white font-semibold">{opp.buyExchange}</p>
+                              <p className="text-slate-400 font-mono">{formatPrice(opp.buyPrice)}</p>
+                            </div>
+                            <ArrowRightLeft className="w-4 h-4 text-amber-400 shrink-0" />
+                            <div className="flex-1 bg-slate-800 rounded-lg px-3 py-2">
+                              <p className="text-slate-500 mb-0.5">Sell on</p>
+                              <p className="text-white font-semibold">{opp.sellExchange}</p>
+                              <p className="text-slate-400 font-mono">{formatPrice(opp.sellPrice)}</p>
+                            </div>
+                          </div>
+                          {/* Stats row */}
+                          <div className="flex gap-3 text-xs">
+                            <div className="flex-1 text-center">
+                              <p className="text-slate-500">Spread</p>
+                              <p className="text-cyan-400 font-semibold">{opp.spread.toFixed(2)}%</p>
+                            </div>
+                            <div className="flex-1 text-center">
+                              <p className="text-slate-500">Volume 24h</p>
+                              <p className="text-slate-300 font-medium">{formatVolume(opp.volume24h)}</p>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+
                   {/* Pagination */}
                   {totalPages > 1 && (
-                    <div className="px-5 py-3 border-t border-slate-800 flex items-center justify-between">
+                    <div className="px-4 sm:px-5 py-3 border-t border-slate-800 flex items-center justify-between">
                       <span className="text-slate-500 text-sm">
                         Page {oppPage + 1} of {totalPages}
                       </span>
@@ -538,7 +584,7 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
                           onClick={() => setOppPage(p => p - 1)}
                           className="text-slate-400 hover:text-white border border-slate-800 hover:bg-slate-800"
                         >
-                          Previous
+                          Prev
                         </Button>
                         <Button
                           variant="ghost"
@@ -574,27 +620,27 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
 
         {/* ── TAB: FUNDS & DEPOSITS ── */}
         {activeTab === 'funds' && (
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             {/* Summary */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-3 gap-2 sm:gap-4">
               {[
-                { label: 'Total Confirmed', value: `$${confirmedTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, icon: CheckCircle2, color: 'text-green-400' },
-                { label: 'Pending Requests', value: pendingCount.toString(), icon: Clock, color: 'text-yellow-400' },
-                { label: 'Total Deposits', value: fundRequests.length.toString(), icon: Wallet, color: 'text-amber-400' },
+                { label: 'Confirmed', value: `$${confirmedTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, icon: CheckCircle2, color: 'text-green-400' },
+                { label: 'Pending', value: pendingCount.toString(), icon: Clock, color: 'text-yellow-400' },
+                { label: 'Total', value: fundRequests.length.toString(), icon: Wallet, color: 'text-amber-400' },
               ].map(({ label, value, icon: Icon, color }) => (
-                <Card key={label} className="bg-slate-900 border-slate-800 p-4 flex items-center gap-4">
-                  <div className="p-2.5 rounded-xl bg-slate-800">
-                    <Icon className={`w-5 h-5 ${color}`} />
+                <Card key={label} className="bg-slate-900 border-slate-800 p-3 sm:p-4 flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-slate-800 shrink-0">
+                    <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${color}`} />
                   </div>
-                  <div>
-                    <p className="text-slate-500 text-xs">{label}</p>
-                    <p className={`text-2xl font-bold ${color}`}>{value}</p>
+                  <div className="text-center sm:text-left">
+                    <p className="text-slate-500 text-[10px] sm:text-xs">{label}</p>
+                    <p className={`text-base sm:text-2xl font-bold ${color} leading-tight`}>{value}</p>
                   </div>
                 </Card>
               ))}
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
               {/* ─── Deposit Form ─── */}
               <div className="space-y-4">
                 <h2 className="text-white font-bold text-lg flex items-center gap-2">
