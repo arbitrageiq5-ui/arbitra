@@ -9,6 +9,12 @@ export const metadata: Metadata = {
   title: 'ArbitrageIQ — Discover Arbitrage Opportunities Before Everyone Else',
   description: 'Monitor prices across global exchanges, compare spreads, estimate transaction costs, and identify potential arbitrage opportunities using AI-powered analytics.',
   generator: 'v0.app',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'ArbitrageIQ',
+  },
   icons: {
     icon: [
       {
@@ -23,6 +29,16 @@ export const metadata: Metadata = {
         url: '/icon.svg',
         type: 'image/svg+xml',
       },
+      {
+        url: '/icon-192x192.png',
+        sizes: '192x192',
+        type: 'image/png',
+      },
+      {
+        url: '/icon-512x512.png',
+        sizes: '512x512',
+        type: 'image/png',
+      },
     ],
     apple: '/apple-icon.png',
   },
@@ -30,7 +46,15 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   colorScheme: 'dark',
-  themeColor: [{ media: '(prefers-color-scheme: dark)', color: '#050816' }],
+  themeColor: [
+    { media: '(prefers-color-scheme: dark)', color: '#050816' },
+    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
+  ],
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
+  viewportFit: 'cover',
 }
 
 export default function RootLayout({
@@ -40,10 +64,36 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={inter.className} style={{ backgroundColor: '#050816' }}>
+      <head>
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="ArbitrageIQ" />
+      </head>
       <body className="antialiased font-sans" style={{ backgroundColor: '#050816', color: '#FFFFFF' }}>
         {children}
         {process.env.NODE_ENV === 'production' && <Analytics />}
+        <ServiceWorkerRegister />
       </body>
     </html>
+  )
+}
+
+function ServiceWorkerRegister() {
+  return (
+    <script
+      dangerouslySetInnerHTML={{
+        __html: `
+          if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+              navigator.serviceWorker
+                .register('/sw.js')
+                .then(reg => console.log('[PWA] Service Worker registered'))
+                .catch(err => console.error('[PWA] Service Worker registration failed:', err))
+            })
+          }
+        `,
+      }}
+    />
   )
 }
