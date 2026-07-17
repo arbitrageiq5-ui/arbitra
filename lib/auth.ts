@@ -38,20 +38,27 @@ export const auth = betterAuth({
     },
   },
   trustedOrigins: [
-    // localhost for dev preview
+    // localhost for dev
     'http://localhost:3000',
     'http://localhost:3001',
     'http://localhost:3002',
     // v0 sandbox runtime URL
     ...(process.env.V0_RUNTIME_URL ? [process.env.V0_RUNTIME_URL] : []),
-    // Vercel deployment URLs — Better Auth does NOT support wildcards, must be exact
+    // Dynamic Vercel deployment URLs (Better Auth does NOT support wildcards — exact only)
     ...(process.env.VERCEL_URL ? [`https://${process.env.VERCEL_URL}`] : []),
     ...(process.env.VERCEL_BRANCH_URL ? [`https://${process.env.VERCEL_BRANCH_URL}`] : []),
     ...(process.env.VERCEL_PROJECT_PRODUCTION_URL
       ? [`https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`]
       : []),
-    // Explicitly set production domain if configured
+    // Primary origin from env (set per-environment via Vercel CLI)
     ...(process.env.BETTER_AUTH_URL ? [process.env.BETTER_AUTH_URL] : []),
+    // Known static aliases — all production & preview domains for this project
+    'https://arbitrageiq.exchange',
+    'https://www.arbitrageiq.exchange',
+    'https://arbitra-rho.vercel.app',
+    'https://v0-arbitrageiq.vercel.app',
+    'https://arbitra-arbitrageiq5-2752s-projects.vercel.app',
+    'https://arbitra-arbitrageiq5-2752-arbitrageiq5-2752s-projects.vercel.app',
   ],
   session: {
     expiresIn: 60 * 60 * 24 * 7,
