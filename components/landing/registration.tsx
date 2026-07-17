@@ -1,10 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { CheckCircle2, Zap, TrendingUp, ShieldCheck, Bell, Loader2 } from 'lucide-react'
+import { CheckCircle2, Zap, TrendingUp, ShieldCheck, Bell, Loader2, Shield } from 'lucide-react'
 import Link from 'next/link'
-import { authClient } from '@/lib/auth-client'
+import { registerWithCaptcha } from '@/app/actions/secure-registration'
 
 const benefits = [
   { icon: Zap, text: 'Free forever plan — no credit card required' },
@@ -19,34 +19,79 @@ const countries = [
   'India', 'Brazil', 'Mexico', 'Other',
 ]
 
+declare global {
+  interface Window {
+    grecaptcha: {
+      execute: (siteKey: string, options: { action: string }) => Promise<string>
+    }
+  }
+}
+
 export function Registration() {
   const [form, setForm] = useState({
-    name: '', email: '', phone: '', country: '', password: '', referral: '', agree: false,
+    name: '',
+    email: '',
+    phone: '',
+    country: '',
+    password: '',
+    tradingExperienceLevel: 'beginner' as 'beginner' | 'intermediate' | 'advanced',
+    agree: false,
   })
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const scriptLoaded = useRef(false)
+
+  // Load reCAPTCHA v3 script on mount
+  useEffect(() => {
+    if (scriptLoaded.current) return
+    scriptLoaded.current = true
+
+    const script = document.createElement('script')
+    script.src = `https://www.google.com/recaptcha/api.js?render=${process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY}`
+    script.async = true
+    script.defer = true
+    document.head.appendChild(script)
+  }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
     setLoading(true)
 
-    const { error: signUpError } = await authClient.signUp.email({
-      email: form.email,
-      password: form.password,
-      name: form.name,
-      role: 'viewer',
-    })
+    try {
+      // Get reCAPTCHA v3 token
+      const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY
+      if (!siteKey || !window.grecaptcha) {
+        throw new Error('reCAPTCHA not available')
+      }
 
-    setLoading(false)
+      const captchaToken = await window.grecaptcha.execute(siteKey, { action: 'register' })
 
-    if (signUpError) {
-      setError(signUpError.message ?? 'Something went wrong. Please try again.')
-      return
+      // Call secure registration with captcha
+      const result = await registerWithCaptcha({
+        email: form.email.toLowerCase(),
+        password: form.password,
+        name: form.name,
+        phone: form.phone,
+        country: form.country,
+        tradingExperienceLevel: form.tradingExperienceLevel,
+        captchaToken,
+      })
+
+      if (!result.success) {
+        setError(result.error || 'Registration failed. Please try again.')
+        setLoading(false)
+        return
+      }
+
+      // Success!
+      setSubmitted(true)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
+    } finally {
+      setLoading(false)
     }
-
-    setSubmitted(true)
   }
 
   return (
@@ -135,7 +180,7 @@ export function Registration() {
                   <form onSubmit={handleSubmit} className="flex flex-col gap-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-xs text-[#98A2B3] mb-1.5">Full Name</label>
+                        <label className="block text-xs text-[#98A2B3] mb-1.5">Full Name *</label>
                         <input
                           type="text"
                           required
@@ -158,7 +203,7 @@ export function Registration() {
                     </div>
 
                     <div>
-                      <label className="block text-xs text-[#98A2B3] mb-1.5">Email Address</label>
+                      <label className="block text-xs text-[#98A2B3] mb-1.5">Email Address *</label>
                       <input
                         type="email"
                         required
@@ -169,22 +214,38 @@ export function Registration() {
                       />
                     </div>
 
-                    <div>
-                      <label className="block text-xs text-[#98A2B3] mb-1.5">Country</label>
-                      <select
-                        value={form.country}
-                        onChange={(e) => setForm({ ...form, country: e.target.value })}
-                        className="w-full px-4 py-2.5 text-sm rounded-xl bg-[#0E1324] border border-white/[0.08] text-white focus:outline-none focus:border-[#00D4FF]/40 transition-colors appearance-none"
-                      >
-                        <option value="" disabled>Select your country</option>
-                        {countries.map((c) => (
-                          <option key={c} value={c}>{c}</option>
-                        ))}
-                      </select>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs text-[#98A2B3] mb-1.5">Country *</label>
+                        <select
+                          required
+                          value={form.country}
+                          onChange={(e) => setForm({ ...form, country: e.target.value })}
+                          className="w-full px-4 py-2.5 text-sm rounded-xl bg-[#0E1324] border border-white/[0.08] text-white focus:outline-none focus:border-[#00D4FF]/40 transition-colors appearance-none"
+                        >
+                          <option value="" disabled>Select country</option>
+                          {countries.map((c) => (
+                            <option key={c} value={c}>{c}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-[#98A2B3] mb-1.5">Trading Experience *</label>
+                        <select
+                          required
+                          value={form.tradingExperienceLevel}
+                          onChange={(e) => setForm({ ...form, tradingExperienceLevel: e.target.value as 'beginner' | 'intermediate' | 'advanced' })}
+                          className="w-full px-4 py-2.5 text-sm rounded-xl bg-[#0E1324] border border-white/[0.08] text-white focus:outline-none focus:border-[#00D4FF]/40 transition-colors appearance-none"
+                        >
+                          <option value="beginner">Beginner</option>
+                          <option value="intermediate">Intermediate</option>
+                          <option value="advanced">Advanced</option>
+                        </select>
+                      </div>
                     </div>
 
                     <div>
-                      <label className="block text-xs text-[#98A2B3] mb-1.5">Password</label>
+                      <label className="block text-xs text-[#98A2B3] mb-1.5">Password *</label>
                       <input
                         type="password"
                         required
@@ -195,35 +256,34 @@ export function Registration() {
                       />
                     </div>
 
-                    <div>
-                      <label className="block text-xs text-[#98A2B3] mb-1.5">Referral Code <span className="text-[#98A2B3]/50">(optional)</span></label>
-                      <input
-                        type="text"
-                        value={form.referral}
-                        onChange={(e) => setForm({ ...form, referral: e.target.value })}
-                        placeholder="ARBRIQ2025"
-                        className="w-full px-4 py-2.5 text-sm rounded-xl bg-white/[0.04] border border-white/[0.08] text-white placeholder-[#98A2B3]/50 focus:outline-none focus:border-[#00D4FF]/40 transition-colors"
-                      />
-                    </div>
+                    <div className="space-y-3">
+                      {/* Security notice */}
+                      <div className="flex items-start gap-2 p-3 rounded-xl bg-green-500/5 border border-green-500/20">
+                        <Shield className="w-4 h-4 text-green-400 shrink-0 mt-0.5" />
+                        <p className="text-xs text-green-300/80">
+                          This form is protected by reCAPTCHA v3 to prevent spam and abuse. Your submission is automatically verified.
+                        </p>
+                      </div>
 
-                    <label className="flex items-start gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        required
-                        checked={form.agree}
-                        onChange={(e) => setForm({ ...form, agree: e.target.checked })}
-                        className="mt-1 accent-[#00D4FF]"
-                      />
-                      <span className="text-xs text-[#98A2B3]">
-                        I agree to the{' '}
-                        <Link href="#" className="text-[#00D4FF] hover:underline">Terms of Service</Link>
-                        {', '}
-                        <Link href="#" className="text-[#00D4FF] hover:underline">Privacy Policy</Link>
-                        {', and '}
-                        <Link href="#" className="text-[#00D4FF] hover:underline">Risk Disclosure</Link>.
-                        I understand this platform provides market intelligence only.
-                      </span>
-                    </label>
+                      <label className="flex items-start gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          required
+                          checked={form.agree}
+                          onChange={(e) => setForm({ ...form, agree: e.target.checked })}
+                          className="mt-1 accent-[#00D4FF]"
+                        />
+                        <span className="text-xs text-[#98A2B3]">
+                          I agree to the{' '}
+                          <Link href="#" className="text-[#00D4FF] hover:underline">Terms of Service</Link>
+                          {', '}
+                          <Link href="#" className="text-[#00D4FF] hover:underline">Privacy Policy</Link>
+                          {', and '}
+                          <Link href="#" className="text-[#00D4FF] hover:underline">Risk Disclosure</Link>.
+                          I understand this platform provides market intelligence only.
+                        </span>
+                      </label>
+                    </div>
 
                     {error && (
                       <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-2.5" role="alert">
