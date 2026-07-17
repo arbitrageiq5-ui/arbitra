@@ -175,7 +175,7 @@ export function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
     const role = (session?.data?.user as unknown as { role?: string })?.role ?? 'viewer'
     if (role === 'admin') router.push('/admin')
     else if (role === 'trader') router.push('/trader')
-    else router.push('/opportunities')
+    else router.push('/viewer')
     router.refresh()
   }
 

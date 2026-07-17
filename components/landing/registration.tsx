@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { CheckCircle2, Zap, TrendingUp, ShieldCheck, Bell, Loader2, Shield, RefreshCw } from 'lucide-react'
 import Link from 'next/link'
-import { registerWithCaptcha } from '@/app/actions/secure-registration'
+import { registerWithCaptcha, saveRegistrationProfile } from '@/app/actions/secure-registration'
+import { authClient } from '@/lib/auth-client'
 
 const benefits = [
   { icon: Zap, text: 'Free forever plan — no credit card required' },
@@ -47,6 +49,7 @@ function generateChallenge(): CaptchaChallenge {
 }
 
 export function Registration() {
+  const router = useRouter()
   const [form, setForm] = useState({
     name: '',
     email: '',
@@ -104,19 +107,43 @@ export function Registration() {
     setLoading(true)
 
     try {
-      // Pre-flight check: captcha + rate limit
-      const result = await registerWithCaptcha({
+      // Step 1: Pre-flight — captcha + rate limit + email uniqueness check
+      const preflight = await registerWithCaptcha({
         email: form.email.toLowerCase(),
         captchaToken: 'math-captcha-passed',
       })
 
-      if (!result.success) {
-        setError(result.error || 'Registration failed. Please try again.')
+      if (!preflight.success) {
+        setError(preflight.error || 'Registration failed. Please try again.')
         refreshChallenge()
         return
       }
 
+      // Step 2: Create the account via Better Auth (role defaults to 'viewer' in schema)
+      const { data, error: signUpError } = await authClient.signUp.email({
+        name: form.name.trim(),
+        email: form.email.toLowerCase().trim(),
+        password: form.password,
+        role: 'viewer',
+      })
+
+      if (signUpError || !data?.user?.id) {
+        setError(signUpError?.message ?? 'Account creation failed. Please try again.')
+        refreshChallenge()
+        return
+      }
+
+      // Step 3: Save extended profile fields (phone, country, experience)
+      await saveRegistrationProfile({
+        userId: data.user.id,
+        phone: form.phone || undefined,
+        country: form.country || undefined,
+        tradingExperienceLevel: form.tradingExperienceLevel,
+      })
+
+      // Step 4: Redirect to viewer dashboard
       setSubmitted(true)
+      setTimeout(() => router.push('/viewer'), 2000)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
       refreshChallenge()
@@ -193,15 +220,19 @@ export function Registration() {
                     <CheckCircle2 className="w-8 h-8 text-[#00FF99]" />
                   </div>
                   <h3 className="text-xl font-bold text-white mb-2">Account Created!</h3>
-                  <p className="text-[#98A2B3] text-sm mb-6">
-                    Welcome to ArbitrageIQ. Check your email to verify your account and start exploring opportunities.
+                  <p className="text-[#98A2B3] text-sm mb-2">
+                    Welcome to ArbitrageIQ. Your free Viewer account is ready.
                   </p>
-                  <button
-                    onClick={() => setSubmitted(false)}
-                    className="text-sm text-[#00D4FF] hover:underline"
+                  <p className="text-xs text-[#98A2B3]/60 mb-6 flex items-center gap-1.5">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    Redirecting to your dashboard...
+                  </p>
+                  <Link
+                    href="/viewer"
+                    className="px-5 py-2.5 rounded-xl text-sm font-semibold text-[#050816] bg-[#00D4FF] hover:bg-[#00D4FF]/90 transition-all"
                   >
-                    Back to form
-                  </button>
+                    Go to Dashboard
+                  </Link>
                 </div>
               ) : (
                 <>
