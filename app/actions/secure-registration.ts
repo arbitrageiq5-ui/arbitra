@@ -2,7 +2,7 @@
 
 import { db } from '@/lib/db'
 import { user, registrationAudits } from '@/lib/db/schema'
-import { eq, and, gt, desc } from 'drizzle-orm'
+import { eq, and, gt, desc, count } from 'drizzle-orm'
 import { headers } from 'next/headers'
 
 const CAPTCHA_SCORE_THRESHOLD = 0.5 // reCAPTCHA v3: score >= 0.5 is likely legitimate
@@ -63,7 +63,7 @@ async function checkRateLimit(ipAddress: string): Promise<{ allowed: boolean; at
   const windowStart = new Date(Date.now() - RATE_LIMIT_WINDOW_MS)
 
   const [result] = await db
-    .select({ count: db.count() })
+    .select({ count: count() })
     .from(registrationAudits)
     .where(
       and(
@@ -72,7 +72,7 @@ async function checkRateLimit(ipAddress: string): Promise<{ allowed: boolean; at
       )
     )
 
-  const attemptCount = result?.count ?? 0
+  const attemptCount = Number(result?.count ?? 0)
   return {
     allowed: attemptCount < RATE_LIMIT_MAX_ATTEMPTS,
     attemptCount,
@@ -107,9 +107,8 @@ export async function registerWithCaptcha({
   captchaToken: string
 }): Promise<{ success: boolean; error?: string }> {
   try {
-    const headersList = await headers()
     const ipAddress = await getClientIp()
-    const userAgent = headersList.get('user-agent') || ''
+    const userAgent = (await headers()).get('user-agent') || ''
 
     // 1. Check rate limiting
     const { allowed, attemptCount } = await checkRateLimit(ipAddress)
@@ -205,9 +204,7 @@ export async function saveRegistrationProfile({
       })
       .where(eq(user.id, userId))
 
-    // Update audit to success
-    const headersList = await headers()
-    const ipAddress = await getClientIp()
+    // Update the most-recent pending audit for this user to success
     await db
       .update(registrationAudits)
       .set({
@@ -218,7 +215,7 @@ export async function saveRegistrationProfile({
       })
       .where(
         and(
-          eq(registrationAudits.email, (await db.select({ email: user.email }).from(user).where(eq(user.id, userId)).limit(1))[0]?.email ?? ''),
+          eq(registrationAudits.userId, userId),
           eq(registrationAudits.registrationStatus, 'pending')
         )
       )
