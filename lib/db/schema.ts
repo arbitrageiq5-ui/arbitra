@@ -15,6 +15,11 @@ export const user = pgTable('user', {
   referredBy: text('referred_by'), // userId of referrer (no FK to avoid circular)
   isActivated: boolean('is_activated').notNull().default(false),
   activationPaidAt: timestamp('activation_paid_at'),
+  // Registration details
+  phone: text('phone'),
+  country: text('country'),
+  // 'beginner' | 'intermediate' | 'advanced'
+  tradingExperienceLevel: text('trading_experience_level').default('beginner'),
   createdAt: timestamp('createdAt').notNull().defaultNow(),
   updatedAt: timestamp('updatedAt').notNull().defaultNow(),
 })
@@ -280,6 +285,23 @@ export const withdrawals = pgTable('withdrawals', {
 })
 
 // --- Trading Bots ---
+
+// --- Registration Audit ---
+
+export const registrationAudits = pgTable('registration_audits', {
+  id: serial('id').primaryKey(),
+  userId: text('userId').references(() => user.id, { onDelete: 'cascade' }),
+  email: text('email').notNull(),
+  ipAddress: text('ip_address'),
+  userAgent: text('user_agent'),
+  captchaScore: decimal('captcha_score', { precision: 3, scale: 2 }),
+  captchaPassed: boolean('captcha_passed').default(false),
+  registrationStatus: text('registration_status').notNull().default('pending'), // 'pending' | 'success' | 'rejected'
+  rejectionReason: text('rejection_reason'),
+  country: text('country'),
+  tradingExperienceLevel: text('trading_experience_level'),
+  createdAt: timestamp('createdAt').notNull().defaultNow(),
+})
 
 export const tradingBots = pgTable('trading_bots', {
   id: serial('id').primaryKey(),
