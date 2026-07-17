@@ -6,7 +6,6 @@ import { arbitrageOpportunities, notifications, portfolio } from '@/lib/db/schem
 import { headers } from 'next/headers'
 import { eq, and, desc } from 'drizzle-orm'
 import { OpenAI } from 'openai'
-import { getPricesAcrossExchanges, detectArbitrageOpportunities } from '@/lib/services/exchanges'
 
 let openai: OpenAI | null = null
 
@@ -154,79 +153,68 @@ export async function getMarketOpportunities(): Promise<{
     ZRO: 'alt', EIGEN: 'alt', SCR: 'l2',
   }
 
-  // Fetch LIVE prices from real exchanges
-  try {
-    const topSymbols = [
-      'BTC', 'ETH', 'BNB', 'SOL', 'XRP', 'DOGE', 'ADA', 'AVAX',
-      'LINK', 'MATIC', 'DOT', 'ATOM', 'UNI', 'LTC', 'NEAR',
-    ]
-    
-    const liveprices = await getPricesAcrossExchanges(topSymbols)
-    const opportunities = detectArbitrageOpportunities(liveprices, 0.3) // min 0.3% profit
-    
-    // Enrich with metadata
-    return opportunities
-      .map((opp, idx) => {
-        const isMajor = categories[opp.symbol] === 'major'
-        const isMeme = categories[opp.symbol] === 'meme'
-        const netProfitAfterFees = opp.profitPercentage - 0.2 // assume 0.1% buy + 0.1% sell fees
-        
-        return {
-          id: `${opp.symbol}-${opp.buyExchange}-${opp.sellExchange}-${Date.now()}-${idx}`,
-          symbol: opp.symbol,
-          category: categories[opp.symbol] ?? 'alt',
-          buyExchange: opp.buyExchange,
-          sellExchange: opp.sellExchange,
-          buyPrice: parseFloat(opp.buyPrice.toFixed(8)),
-          sellPrice: parseFloat(opp.sellPrice.toFixed(8)),
-          spread: parseFloat(opp.profitPercentage.toFixed(4)),
-          netProfit: parseFloat(Math.max(0, netProfitAfterFees).toFixed(4)),
-          volume24h: 10000000, // placeholder, would need additional API calls
-          liquidity: isMajor ? 'High' : 'Medium' as const,
-          risk: netProfitAfterFees > 2 ? 'High' : netProfitAfterFees > 0.8 ? 'Medium' : 'Low' as const,
-          detectedAt: new Date().toISOString(),
-        }
+  // Generate simulated opportunities with live-like refresh
+  const results: ReturnType<typeof getMarketOpportunities> extends Promise<infer T> ? T : never = []
+  const seed = Math.floor(Date.now() / 15000) // refresh every 15 seconds for "live" feel
+  const symbols = Object.keys(BASE_PRICES)
+
+  symbols.forEach((symbol, symbolIdx) => {
+    const basePrice = BASE_PRICES[symbol]
+    const rng = seededRand(seed + symbolIdx * 997)
+    const isMajor = categories[symbol] === 'major'
+    const isMeme = categories[symbol] === 'meme'
+
+    // Each symbol gets 1-2 opportunities
+    const numOpps = Math.floor(rng() * 2) + 1
+
+    for (let i = 0; i < numOpps; i++) {
+      const rng2 = seededRand(seed + symbolIdx * 997 + i * 137)
+
+      // Pick two different exchanges
+      let buyIdx = Math.floor(rng2() * EXCHANGES.length)
+      let sellIdx = Math.floor(rng2() * EXCHANGES.length)
+      while (sellIdx === buyIdx) sellIdx = Math.floor(rng2() * EXCHANGES.length)
+
+      const buyExchange = EXCHANGES[buyIdx]
+      const sellExchange = EXCHANGES[sellIdx]
+
+      // Spread calculation
+      const maxSpread = isMeme ? 5.0 : isMajor ? 1.5 : 3.0
+      const minSpread = isMeme ? 0.5 : isMajor ? 0.1 : 0.3
+      const spreadPct = minSpread + rng2() * (maxSpread - minSpread)
+
+      const buyPrice = basePrice * (1 - spreadPct / 200)
+      const sellPrice = basePrice * (1 + spreadPct / 200)
+
+      const buyFee = EXCHANGE_FEES[buyExchange] ?? 0.1
+      const sellFee = EXCHANGE_FEES[sellExchange] ?? 0.1
+      const totalFees = buyFee + sellFee
+      const netProfit = spreadPct - totalFees / 100 * 100
+
+      if (netProfit < 0.05) continue
+
+      const liq: 'High' | 'Medium' | 'Low' = isMajor ? 'High' : rng2() > 0.5 ? 'Medium' : 'Low'
+      const risk: 'Low' | 'Medium' | 'High' = netProfit > 2 ? 'High' : netProfit > 0.8 ? 'Medium' : 'Low'
+
+      results.push({
+        id: `${symbol}-${buyExchange}-${sellExchange}-${seed}-${i}`,
+        symbol,
+        category: categories[symbol] ?? 'alt',
+        buyExchange,
+        sellExchange,
+        buyPrice,
+        sellPrice,
+        spread: parseFloat(spreadPct.toFixed(4)),
+        netProfit: parseFloat(netProfit.toFixed(4)),
+        volume24h: 10000000 + Math.floor(rng2() * 90000000),
+        liquidity: liq,
+        risk,
+        detectedAt: new Date().toISOString(),
       })
-      .sort((a, b) => b.netProfit - a.netProfit)
-  } catch (error) {
-    console.error('[v0] Live price fetching failed, falling back to simulation:', error)
-    // Fallback to simulation if APIs are down
-    const results: ReturnType<typeof getMarketOpportunities> extends Promise<infer T> ? T : never = []
-    const seed = Math.floor(Date.now() / 30000)
-    const symbols = Object.keys(BASE_PRICES).slice(0, 20)
+    }
+  })
 
-    symbols.forEach((symbol, symbolIdx) => {
-      const basePrice = BASE_PRICES[symbol]
-      const rng = seededRand(seed + symbolIdx * 997)
-      const isMajor = categories[symbol] === 'major'
-      const maxSpread = isMajor ? 1.5 : 3.0
-      const minSpread = isMajor ? 0.1 : 0.3
-      const spreadPct = minSpread + rng() * (maxSpread - minSpread)
-      const netProfit = spreadPct - 0.2
-
-      if (netProfit >= 0.3) {
-        const buyExchange = EXCHANGES[Math.floor(rng() * 3)]
-        const sellExchange = EXCHANGES[Math.floor(3 + rng() * 3)]
-        
-        results.push({
-          id: `${symbol}-${buyExchange}-${sellExchange}-${seed}`,
-          symbol,
-          category: categories[symbol] ?? 'alt',
-          buyExchange,
-          sellExchange,
-          buyPrice: basePrice * (1 - spreadPct / 200),
-          sellPrice: basePrice * (1 + spreadPct / 200),
-          spread: parseFloat(spreadPct.toFixed(4)),
-          netProfit: parseFloat(netProfit.toFixed(4)),
-          volume24h: 10000000,
-          liquidity: 'High' as const,
-          risk: 'Medium' as const,
-          detectedAt: new Date().toISOString(),
-        })
-      }
-    })
-    return results.sort((a, b) => b.netProfit - a.netProfit)
-  }
+  return results.sort((a, b) => b.netProfit - a.netProfit)
 }
 
 export async function scoreOpportunityWithAI(opportunityId: number) {
