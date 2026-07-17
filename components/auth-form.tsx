@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { authClient } from '@/lib/auth-client'
@@ -11,6 +11,34 @@ import { Card } from '@/components/ui/card'
 import { getRoleLabel, getRoleDescription, UserRole } from '@/lib/roles'
 import { validateReferralCode } from '@/app/actions/referral'
 import { storeReferredBy } from '@/app/actions/users'
+import { registerWithCaptcha } from '@/app/actions/secure-registration'
+import { RefreshCw, Shield } from 'lucide-react'
+
+// ── Math captcha helpers ───────────────────────────────────────────────────────
+type CaptchaChallenge = { question: string; answer: number }
+
+function generateChallenge(): CaptchaChallenge {
+  const ops = ['+', '-', '*'] as const
+  const op = ops[Math.floor(Math.random() * ops.length)]
+  let a: number, b: number, answer: number, question: string
+  if (op === '+') {
+    a = Math.floor(Math.random() * 20) + 1
+    b = Math.floor(Math.random() * 20) + 1
+    answer = a + b
+    question = `${a} + ${b}`
+  } else if (op === '-') {
+    a = Math.floor(Math.random() * 20) + 10
+    b = Math.floor(Math.random() * a) + 1
+    answer = a - b
+    question = `${a} - ${b}`
+  } else {
+    a = Math.floor(Math.random() * 9) + 2
+    b = Math.floor(Math.random() * 9) + 2
+    answer = a * b
+    question = `${a} × ${b}`
+  }
+  return { question, answer }
+}
 
 export function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
   const router = useRouter()
@@ -25,7 +53,23 @@ export function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
+  // Math captcha — generated client-side only to avoid SSR hydration mismatch
+  const [challenge, setChallenge] = useState<CaptchaChallenge | null>(null)
+  const [captchaAnswer, setCaptchaAnswer] = useState('')
+  const [captchaError, setCaptchaError] = useState(false)
+
+  const refreshChallenge = useCallback(() => {
+    setChallenge(generateChallenge())
+    setCaptchaAnswer('')
+    setCaptchaError(false)
+  }, [])
+
   const isSignUp = mode === 'sign-up'
+
+  // Generate initial captcha challenge after mount (client-only)
+  useEffect(() => {
+    if (isSignUp) refreshChallenge()
+  }, [isSignUp, refreshChallenge])
 
   // Pre-fill referral code from URL param e.g. /sign-up?ref=ABCD1234
   useEffect(() => {
@@ -51,26 +95,49 @@ export function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+    setCaptchaError(false)
+
+    // ── Sign-up: verify captcha before anything else ────────────────────────
+    if (isSignUp) {
+      const userAnswer = parseInt(captchaAnswer.trim(), 10)
+      if (!challenge || isNaN(userAnswer) || userAnswer !== challenge.answer) {
+        setCaptchaError(true)
+        refreshChallenge()
+        setError('Incorrect security answer. A new challenge has been generated.')
+        return
+      }
+    }
+
     setLoading(true)
 
     if (isSignUp) {
-      const { error } = await authClient.signUp.email({
-        email,
+      // Use the secure server-action (rate-limit + audit log) instead of direct authClient
+      const result = await registerWithCaptcha({
+        email: email.toLowerCase(),
         password,
         name,
-        role: selectedRole,
+        captchaToken: 'math-captcha-passed',
+        tradingExperienceLevel: 'beginner',
       })
-      if (error) {
-        setError(error.message ?? 'Something went wrong')
+      if (!result.success) {
+        setError(result.error ?? 'Something went wrong')
+        refreshChallenge()
         setLoading(false)
         return
       }
 
-      // After sign-up: store referredBy if a valid code was entered
+      // Store referral association if a valid code was entered
       if (referralCode && referralValid) {
-        try {
-          await storeReferredBy(referralCode)
-        } catch { /* non-fatal */ }
+        try { await storeReferredBy(referralCode) } catch { /* non-fatal */ }
+      }
+
+      // Sign in to create the session
+      const { error: signInError } = await authClient.signIn.email({ email: email.toLowerCase(), password })
+      if (signInError) {
+        setError('Account created! Please sign in to continue.')
+        setLoading(false)
+        router.push('/sign-in')
+        return
       }
     } else {
       const { error } = await authClient.signIn.email({ email, password })
@@ -212,6 +279,46 @@ export function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
               autoComplete={isSignUp ? 'new-password' : 'current-password'}
             />
           </div>
+
+          {/* Math captcha — sign-up only */}
+          {isSignUp && challenge && (
+            <div className="rounded-lg border border-border bg-muted/40 p-4 flex flex-col gap-3">
+              <div className="flex items-center gap-2">
+                <Shield className="w-3.5 h-3.5 text-primary shrink-0" />
+                <span className="text-xs font-semibold text-foreground uppercase tracking-wide">Security Check</span>
+              </div>
+              <p className="text-xs text-muted-foreground">Solve the equation to prove you&apos;re human:</p>
+              <div className="flex items-center gap-3">
+                {/* Challenge display */}
+                <div className="flex-1 flex items-center justify-center px-4 py-2.5 rounded-lg bg-background border border-border select-none">
+                  <span className="text-base font-bold font-mono tracking-widest text-foreground">
+                    {challenge.question} = ?
+                  </span>
+                </div>
+                {/* Answer input */}
+                <Input
+                  type="number"
+                  value={captchaAnswer}
+                  onChange={(e) => { setCaptchaAnswer(e.target.value); setCaptchaError(false) }}
+                  placeholder="0"
+                  className={`w-20 text-center font-bold text-base font-mono ${captchaError ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                  required={isSignUp}
+                />
+                {/* Refresh */}
+                <button
+                  type="button"
+                  onClick={refreshChallenge}
+                  className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  title="New challenge"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              {captchaError && (
+                <p className="text-xs text-destructive">Wrong answer — a new challenge has been generated.</p>
+              )}
+            </div>
+          )}
 
           {error && (
             <p className="text-sm text-destructive" role="alert">
