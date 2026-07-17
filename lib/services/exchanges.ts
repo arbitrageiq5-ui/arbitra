@@ -14,6 +14,7 @@ const EXCHANGES = {
   gateio: 'https://api.gateio.ws/api/v4',
   gemini: 'https://api.gemini.com/v1',
   cryptocom: 'https://api.crypto.com/v2',
+  bitget: 'https://api.bitget.com/v2',
 }
 
 const SYMBOL_TO_COINGECKO_ID: Record<string, string> = {
@@ -300,14 +301,35 @@ async function getCryptocomPrice(symbol: string): Promise<ExchangePrice | null> 
   }
 }
 
-// Get prices from all exchanges (LIVE rates from 11 sources)
+// Bitget Price Fetcher
+async function getBitgetPrice(symbol: string): Promise<ExchangePrice | null> {
+  try {
+    const response = await axios.get(`${EXCHANGES.bitget}/public/spot/tickers`, {
+      params: {
+        symbol: `${symbol.toUpperCase()}USDT`,
+      },
+      timeout: 5000,
+    })
+    const data = response.data.data[0]
+    return {
+      symbol,
+      exchange: 'bitget',
+      price: parseFloat(data.lastPr || data.last),
+      timestamp: Date.now(),
+    }
+  } catch {
+    return null
+  }
+}
+
+// Get prices from all exchanges (LIVE rates from 12 sources)
 export async function getPricesAcrossExchanges(
   symbols: string[]
 ): Promise<ExchangePrice[]> {
   const prices: ExchangePrice[] = []
 
   for (const symbol of symbols) {
-    // Fetch from all 11 sources in parallel for maximum coverage
+    // Fetch from all 12 sources in parallel for maximum coverage
     const [
       coingecko,
       binance,
@@ -321,6 +343,7 @@ export async function getPricesAcrossExchanges(
       gateio,
       gemini,
       cryptocom,
+      bitget,
     ] = await Promise.all([
       getCoinGeckoPrice(symbol),
       getBinancePrice(symbol),
@@ -334,6 +357,7 @@ export async function getPricesAcrossExchanges(
       getGateioPrice(symbol),
       getGeminiPrice(symbol),
       getCryptocomPrice(symbol),
+      getBitgetPrice(symbol),
     ])
 
     if (coingecko) prices.push(coingecko)
@@ -348,6 +372,7 @@ export async function getPricesAcrossExchanges(
     if (gateio) prices.push(gateio)
     if (gemini) prices.push(gemini)
     if (cryptocom) prices.push(cryptocom)
+    if (bitget) prices.push(bitget)
   }
 
   return prices
