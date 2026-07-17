@@ -11,7 +11,7 @@ import { Card } from '@/components/ui/card'
 import { getRoleLabel, getRoleDescription, UserRole } from '@/lib/roles'
 import { validateReferralCode } from '@/app/actions/referral'
 import { storeReferredBy } from '@/app/actions/users'
-import { registerWithCaptcha } from '@/app/actions/secure-registration'
+import { registerWithCaptcha, saveRegistrationProfile } from '@/app/actions/secure-registration'
 import { RefreshCw, Shield } from 'lucide-react'
 
 // ── Math captcha helpers ───────────────────────────────────────────────────────
@@ -111,33 +111,40 @@ export function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
     setLoading(true)
 
     if (isSignUp) {
-      // Use the secure server-action (rate-limit + audit log) instead of direct authClient
-      const result = await registerWithCaptcha({
+      // Step 1 — Server pre-flight: captcha + rate limit + email uniqueness check
+      const preflightResult = await registerWithCaptcha({
         email: email.toLowerCase(),
-        password,
-        name,
         captchaToken: 'math-captcha-passed',
-        tradingExperienceLevel: 'beginner',
       })
-      if (!result.success) {
-        setError(result.error ?? 'Something went wrong')
+      if (!preflightResult.success) {
+        setError(preflightResult.error ?? 'Something went wrong')
         refreshChallenge()
         setLoading(false)
         return
       }
 
-      // Store referral association if a valid code was entered
-      if (referralCode && referralValid) {
-        try { await storeReferredBy(referralCode) } catch { /* non-fatal */ }
+      // Step 2 — Let Better Auth create the account (it hashes the password correctly)
+      const { data: signUpData, error: signUpError } = await authClient.signUp.email({
+        email: email.toLowerCase(),
+        password,
+        name,
+        role: selectedRole,
+      })
+      if (signUpError) {
+        setError(signUpError.message ?? 'Account creation failed.')
+        refreshChallenge()
+        setLoading(false)
+        return
       }
 
-      // Sign in to create the session
-      const { error: signInError } = await authClient.signIn.email({ email: email.toLowerCase(), password })
-      if (signInError) {
-        setError('Account created! Please sign in to continue.')
-        setLoading(false)
-        router.push('/sign-in')
-        return
+      // Step 3 — Save extra profile fields via server action
+      if (signUpData?.user?.id) {
+        try { await saveRegistrationProfile({ userId: signUpData.user.id }) } catch { /* non-fatal */ }
+      }
+
+      // Step 4 — Store referral association
+      if (referralCode && referralValid) {
+        try { await storeReferredBy(referralCode) } catch { /* non-fatal */ }
       }
     } else {
       const { error } = await authClient.signIn.email({ email, password })

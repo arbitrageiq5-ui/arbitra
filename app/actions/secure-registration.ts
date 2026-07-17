@@ -80,10 +80,11 @@ async function checkRateLimit(ipAddress: string): Promise<{ allowed: boolean; at
 }
 
 /**
- * Get client IP address from headers (works with proxies like Vercel)
+ * Get client IP address from headers (works with proxies like Vercel).
+ * headers() must be awaited in Next.js 16.
  */
-function getClientIp(): string {
-  const headersList = headers()
+async function getClientIp(): Promise<string> {
+  const headersList = await headers()
   return (
     headersList.get('x-forwarded-for')?.split(',')[0].trim() ||
     headersList.get('x-real-ip') ||
@@ -93,49 +94,39 @@ function getClientIp(): string {
 }
 
 /**
- * Register user with captcha validation and secure audit logging
+ * Pre-flight check: validate captcha and rate limit before account creation.
+ * Does NOT insert the user — Better Auth handles that via authClient.signUp.email()
+ * on the client, which correctly hashes the password. After Better Auth creates
+ * the account, call saveRegistrationProfile() to store extra profile fields.
  */
 export async function registerWithCaptcha({
   email,
-  password,
-  name,
-  phone,
-  country,
-  tradingExperienceLevel,
   captchaToken,
 }: {
   email: string
-  password: string
-  name: string
-  phone: string
-  country: string
-  tradingExperienceLevel: 'beginner' | 'intermediate' | 'advanced'
   captchaToken: string
-}): Promise<{ success: boolean; error?: string; userId?: string }> {
+}): Promise<{ success: boolean; error?: string }> {
   try {
-    const ipAddress = getClientIp()
-    const userAgent = headers().get('user-agent') || ''
+    const headersList = await headers()
+    const ipAddress = await getClientIp()
+    const userAgent = headersList.get('user-agent') || ''
 
     // 1. Check rate limiting
     const { allowed, attemptCount } = await checkRateLimit(ipAddress)
     if (!allowed) {
-      // Log failed attempt
       await db.insert(registrationAudits).values({
         email,
         ipAddress,
         userAgent,
         registrationStatus: 'rejected',
         rejectionReason: `Rate limited: ${attemptCount} attempts in last hour`,
-        country,
-        tradingExperienceLevel,
       })
-      return { success: false, error: 'Too many registration attempts. Try again later.' }
+      return { success: false, error: 'Too many registration attempts. Please try again in an hour.' }
     }
 
     // 2. Verify captcha
     const captchaResult = await verifyCaptcha(captchaToken, ipAddress)
     if (!captchaResult.success) {
-      // Log failed captcha
       await db.insert(registrationAudits).values({
         email,
         ipAddress,
@@ -143,14 +134,12 @@ export async function registerWithCaptcha({
         captchaScore: parseFloat(captchaResult.score.toFixed(2)),
         captchaPassed: false,
         registrationStatus: 'rejected',
-        rejectionReason: `Captcha score too low: ${captchaResult.score.toFixed(2)}`,
-        country,
-        tradingExperienceLevel,
+        rejectionReason: `Captcha failed: score ${captchaResult.score.toFixed(2)}`,
       })
-      return { success: false, error: 'Captcha verification failed. Please try again.' }
+      return { success: false, error: 'Security check failed. Please try again.' }
     }
 
-    // 3. Validate email uniqueness
+    // 3. Check email uniqueness before proceeding
     const existingUser = await db
       .select({ id: user.id })
       .from(user)
@@ -158,7 +147,6 @@ export async function registerWithCaptcha({
       .limit(1)
 
     if (existingUser.length > 0) {
-      // Log duplicate email attempt
       await db.insert(registrationAudits).values({
         email,
         ipAddress,
@@ -167,53 +155,78 @@ export async function registerWithCaptcha({
         captchaPassed: true,
         registrationStatus: 'rejected',
         rejectionReason: 'Email already registered',
-        country,
-        tradingExperienceLevel,
       })
-      return { success: false, error: 'Email already registered.' }
+      return { success: false, error: 'This email is already registered.' }
     }
 
-    // 4. Create user with additional details
-    const newUser = await db
-      .insert(user)
-      .values({
-        email: email.toLowerCase(),
-        password,
-        name,
-        phone,
-        country,
-        tradingExperienceLevel,
-        role: 'trader',
-      })
-      .returning({ id: user.id })
-
-    if (!newUser[0]) {
-      throw new Error('Failed to create user')
-    }
-
-    // 5. Log successful registration
+    // Pre-flight passed — log pending, client will complete via Better Auth
     await db.insert(registrationAudits).values({
-      userId: newUser[0].id,
       email,
       ipAddress,
       userAgent,
       captchaScore: parseFloat(captchaResult.score.toFixed(2)),
       captchaPassed: true,
-      registrationStatus: 'success',
-      country,
-      tradingExperienceLevel,
+      registrationStatus: 'pending',
     })
 
-    return {
-      success: true,
-      userId: newUser[0].id,
-    }
+    return { success: true }
   } catch (err) {
-    console.error('[v0] Registration error:', err)
+    console.error('[v0] Registration pre-flight error:', err)
     return {
       success: false,
       error: err instanceof Error ? err.message : 'Registration failed. Please try again.',
     }
+  }
+}
+
+/**
+ * Save additional profile fields after Better Auth creates the account.
+ * Called from the client after authClient.signUp.email() succeeds.
+ */
+export async function saveRegistrationProfile({
+  userId,
+  phone,
+  country,
+  tradingExperienceLevel,
+}: {
+  userId: string
+  phone?: string
+  country?: string
+  tradingExperienceLevel?: string
+}): Promise<{ success: boolean }> {
+  try {
+    await db
+      .update(user)
+      .set({
+        phone: phone || null,
+        country: country || null,
+        tradingExperienceLevel: tradingExperienceLevel || 'beginner',
+        updatedAt: new Date(),
+      })
+      .where(eq(user.id, userId))
+
+    // Update audit to success
+    const headersList = await headers()
+    const ipAddress = await getClientIp()
+    await db
+      .update(registrationAudits)
+      .set({
+        userId,
+        registrationStatus: 'success',
+        country: country || null,
+        tradingExperienceLevel: tradingExperienceLevel || 'beginner',
+      })
+      .where(
+        and(
+          eq(registrationAudits.email, (await db.select({ email: user.email }).from(user).where(eq(user.id, userId)).limit(1))[0]?.email ?? ''),
+          eq(registrationAudits.registrationStatus, 'pending')
+        )
+      )
+
+    return { success: true }
+  } catch (err) {
+    console.error('[v0] saveRegistrationProfile error:', err)
+    return { success: false }
   }
 }
 
@@ -231,7 +244,7 @@ export async function getRegistrationAudits({
     const audits = await db
       .select()
       .from(registrationAudits)
-      .orderBy((t) => [desc(t.createdAt)])
+      .orderBy(desc(registrationAudits.createdAt))
       .limit(limit)
       .offset(offset)
 
