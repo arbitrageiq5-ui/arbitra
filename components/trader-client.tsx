@@ -87,6 +87,9 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
   const [refreshing, setRefreshing] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [minProfit, setMinProfit] = useState(0)
+  const [selectedExchanges, setSelectedExchanges] = useState<string[]>([])
+  const [selectedRisks, setSelectedRisks] = useState<string[]>([])
+  const [minVolume, setMinVolume] = useState(0)
   const [sortKey, setSortKey] = useState<SortKey>('netProfit')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [showFilters, setShowFilters] = useState(false)
@@ -175,13 +178,20 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
       data = data.filter(o => o.symbol.includes(q) || o.buyExchange.toUpperCase().includes(q) || o.sellExchange.toUpperCase().includes(q))
     }
     if (minProfit > 0) data = data.filter(o => o.netProfit >= minProfit)
+    if (selectedExchanges.length > 0) {
+      data = data.filter(o => selectedExchanges.includes(o.buyExchange) || selectedExchanges.includes(o.sellExchange))
+    }
+    if (selectedRisks.length > 0) {
+      data = data.filter(o => selectedRisks.includes(o.risk))
+    }
+    if (minVolume > 0) data = data.filter(o => o.volume24h >= minVolume)
     return [...data].sort((a, b) => {
       const va = a[sortKey] as number | string
       const vb = b[sortKey] as number | string
       if (typeof va === 'string') return sortDir === 'asc' ? va.localeCompare(vb as string) : (vb as string).localeCompare(va)
       return sortDir === 'asc' ? (va as number) - (vb as number) : (vb as number) - (va as number)
     })
-  }, [opportunities, searchQuery, minProfit, sortKey, sortDir])
+  }, [opportunities, searchQuery, minProfit, selectedExchanges, selectedRisks, minVolume, sortKey, sortDir])
 
   const paginated = filtered.slice(oppPage * OPP_PAGE_SIZE, (oppPage + 1) * OPP_PAGE_SIZE)
   const totalPages = Math.ceil(filtered.length / OPP_PAGE_SIZE)
@@ -388,7 +398,7 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
               <button
                 onClick={() => setShowFilters(!showFilters)}
                 className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-medium transition-colors shrink-0 ${
-                  showFilters || minProfit > 0
+                  showFilters || minProfit > 0 || selectedExchanges.length > 0 || selectedRisks.length > 0 || minVolume > 0
                     ? 'bg-amber-500/10 border-amber-500/40 text-amber-400'
                     : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
                 }`}
@@ -403,9 +413,9 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
               >
                 <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin text-amber-400' : ''}`} />
               </button>
-              {(searchQuery || minProfit > 0) && (
+              {(searchQuery || minProfit > 0 || selectedExchanges.length > 0 || selectedRisks.length > 0 || minVolume > 0) && (
                 <button
-                  onClick={() => { setSearchQuery(''); setMinProfit(0); setOppPage(0) }}
+                  onClick={() => { setSearchQuery(''); setMinProfit(0); setSelectedExchanges([]); setSelectedRisks([]); setMinVolume(0); setOppPage(0) }}
                   className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-white transition-colors shrink-0"
                 >
                   <X className="w-3.5 h-3.5" /> Clear
@@ -414,18 +424,91 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
             </div>
 
             {showFilters && (
-              <Card className="bg-slate-900 border-slate-800 p-4">
-                <div className="flex items-center gap-4">
+              <Card className="bg-slate-900 border-slate-800 p-4 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                  {/* Min Net Profit */}
                   <div>
-                    <label className="text-xs text-slate-400 mb-1.5 block">Min Net Profit %</label>
+                    <label className="text-xs text-slate-400 mb-1.5 block font-medium">Min Net Profit %</label>
                     <input
                       type="number"
                       min="0"
                       step="0.1"
                       value={minProfit}
                       onChange={e => { setMinProfit(parseFloat(e.target.value) || 0); setOppPage(0) }}
-                      className="w-36 px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-amber-500/50"
+                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-amber-500/50"
+                      placeholder="0.0"
                     />
+                  </div>
+
+                  {/* Risk Level */}
+                  <div>
+                    <label className="text-xs text-slate-400 mb-1.5 block font-medium">Risk Level</label>
+                    <div className="flex gap-1.5">
+                      {['Low', 'Medium', 'High'].map(risk => (
+                        <button
+                          key={risk}
+                          onClick={() => {
+                            setSelectedRisks(prev =>
+                              prev.includes(risk)
+                                ? prev.filter(r => r !== risk)
+                                : [...prev, risk]
+                            )
+                            setOppPage(0)
+                          }}
+                          className={`flex-1 px-2.5 py-1.5 rounded text-xs font-medium transition-colors ${
+                            selectedRisks.includes(risk)
+                              ? risk === 'Low'
+                                ? 'bg-green-500/30 border border-green-500/50 text-green-300'
+                                : risk === 'Medium'
+                                  ? 'bg-amber-500/30 border border-amber-500/50 text-amber-300'
+                                  : 'bg-red-500/30 border border-red-500/50 text-red-300'
+                              : 'bg-slate-800 border border-slate-700 text-slate-400 hover:text-slate-300'
+                          }`}
+                        >
+                          {risk}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Min Volume */}
+                  <div>
+                    <label className="text-xs text-slate-400 mb-1.5 block font-medium">Min Volume 24h</label>
+                    <select
+                      value={minVolume}
+                      onChange={e => { setMinVolume(parseFloat(e.target.value) || 0); setOppPage(0) }}
+                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-amber-500/50"
+                    >
+                      <option value="0">Any</option>
+                      <option value="1000000">$1M+</option>
+                      <option value="5000000">$5M+</option>
+                      <option value="10000000">$10M+</option>
+                      <option value="50000000">$50M+</option>
+                      <option value="100000000">$100M+</option>
+                    </select>
+                  </div>
+
+                  {/* Exchanges */}
+                  <div>
+                    <label className="text-xs text-slate-400 mb-1.5 block font-medium">Exchange</label>
+                    <select
+                      multiple
+                      value={selectedExchanges}
+                      onChange={e => {
+                        const selected = Array.from(e.target.selectedOptions, opt => opt.value)
+                        setSelectedExchanges(selected)
+                        setOppPage(0)
+                      }}
+                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-amber-500/50"
+                      size={3}
+                    >
+                      {['Binance', 'OKX', 'Bybit', 'KuCoin', 'Gate.io', 'MEXC', 'HTX', 'Kraken', 'Coinbase', 'Gemini', 'Crypto.com', 'BingX'].map(exchange => (
+                        <option key={exchange} value={exchange}>
+                          {exchange}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-[10px] text-slate-500 mt-1">Hold Ctrl/Cmd to select multiple</p>
                   </div>
                 </div>
               </Card>
