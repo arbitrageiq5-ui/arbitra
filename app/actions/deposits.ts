@@ -83,13 +83,15 @@ export async function deleteDepositAddress(id: number) {
 export async function submitFundRequest(
   network: Network,
   amount: number,
-  txHash?: string
+  txHash?: string,
+  screenshotUrl?: string
 ) {
   const session = await getSession()
   const u = session.user as unknown as { role?: string }
   if (u.role !== 'trader') throw new Error('Trader access required')
 
   if (amount <= 0) throw new Error('Amount must be greater than 0')
+  if (!txHash?.trim()) throw new Error('Transaction hash is required')
 
   const [row] = await db
     .insert(fundRequests)
@@ -97,7 +99,8 @@ export async function submitFundRequest(
       userId: session.user.id,
       network,
       amount: amount.toString(),
-      txHash: txHash?.trim() || null,
+      txHash: txHash.trim(),
+      screenshotUrl: screenshotUrl?.trim() || null,
       status: 'pending',
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -127,6 +130,7 @@ export async function getAllFundRequests() {
       network: fundRequests.network,
       amount: fundRequests.amount,
       txHash: fundRequests.txHash,
+      screenshotUrl: fundRequests.screenshotUrl,
       status: fundRequests.status,
       note: fundRequests.note,
       reviewedBy: fundRequests.reviewedBy,

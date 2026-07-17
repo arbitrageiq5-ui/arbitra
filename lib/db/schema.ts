@@ -200,6 +200,7 @@ export const fundRequests = pgTable('fund_requests', {
   network: text('network').notNull(), // 'TRC20' | 'BEP20' | 'ERC20'
   amount: decimal('amount', { precision: 18, scale: 2 }).notNull(),
   txHash: text('tx_hash'),
+  screenshotUrl: text('screenshot_url'), // Blob pathname for private proof screenshot
   status: text('status').notNull().default('pending'), // 'pending' | 'confirmed' | 'rejected'
   note: text('note'),
   reviewedBy: text('reviewedBy').references(() => user.id),
