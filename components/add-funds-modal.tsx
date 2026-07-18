@@ -175,7 +175,8 @@ export function AddFundsModal({ onClose }: { onClose: () => void }) {
     if (isNaN(parsed) || parsed <= 0) { setError('Please enter a valid amount'); return }
     const meta = NETWORK_META[selectedNetwork]
     if (parsed < meta.minDeposit) { setError(`Minimum deposit is $${meta.minDeposit} USDT`); return }
-    if (!txHash.trim()) { setError('Transaction hash is required'); return }
+    if (!txHash.trim()) { setError('Transaction Hash ID is required'); return }
+    if (!screenshotFile) { setError('Payment screenshot is required'); return }
 
     try {
       setSubmitting(true)
@@ -405,7 +406,7 @@ export function AddFundsModal({ onClose }: { onClose: () => void }) {
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
                     <ImageIcon className="w-3 h-3" />
-                    Payment Screenshot <span className="text-slate-600 normal-case font-normal">(optional but recommended)</span>
+                    Payment Screenshot <span className="text-red-400">*</span>
                   </label>
 
                   {screenshotPreview ? (

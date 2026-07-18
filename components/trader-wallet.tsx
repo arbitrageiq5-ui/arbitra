@@ -77,6 +77,7 @@ export function TraderWallet() {
   const [withNetwork, setWithNetwork] = useState<Network>('TRC20')
   const [withAmount, setWithAmount] = useState('')
   const [withAddress, setWithAddress] = useState('')
+  const [withTxHash, setWithTxHash] = useState('')
   const [submittingWith, setSubmittingWith] = useState(false)
   const [showAllWith, setShowAllWith] = useState(false)
 
@@ -121,11 +122,15 @@ export function TraderWallet() {
 
   const handleWithdraw = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!withTxHash.trim()) {
+      showToast('Transaction Hash ID is required', 'error')
+      return
+    }
     try {
       setSubmittingWith(true)
-      await requestWithdrawal(parseFloat(withAmount), withNetwork, withAddress)
+      await requestWithdrawal(parseFloat(withAmount), withNetwork, withAddress, withTxHash.trim())
       await load()
-      setWithAmount(''); setWithAddress('')
+      setWithAmount(''); setWithAddress(''); setWithTxHash('')
       setActivePanel(null)
       showToast('Withdrawal request submitted. Admin will process it shortly.')
     } catch (err) {
@@ -509,6 +514,19 @@ export function TraderWallet() {
                     required placeholder="Your USDT wallet address"
                     className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-white placeholder-slate-600 text-sm font-mono focus:outline-none focus:border-red-500/50 transition-colors"
                   />
+                </div>
+
+                <div>
+                  <label className="text-slate-400 text-xs font-medium mb-1.5 block flex items-center gap-1">
+                    <span className="text-red-400">*</span> Transaction Hash ID
+                  </label>
+                  <input
+                    type="text"
+                    value={withTxHash} onChange={e => setWithTxHash(e.target.value)}
+                    required placeholder="Withdrawal TX Hash / ID"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2.5 text-amber-200 placeholder-slate-600 text-sm font-mono focus:outline-none focus:border-red-500/50 transition-colors"
+                  />
+                  <p className="text-slate-500 text-xs mt-1">Copy the TX/TXID from your exchange or wallet after initiating withdrawal.</p>
                 </div>
 
                 <div className="bg-slate-800/60 border border-slate-700 rounded-lg px-3 py-2.5 space-y-1">

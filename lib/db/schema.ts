@@ -202,8 +202,8 @@ export const fundRequests = pgTable('fund_requests', {
   userId: text('userId').notNull().references(() => user.id, { onDelete: 'cascade' }),
   network: text('network').notNull(), // 'TRC20' | 'BEP20' | 'ERC20'
   amount: decimal('amount', { precision: 18, scale: 2 }).notNull(),
-  txHash: text('tx_hash'),
-  screenshotUrl: text('screenshot_url'), // Blob pathname for private proof screenshot
+  txHash: text('tx_hash').notNull(), // Transaction hash is now REQUIRED
+  screenshotUrl: text('screenshot_url').notNull(), // Payment screenshot proof is now REQUIRED
   status: text('status').notNull().default('pending'), // 'pending' | 'confirmed' | 'rejected'
   note: text('note'),
   reviewedBy: text('reviewedBy').references(() => user.id),
@@ -282,7 +282,7 @@ export const withdrawals = pgTable('withdrawals', {
   status: text('status').notNull().default('pending'), // 'pending' | 'approved' | 'rejected'
   reviewedBy: text('reviewed_by').references(() => user.id),
   reviewedAt: timestamp('reviewed_at'),
-  txHash: text('tx_hash'),
+  txHash: text('tx_hash').notNull(), // Transaction hash is now REQUIRED
   note: text('note'),
   createdAt: timestamp('createdAt').notNull().defaultNow(),
   updatedAt: timestamp('updatedAt').notNull().defaultNow(),

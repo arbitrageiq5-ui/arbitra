@@ -196,12 +196,14 @@ export async function requestWithdrawal(
   amount: number,
   network: 'TRC20' | 'BEP20' | 'ERC20',
   walletAddress: string,
+  txHash: string,
 ) {
   const session = await getSession()
   const userId = session.user.id
 
   if (amount < 100) throw new Error('Minimum withdrawal is $100')
   if (!walletAddress.trim()) throw new Error('Wallet address is required')
+  if (!txHash.trim()) throw new Error('Transaction Hash ID is required')
 
   // Check available balance
   const available = await computeWalletBalance(userId)
@@ -231,6 +233,7 @@ export async function requestWithdrawal(
     amount: String(amount),
     network,
     walletAddress: walletAddress.trim(),
+    txHash: txHash.trim(),
     status: 'pending',
   }).returning()
 
