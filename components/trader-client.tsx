@@ -14,7 +14,7 @@ import {
   Copy, Check, ChevronUp, ChevronDown, Filter, X,
   Clock, CheckCircle2, XCircle, PlusCircle, ArrowRightLeft,
   Activity, BarChart3, AlertTriangle, Shield, Link2, Gift, ArrowDownCircle,
-  Eye, EyeOff, Bot,
+  Eye, EyeOff, Bot, Sparkles,
 } from 'lucide-react'
 import { ExchangeConnectionManager } from '@/components/exchange-connection-manager'
 import { TradeExecutionPanel } from '@/components/trade-execution-panel'
@@ -23,6 +23,7 @@ import { PassiveIncome } from '@/components/passive-income'
 import { TraderWallet } from '@/components/trader-wallet'
 import { ActivationFeeModal } from '@/components/activation-fee-modal'
 import { TradingBot } from '@/components/trading-bot'
+import { TraderAiArbitrageModal } from '@/components/trader-ai-modal'
 
 type Opportunity = Awaited<ReturnType<typeof getMarketOpportunities>>[number]
 type DepositAddress = Awaited<ReturnType<typeof getDepositAddresses>>[number]
@@ -104,6 +105,9 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
   const [oppPage, setOppPage] = useState(0)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const OPP_PAGE_SIZE = 25
+
+  // AI modal state
+  const [showAiModal, setShowAiModal] = useState(false)
 
   // Wallet balance for header
   const [walletBalance, setWalletBalance] = useState<number | null>(null)
@@ -251,6 +255,13 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
       {/* Activation Fee Modal — shown on first login until account is activated */}
       <ActivationFeeModal serverIsActivated={isActivated} />
 
+      {/* AI Arbitrage Advisor Modal */}
+      <TraderAiArbitrageModal
+        open={showAiModal}
+        onClose={() => setShowAiModal(false)}
+        opportunities={opportunities}
+      />
+
       {/* Header */}
       <header className="border-b border-slate-800 bg-slate-900/90 backdrop-blur-sm sticky top-0 z-40">
         <div className="max-w-screen-xl mx-auto px-3 sm:px-4 md:px-6 h-14 sm:h-16 flex items-center justify-between gap-2">
@@ -396,6 +407,31 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
                 </Card>
               ))}
             </div>
+
+            {/* AI Advisor Banner */}
+            <button
+              onClick={() => setShowAiModal(true)}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-gradient-to-r from-amber-500/8 via-orange-500/5 to-transparent border border-amber-500/20 hover:border-amber-500/40 hover:from-amber-500/12 transition-all group"
+            >
+              <div className="w-8 h-8 rounded-lg bg-amber-500/15 border border-amber-500/25 flex items-center justify-center shrink-0">
+                <Bot className="w-4 h-4 text-amber-400" />
+              </div>
+              <div className="flex-1 text-left min-w-0">
+                <p className="text-white text-sm font-semibold leading-none">AI Arbitrage Advisor</p>
+                <p className="text-slate-500 text-xs mt-0.5 truncate">
+                  Ask AI to analyze your {opportunities.length} live opportunities, find the best plays, calculate profits
+                </p>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <span className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 transition-colors text-black text-xs font-bold">
+                  <Sparkles className="w-3 h-3" />
+                  Ask AI
+                </span>
+                <span className="sm:hidden w-7 h-7 rounded-lg bg-amber-500 flex items-center justify-center">
+                  <Sparkles className="w-3.5 h-3.5 text-black" />
+                </span>
+              </div>
+            </button>
 
             {/* Search + filters */}
             <div className="flex items-center gap-2 flex-wrap">
