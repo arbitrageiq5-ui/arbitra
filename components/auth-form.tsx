@@ -149,34 +149,33 @@ export function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
         try { await storeReferredBy(referralCode) } catch { /* non-fatal */ }
       }
     } else {
-      const { error } = await authClient.signIn.email({ email, password })
+      const { data: signInData, error } = await authClient.signIn.email({ email, password })
       if (error) {
         setError(error.message ?? 'Something went wrong')
         setLoading(false)
         return
       }
+
+      // Fire-and-forget: record login IP without blocking the redirect
+      const userId = signInData?.user?.id
+      if (userId) {
+        recordUserLogin(userId).catch(() => {/* non-fatal */})
+      }
+
+      // Redirect immediately using the role from the signIn response
+      const role = (signInData?.user as unknown as { role?: string })?.role ?? 'viewer'
+      const dest = role === 'admin' ? '/admin' : role === 'trader' ? '/trader' : '/viewer'
+      window.location.href = dest
+      return
     }
 
     setLoading(false)
 
+    // Sign-up flow: get session then redirect
     const session = await authClient.getSession()
-    const userId = session?.data?.user?.id
-    
-    // Record login IP for security tracking
-    if (userId) {
-      try {
-        await recordUserLogin(userId)
-      } catch (err) {
-        console.error('Failed to record login IP:', err)
-        // non-fatal — continue with login
-      }
-    }
-
     const role = (session?.data?.user as unknown as { role?: string })?.role ?? 'viewer'
-    if (role === 'admin') router.push('/admin')
-    else if (role === 'trader') router.push('/trader')
-    else router.push('/viewer')
-    router.refresh()
+    const dest = role === 'admin' ? '/admin' : role === 'trader' ? '/trader' : '/viewer'
+    window.location.href = dest
   }
 
   return (
