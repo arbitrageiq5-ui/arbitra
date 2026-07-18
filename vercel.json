@@ -6,7 +6,8 @@
   "outputDirectory": ".next",
   "env": {
     "NEXT_PUBLIC_APP_URL": {
-      "description": "Public app URL for OAuth callbacks"
+      "description": "Public app URL for OAuth callbacks",
+      "value": "https://arbitrageiq.vercel.app"
     }
   },
   "crons": [
