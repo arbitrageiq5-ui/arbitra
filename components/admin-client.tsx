@@ -20,8 +20,9 @@ import {
   Zap, Shield, BarChart3, RefreshCw, UserPlus, X, Eye, EyeOff, KeyRound,
   TrendingUp, Activity, PauseCircle, StopCircle, DollarSign, Gift, ArrowUpCircle,
 } from 'lucide-react'
+import AdminArbitragePanel from '@/components/admin-arbitrage-panel'
 
-type Tab = 'users' | 'deposit-addresses' | 'fund-requests' | 'auto-trade' | 'activation-fees' | 'withdrawals' | 'wallets'
+type Tab = 'users' | 'deposit-addresses' | 'fund-requests' | 'auto-trade' | 'activation-fees' | 'withdrawals' | 'wallets' | 'arbitrage'
 type Network = 'TRC20' | 'BEP20' | 'ERC20'
 
 interface User { id: string; name: string | null; email: string; role: string; createdAt: Date }
@@ -473,6 +474,7 @@ export default function AdminClient() {
             { key: 'activation-fees' as Tab,      label: 'Activations',       icon: Gift,        badge: activationFeeReqs.filter(f => f.status === 'pending').length },
             { key: 'withdrawals' as Tab,          label: 'Withdrawals',        icon: ArrowUpCircle, badge: withdrawalReqs.filter(w => w.status === 'pending').length },
             { key: 'wallets' as Tab,              label: 'Wallets',             icon: Wallet,        badge: traderBalances.length },
+            { key: 'arbitrage' as Tab,            label: 'Arbitrage',           icon: Activity,      badge: 0 },
           ]).map(tab => (
             <button
               key={tab.key}
@@ -1380,6 +1382,22 @@ export default function AdminClient() {
                 </div>
               )}
             </Card>
+          </div>
+        )}
+
+        {/* ── ARBITRAGE TAB ── */}
+        {activeTab === 'arbitrage' && (
+          <div className="space-y-1">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-9 h-9 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                <Activity className="w-5 h-5 text-amber-400" />
+              </div>
+              <div>
+                <h2 className="text-white font-bold text-lg leading-none">Arbitrage Control Center</h2>
+                <p className="text-slate-500 text-sm mt-0.5">Live multi-exchange scanning, opportunity detection and transfer routing</p>
+              </div>
+            </div>
+            <AdminArbitragePanel />
           </div>
         )}
 
