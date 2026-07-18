@@ -368,3 +368,32 @@ export const autoTradeLogs = pgTable('auto_trade_logs', {
   status: text('status').notNull().default('completed'),
   createdAt: timestamp('createdAt').notNull().defaultNow(),
 })
+
+// --- Arbitrage Exchange API Keys (admin-managed) ---
+
+export const exchangeApiKeys = pgTable('exchange_api_keys', {
+  id: serial('id').primaryKey(),
+  exchange: text('exchange').notNull().unique(), // 'binance' | 'kraken' | 'okx' etc.
+  label: text('label').notNull(),               // display name
+  apiKey: text('api_key'),                       // optional — some public APIs don't need keys
+  apiSecret: text('api_secret'),
+  passphrase: text('passphrase'),                // KuCoin, Bitget etc.
+  isEnabled: boolean('is_enabled').notNull().default(true),
+  isPublicOnly: boolean('is_public_only').notNull().default(true), // true = read-only price feed
+  lastTestedAt: timestamp('last_tested_at'),
+  lastTestStatus: text('last_test_status'),      // 'ok' | 'error' | null
+  lastTestMs: integer('last_test_ms'),           // latency in ms
+  note: text('note'),
+  createdAt: timestamp('createdAt').notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt').notNull().defaultNow(),
+})
+
+// --- AI Arbitrage Strategy Config ---
+
+export const arbitrageConfig = pgTable('arbitrage_config', {
+  id: serial('id').primaryKey(),
+  configKey: text('config_key').notNull().unique(), // 'ai_strategy' | 'scan_settings' etc.
+  configValue: jsonb('config_value').notNull().default({}),
+  updatedBy: text('updated_by').references(() => user.id),
+  updatedAt: timestamp('updatedAt').notNull().defaultNow(),
+})
