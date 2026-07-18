@@ -8,7 +8,7 @@ import {
   TrendingUp, TrendingDown, AlertCircle, CheckCircle2,
   ChevronDown, ChevronUp, Settings, BarChart3, Zap,
   ArrowDownCircle, ArrowUpCircle, Clock, Shield,
-  Info, X, Activity,
+  Info, X, Activity, Sparkles,
 } from 'lucide-react'
 import {
   createTradingBot, getMyBots, getBotOrders,
@@ -17,6 +17,7 @@ import {
 } from '@/app/actions/trading-bot'
 import { DCA_PAIRS, type DcaConfig } from '@/lib/trading-bot-constants'
 import { SUPPORTED_EXCHANGES } from '@/lib/exchange-constants'
+import { BotAiAdvisorModal } from '@/components/bot-ai-advisor-modal'
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -140,19 +141,33 @@ const DEFAULT_CONFIG: DcaConfig = {
 
 function CreateBotModal({
   accounts,
+  prefillConfig,
   onClose,
   onCreate,
 }: {
   accounts: ExchangeAccount[]
+  prefillConfig?: Partial<DcaConfig & { name?: string; symbol?: string; marketType?: 'spot' | 'futures' }> | null
   onClose: () => void
   onCreate: () => void
 }) {
-  const [name, setName] = useState('')
-  const [marketType, setMarketType] = useState<'spot' | 'futures'>('spot')
+  const [name, setName] = useState(prefillConfig?.name ?? '')
+  const [marketType, setMarketType] = useState<'spot' | 'futures'>(prefillConfig?.marketType ?? 'spot')
   const [exchange, setExchange] = useState(accounts[0]?.exchange ?? 'binance')
   const [accountId, setAccountId] = useState<number | null>(accounts[0]?.id ?? null)
-  const [symbol, setSymbol] = useState('BTC/USDT')
-  const [cfg, setCfg] = useState<DcaConfig>({ ...DEFAULT_CONFIG })
+  const [symbol, setSymbol] = useState(prefillConfig?.symbol ?? 'BTC/USDT')
+  const [cfg, setCfg] = useState<DcaConfig>({
+    ...DEFAULT_CONFIG,
+    ...(prefillConfig ? {
+      baseOrderSize:       prefillConfig.baseOrderSize       ?? DEFAULT_CONFIG.baseOrderSize,
+      safetyOrderSize:     prefillConfig.safetyOrderSize     ?? DEFAULT_CONFIG.safetyOrderSize,
+      maxSafetyOrders:     prefillConfig.maxSafetyOrders     ?? DEFAULT_CONFIG.maxSafetyOrders,
+      priceDeviationPct:   prefillConfig.priceDeviationPct   ?? DEFAULT_CONFIG.priceDeviationPct,
+      safetyOrderVolumePct:prefillConfig.safetyOrderVolumePct?? DEFAULT_CONFIG.safetyOrderVolumePct,
+      takeProfitPct:       prefillConfig.takeProfitPct       ?? DEFAULT_CONFIG.takeProfitPct,
+      interval:            prefillConfig.interval            ?? DEFAULT_CONFIG.interval,
+      leverage:            prefillConfig.leverage            ?? DEFAULT_CONFIG.leverage,
+    } : {}),
+  })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -200,8 +215,18 @@ function CreateBotModal({
               <Bot className="w-5 h-5 text-amber-400" />
             </div>
             <div>
-              <h2 className="text-white font-bold">Create DCA Bot</h2>
-              <p className="text-slate-500 text-xs mt-0.5">Configure your Dollar-Cost Averaging strategy</p>
+              <div className="flex items-center gap-2">
+                <h2 className="text-white font-bold">Create DCA Bot</h2>
+                {prefillConfig && (
+                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 text-[10px] font-bold uppercase tracking-wide">
+                    <Sparkles className="w-2.5 h-2.5" />
+                    AI Setup
+                  </span>
+                )}
+              </div>
+              <p className="text-slate-500 text-xs mt-0.5">
+                {prefillConfig ? 'Settings pre-filled by AI — review and adjust as needed' : 'Configure your Dollar-Cost Averaging strategy'}
+              </p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 rounded-lg hover:bg-slate-800 text-slate-500 hover:text-white transition-colors">
@@ -778,6 +803,8 @@ export function TradingBot() {
   const [accounts, setAccounts] = useState<ExchangeAccount[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
+  const [showAiAdvisor, setShowAiAdvisor] = useState(false)
+  const [aiPrefillConfig, setAiPrefillConfig] = useState<Partial<DcaConfig & { name?: string; symbol?: string; marketType?: 'spot' | 'futures' }> | null>(null)
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
 
   const showToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
@@ -819,6 +846,13 @@ export function TradingBot() {
             className="p-2 rounded-lg hover:bg-slate-800 text-slate-500 hover:text-white border border-slate-800 transition-colors"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+          <button
+            onClick={() => setShowAiAdvisor(true)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 hover:border-amber-500/40 hover:bg-slate-700 transition-all text-slate-300 hover:text-amber-300 text-sm font-semibold"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            AI Setup
           </button>
           <Button
             onClick={() => setShowCreate(true)}
@@ -913,10 +947,22 @@ export function TradingBot() {
       {showCreate && (
         <CreateBotModal
           accounts={accounts}
-          onClose={() => setShowCreate(false)}
+          prefillConfig={aiPrefillConfig}
+          onClose={() => { setShowCreate(false); setAiPrefillConfig(null) }}
           onCreate={load}
         />
       )}
+
+      {/* AI Bot Advisor modal */}
+      <BotAiAdvisorModal
+        open={showAiAdvisor}
+        onClose={() => setShowAiAdvisor(false)}
+        onApplyConfig={(cfg) => {
+          setAiPrefillConfig(cfg)
+          setShowAiAdvisor(false)
+          setShowCreate(true)
+        }}
+      />
 
       {/* Toast */}
       {toast && (
