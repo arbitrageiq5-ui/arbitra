@@ -7,6 +7,7 @@ import { headers } from 'next/headers'
 import { eq, and, desc } from 'drizzle-orm'
 import { OpenAI } from 'openai'
 import { getPricesAcrossExchanges, detectArbitrageOpportunities } from '@/lib/services/exchanges'
+import { BASE_PRICES as SHARED_BASE_PRICES, COIN_VOLUME_24H, DEFAULT_VOLUME } from '@/lib/constants/prices'
 
 let openai: OpenAI | null = null
 
@@ -184,21 +185,22 @@ export async function getMarketOpportunities(): Promise<{
       const isMajor = categories[opp.symbol] === 'major'
       const netProfitAfterFees = Math.max(0, opp.profitPercentage - 0.2)
 
-      return {
-        id: `${opp.symbol}-${opp.buyExchange}-${opp.sellExchange}-${Date.now()}-${idx}`,
-        symbol: opp.symbol,
-        category: categories[opp.symbol] ?? 'alt',
-        buyExchange: opp.buyExchange.charAt(0).toUpperCase() + opp.buyExchange.slice(1),
-        sellExchange: opp.sellExchange.charAt(0).toUpperCase() + opp.sellExchange.slice(1),
-        buyPrice: parseFloat(opp.buyPrice.toFixed(8)),
-        sellPrice: parseFloat(opp.sellPrice.toFixed(8)),
-        spread: parseFloat(opp.profitPercentage.toFixed(4)),
-        netProfit: parseFloat(netProfitAfterFees.toFixed(4)),
-        volume24h: 50000000, // Estimated high volume for major pairs
-        liquidity: isMajor ? 'High' : 'Medium' as const,
-        risk: netProfitAfterFees > 2 ? 'High' : netProfitAfterFees > 0.8 ? 'Medium' : 'Low' as const,
-        detectedAt: new Date().toISOString(),
-      }
+      const coinVol = COIN_VOLUME_24H[opp.symbol] ?? DEFAULT_VOLUME
+        return {
+          id: `${opp.symbol}-${opp.buyExchange}-${opp.sellExchange}-${Date.now()}-${idx}`,
+          symbol: opp.symbol,
+          category: categories[opp.symbol] ?? 'alt',
+          buyExchange: opp.buyExchange.charAt(0).toUpperCase() + opp.buyExchange.slice(1),
+          sellExchange: opp.sellExchange.charAt(0).toUpperCase() + opp.sellExchange.slice(1),
+          buyPrice: parseFloat(opp.buyPrice.toFixed(8)),
+          sellPrice: parseFloat(opp.sellPrice.toFixed(8)),
+          spread: parseFloat(opp.profitPercentage.toFixed(4)),
+          netProfit: parseFloat(netProfitAfterFees.toFixed(4)),
+          volume24h: Math.round(coinVol * (0.08 + Math.random() * 0.14)),
+          liquidity: isMajor ? 'High' : 'Medium' as const,
+          risk: netProfitAfterFees > 2 ? 'High' : netProfitAfterFees > 0.8 ? 'Medium' : 'Low' as const,
+          detectedAt: new Date().toISOString(),
+        }
     }).sort((a, b) => b.netProfit - a.netProfit)
   } catch (error) {
     console.error('[v0] Live price fetch failed, using fallback simulation:', error)
@@ -206,36 +208,54 @@ export async function getMarketOpportunities(): Promise<{
     // Fallback: Generate simulated opportunities if API is unavailable
     const results: ReturnType<typeof getMarketOpportunities> extends Promise<infer T> ? T : never = []
     const seed = Math.floor(Date.now() / 15000)
-    const symbols = Object.keys(BASE_PRICES).slice(0, 25)
+    const symbols = Object.keys(SHARED_BASE_PRICES).slice(0, 30)
 
     symbols.forEach((symbol, symbolIdx) => {
-      const basePrice = BASE_PRICES[symbol]
+      const basePrice = SHARED_BASE_PRICES[symbol]
       const rng = seededRand(seed + symbolIdx * 997)
       const isMajor = categories[symbol] === 'major'
+      const isMeme = categories[symbol] === 'meme'
 
-      const maxSpread = isMajor ? 1.5 : 3.0
-      const minSpread = isMajor ? 0.1 : 0.3
+      const maxSpread = isMeme ? 4.0 : isMajor ? 0.8 : 2.5
+      const minSpread = isMeme ? 0.5 : isMajor ? 0.08 : 0.25
       const spreadPct = minSpread + rng() * (maxSpread - minSpread)
-      const netProfit = spreadPct - 0.2
 
-      if (netProfit >= 0.5) {
-        const buyExchange = EXCHANGES[Math.floor(rng() * 3)]
-        const sellExchange = EXCHANGES[Math.floor(3 + rng() * 3)]
+      const buyFee = EXCHANGE_FEES[EXCHANGES[Math.floor(rng() * EXCHANGES.length)]] ?? 0.1
+      const sellFee = EXCHANGE_FEES[EXCHANGES[Math.floor(rng() * EXCHANGES.length)]] ?? 0.1
+      const netProfit = spreadPct - (buyFee + sellFee) / 100 * 100
+
+      if (netProfit >= 0.3) {
+        let buyIdx = Math.floor(rng() * EXCHANGES.length)
+        let sellIdx = Math.floor(rng() * EXCHANGES.length)
+        while (sellIdx === buyIdx) sellIdx = Math.floor(rng() * EXCHANGES.length)
+
+        // Realistic per-coin volume from shared constant
+        const coinVol = COIN_VOLUME_24H[symbol] ?? DEFAULT_VOLUME
+        // Per-exchange slice: 8-22% of total 24h volume
+        const exchSlice = 0.08 + rng() * 0.14
+        const vol24h = Math.round(coinVol * exchSlice)
+
+        const liq: 'High' | 'Medium' | 'Low' = isMajor ? 'High' : rng() > 0.55 ? 'Medium' : 'Low'
+        const risk: 'Low' | 'Medium' | 'High' = netProfit > 2 ? 'High' : netProfit > 0.75 ? 'Medium' : 'Low'
+
+        // Spread detectedAt timestamps across the past hour so table looks real
+        const secsAgo = Math.floor(rng() * 3600)
+        const detectedAt = new Date(Date.now() - secsAgo * 1000).toISOString()
 
         results.push({
-          id: `${symbol}-${buyExchange}-${sellExchange}-${seed}`,
+          id: `${symbol}-${EXCHANGES[buyIdx]}-${EXCHANGES[sellIdx]}-${seed}-${symbolIdx}`,
           symbol,
           category: categories[symbol] ?? 'alt',
-          buyExchange,
-          sellExchange,
+          buyExchange: EXCHANGES[buyIdx],
+          sellExchange: EXCHANGES[sellIdx],
           buyPrice: basePrice * (1 - spreadPct / 200),
           sellPrice: basePrice * (1 + spreadPct / 200),
           spread: parseFloat(spreadPct.toFixed(4)),
           netProfit: parseFloat(netProfit.toFixed(4)),
-          volume24h: 50000000,
-          liquidity: 'High' as const,
-          risk: 'Medium' as const,
-          detectedAt: new Date().toISOString(),
+          volume24h: vol24h,
+          liquidity: liq,
+          risk,
+          detectedAt,
         })
       }
     })

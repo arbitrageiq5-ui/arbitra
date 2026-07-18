@@ -15,6 +15,7 @@ const Features     = dynamic(() => import('@/components/landing/features').then(
 const HowItWorks   = dynamic(() => import('@/components/landing/how-it-works').then(m => ({ default: m.HowItWorks })),   { loading: () => <SectionSkeleton /> })
 const AISection    = dynamic(() => import('@/components/landing/ai-section').then(m => ({ default: m.AISection })),       { loading: () => <SectionSkeleton /> })
 const WhyChooseUs  = dynamic(() => import('@/components/landing/why-choose-us').then(m => ({ default: m.WhyChooseUs })), { loading: () => <SectionSkeleton /> })
+const Pricing      = dynamic(() => import('@/components/landing/pricing').then(m => ({ default: m.Pricing })),           { loading: () => <SectionSkeleton /> })
 const Testimonials = dynamic(() => import('@/components/landing/testimonials').then(m => ({ default: m.Testimonials })), { loading: () => <SectionSkeleton /> })
 const FAQ          = dynamic(() => import('@/components/landing/faq').then(m => ({ default: m.FAQ })),                   { loading: () => <SectionSkeleton /> })
 const Registration = dynamic(() => import('@/components/landing/registration').then(m => ({ default: m.Registration })), { loading: () => <SectionSkeleton /> })
@@ -30,6 +31,7 @@ export default function Home() {
       <HowItWorks />
       <AISection />
       <WhyChooseUs />
+      <Pricing />
       <Testimonials />
       <FAQ />
       <Registration />

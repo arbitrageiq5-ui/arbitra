@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { Search, RefreshCw, TrendingUp, ChevronLeft, ChevronRight } from 'lucide-react'
+import { BASE_PRICES } from '@/lib/constants/prices'
 
 interface Opportunity {
   id: number
@@ -14,31 +15,35 @@ interface Opportunity {
   spread: number
   fee: number
   netSpread: number
+  profitPer1k: number
   liquidity: 'High' | 'Medium' | 'Low'
   network: string
   updated: number
 }
 
-const COINS = ['BTC', 'ETH', 'SOL', 'BNB', 'XRP', 'AVAX', 'MATIC', 'DOGE', 'ADA', 'LINK', 'DOT', 'UNI', 'ATOM', 'LTC', 'NEAR']
-const EXCHANGES = ['Binance', 'Coinbase', 'Kraken', 'Bybit', 'KuCoin', 'Huobi', 'OKX', 'Gate.io']
-const NETWORKS = ['ERC-20', 'BEP-20', 'TRC-20', 'Solana', 'Polygon', 'Bitcoin', 'Avalanche']
-const LIQUIDITY: Array<'High' | 'Medium' | 'Low'> = ['High', 'Medium', 'Low']
+const COINS = ['BTC', 'ETH', 'SOL', 'BNB', 'XRP', 'AVAX', 'MATIC', 'DOGE', 'ADA', 'LINK', 'DOT', 'UNI', 'ATOM', 'LTC', 'NEAR', 'ARB', 'OP', 'AAVE', 'PEPE', 'TON']
+const EXCHANGES = ['Binance', 'Coinbase', 'Kraken', 'Bybit', 'KuCoin', 'OKX', 'Gate.io', 'Bitget', 'Gemini', 'Bitfinex']
+const NETWORKS = ['ERC-20', 'BEP-20', 'TRC-20', 'Solana', 'Polygon', 'Bitcoin', 'Avalanche', 'Arbitrum', 'Optimism']
+const LIQUIDITY: Array<'High' | 'Medium' | 'Low'> = ['High', 'High', 'Medium', 'Medium', 'Low']
+
+const MAJOR_COINS = new Set(['BTC', 'ETH', 'BNB', 'SOL', 'XRP', 'DOGE'])
 
 function generateRow(id: number): Opportunity {
   const coin = COINS[id % COINS.length]
-  const basePrices: Record<string, number> = {
-    BTC: 67400, ETH: 3520, SOL: 185, BNB: 590, XRP: 0.62,
-    AVAX: 38.4, MATIC: 0.95, DOGE: 0.168, ADA: 0.51, LINK: 18.2,
-    DOT: 8.9, UNI: 11.4, ATOM: 10.8, LTC: 84, NEAR: 7.3,
-  }
-  const base = basePrices[coin] ?? 1
+  const base = BASE_PRICES[coin] ?? 1
+  const isMajor = MAJOR_COINS.has(coin)
   const buyEx = EXCHANGES[Math.floor(Math.random() * EXCHANGES.length)]
   let sellEx = EXCHANGES[Math.floor(Math.random() * EXCHANGES.length)]
   while (sellEx === buyEx) sellEx = EXCHANGES[Math.floor(Math.random() * EXCHANGES.length)]
-  const buyPrice = base * (1 + (Math.random() - 0.5) * 0.004)
-  const spread = 0.1 + Math.random() * 1.4
-  const sellPrice = buyPrice * (1 + spread / 100)
-  const fee = 0.08 + Math.random() * 0.35
+  // Tighter, more realistic spread: majors 0.05-0.8%, alts 0.2-1.8%
+  const spreadMin = isMajor ? 0.05 : 0.2
+  const spreadMax = isMajor ? 0.8  : 1.8
+  const spread = spreadMin + Math.random() * (spreadMax - spreadMin)
+  const buyPrice = base * (1 - spread / 200)
+  const sellPrice = base * (1 + spread / 200)
+  const fee = isMajor ? 0.06 + Math.random() * 0.10 : 0.08 + Math.random() * 0.18
+  const netSpread = spread - fee
+  const profitPer1k = (netSpread / 100) * 1000
   return {
     id,
     coin,
@@ -48,8 +53,9 @@ function generateRow(id: number): Opportunity {
     sellPrice,
     spread,
     fee,
-    netSpread: spread - fee,
-    liquidity: LIQUIDITY[Math.floor(Math.random() * 3)],
+    netSpread,
+    profitPer1k,
+    liquidity: LIQUIDITY[Math.floor(Math.random() * LIQUIDITY.length)],
     network: NETWORKS[Math.floor(Math.random() * NETWORKS.length)],
     updated: 0,
   }
@@ -109,12 +115,19 @@ export function LiveMarket() {
         indices.forEach((i) => {
           const row = next[i]
           if (!row) return
-          const drift = (Math.random() - 0.5) * 0.002
+          // Tiny drift: 0.01-0.05% per tick — much more realistic
+          const drift = (Math.random() - 0.5) * 0.0004
+          const newBuy = row.buyPrice * (1 + drift)
+          const newSpread = Math.max(0.04, row.spread + (Math.random() - 0.5) * 0.02)
+          const newSell = newBuy * (1 + newSpread / 100)
+          const newNet = newSpread - row.fee
           next[i] = {
             ...row,
-            buyPrice: row.buyPrice * (1 + drift),
-            sellPrice: row.sellPrice * (1 + drift),
-            spread: row.spread + (Math.random() - 0.5) * 0.05,
+            buyPrice: newBuy,
+            sellPrice: newSell,
+            spread: newSpread,
+            netSpread: newNet,
+            profitPer1k: (newNet / 100) * 1000,
             updated: Date.now(),
           }
         })
@@ -202,7 +215,7 @@ export function LiveMarket() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-white/[0.06]">
-                  {['Coin', 'Buy Exchange', 'Sell Exchange', 'Buy Price', 'Sell Price', 'Spread', 'Est. Fees', 'Net Spread', 'Liquidity', 'Network', 'Updated'].map((h) => (
+                  {['Coin', 'Buy Exchange', 'Sell Exchange', 'Buy Price', 'Sell Price', 'Spread', 'Est. Fees', 'Net Spread', '$ /1k', 'Liquidity', 'Network', 'Updated'].map((h) => (
                     <th key={h} className="px-4 py-3 text-left text-xs font-medium text-[#98A2B3] whitespace-nowrap">
                       {h}
                     </th>
@@ -249,6 +262,11 @@ export function LiveMarket() {
                       <td className="px-4 py-3 whitespace-nowrap"><SpreadBadge value={row.spread} /></td>
                       <td className="px-4 py-3 text-[#98A2B3] whitespace-nowrap text-xs">{row.fee.toFixed(2)}%</td>
                       <td className="px-4 py-3 whitespace-nowrap"><SpreadBadge value={row.netSpread} /></td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span className={`font-bold text-sm ${row.profitPer1k > 0 ? 'text-[#00FF99]' : 'text-red-400'}`}>
+                          {row.profitPer1k > 0 ? '+' : ''}{row.profitPer1k.toFixed(2)}
+                        </span>
+                      </td>
                       <td className="px-4 py-3 whitespace-nowrap"><LiquidityBadge value={row.liquidity} /></td>
                       <td className="px-4 py-3 text-[#98A2B3] whitespace-nowrap text-xs">{row.network}</td>
                       <td className="px-4 py-3 text-[#98A2B3] whitespace-nowrap text-xs">

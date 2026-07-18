@@ -59,6 +59,13 @@ function formatVolume(v: number) {
   return `$${(v / 1e3).toFixed(0)}K`
 }
 
+function timeAgo(iso: string) {
+  const secs = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
+  if (secs < 60) return `${secs}s ago`
+  if (secs < 3600) return `${Math.floor(secs / 60)}m ago`
+  return `${Math.floor(secs / 3600)}h ago`
+}
+
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false)
   const handleCopy = async () => {
@@ -582,9 +589,11 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
                             { label: 'Sell Exchange', key: null },
                             { label: 'Sell Price', key: null },
                             { label: 'Spread', key: 'spread' as SortKey },
-                            { label: 'Net Profit', key: 'netProfit' as SortKey },
+                            { label: 'Net Profit %', key: 'netProfit' as SortKey },
+                            { label: '$ / $1k', key: null },
                             { label: 'Volume 24h', key: 'volume24h' as SortKey },
                             { label: 'Risk', key: null },
+                            { label: 'Detected', key: null },
                           ]).map(({ label, key }) => (
                             <th key={label} className="px-4 py-3 text-left">
                               {key ? (
@@ -625,12 +634,18 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
                               <td className="px-4 py-3 text-slate-400 font-mono text-xs">{formatPrice(opp.sellPrice)}</td>
                               <td className="px-4 py-3 text-right"><span className="text-cyan-400 font-semibold">{opp.spread.toFixed(2)}%</span></td>
                               <td className="px-4 py-3 text-right"><span className="text-green-400 font-bold">{opp.netProfit.toFixed(2)}%</span></td>
+                              <td className="px-4 py-3 text-right">
+                                <span className="text-amber-400 font-bold text-sm">
+                                  +${((opp.netProfit / 100) * 1000).toFixed(2)}
+                                </span>
+                              </td>
                               <td className="px-4 py-3 text-right text-slate-400 text-xs">{formatVolume(opp.volume24h)}</td>
                               <td className="px-4 py-3">
                                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${riskColor}`}>
                                   <RiskIcon className="w-3 h-3" />{opp.risk}
                                 </span>
                               </td>
+                              <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">{timeAgo(opp.detectedAt)}</td>
                             </tr>
                           )
                         })}
@@ -679,8 +694,16 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
                               <p className="text-cyan-400 font-semibold">{opp.spread.toFixed(2)}%</p>
                             </div>
                             <div className="flex-1 text-center">
-                              <p className="text-slate-500">Volume 24h</p>
+                              <p className="text-slate-500">$ / $1k</p>
+                              <p className="text-amber-400 font-bold">+${((opp.netProfit / 100) * 1000).toFixed(2)}</p>
+                            </div>
+                            <div className="flex-1 text-center">
+                              <p className="text-slate-500">Volume</p>
                               <p className="text-slate-300 font-medium">{formatVolume(opp.volume24h)}</p>
+                            </div>
+                            <div className="flex-1 text-center">
+                              <p className="text-slate-500">Detected</p>
+                              <p className="text-slate-400">{timeAgo(opp.detectedAt)}</p>
                             </div>
                           </div>
                         </div>

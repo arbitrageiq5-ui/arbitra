@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { authClient } from '@/lib/auth-client'
 import {
@@ -8,6 +8,7 @@ import {
   BarChart3, Zap, Lock, ChevronRight, User, Star,
 } from 'lucide-react'
 import Link from 'next/link'
+import { BASE_PRICES } from '@/lib/constants/prices'
 
 interface ViewerDashboardProps {
   user: {
@@ -20,13 +21,42 @@ interface ViewerDashboardProps {
   }
 }
 
-const MARKET_TICKERS = [
-  { pair: 'BTC/USDT', buyEx: 'Binance', sellEx: 'Kraken',  spread: '0.82%', profit: '$41.20', risk: 'Low' },
-  { pair: 'ETH/USDT', buyEx: 'Coinbase', sellEx: 'OKX',    spread: '0.67%', profit: '$13.40', risk: 'Low' },
-  { pair: 'SOL/USDT', buyEx: 'Bybit',    sellEx: 'Binance', spread: '1.24%', profit: '$2.80',  risk: 'Medium' },
-  { pair: 'XRP/USDT', buyEx: 'KuCoin',   sellEx: 'Bitget',  spread: '0.55%', profit: '$0.55',  risk: 'Low' },
-  { pair: 'BNB/USDT', buyEx: 'Gate.io',  sellEx: 'Bybit',   spread: '0.93%', profit: '$2.70',  risk: 'Medium' },
+interface LiveTicker {
+  pair: string
+  symbol: string
+  buyEx: string
+  sellEx: string
+  buyPrice: number
+  sellPrice: number
+  spread: number
+  profit: number
+  risk: 'Low' | 'Medium'
+}
+
+const TICKER_SEEDS: Array<{ symbol: string; buyEx: string; sellEx: string }> = [
+  { symbol: 'BTC', buyEx: 'Binance',  sellEx: 'Kraken'  },
+  { symbol: 'ETH', buyEx: 'Coinbase', sellEx: 'OKX'     },
+  { symbol: 'SOL', buyEx: 'Bybit',    sellEx: 'Binance'  },
+  { symbol: 'XRP', buyEx: 'KuCoin',   sellEx: 'Bitget'   },
+  { symbol: 'BNB', buyEx: 'Gate.io',  sellEx: 'Bybit'    },
 ]
+
+function buildTickers(): LiveTicker[] {
+  return TICKER_SEEDS.map(({ symbol, buyEx, sellEx }) => {
+    const base = BASE_PRICES[symbol] ?? 1
+    const spread = 0.35 + Math.random() * 0.75
+    const buyPrice = base * (1 - spread / 200)
+    const sellPrice = base * (1 + spread / 200)
+    const netSpread = spread - 0.15
+    return {
+      pair: `${symbol}/USDT`, symbol, buyEx, sellEx,
+      buyPrice, sellPrice,
+      spread: parseFloat(netSpread.toFixed(3)),
+      profit: parseFloat(((netSpread / 100) * 1000).toFixed(2)),
+      risk: netSpread > 0.7 ? 'Medium' : 'Low',
+    }
+  })
+}
 
 const UPGRAGE_PERKS = [
   { icon: BarChart3, title: 'Real-time Alerts',   desc: 'Telegram, WhatsApp & email notifications for every opportunity.' },
@@ -44,6 +74,30 @@ const RISK_COLOR: Record<string, string> = {
 export function ViewerDashboard({ user }: ViewerDashboardProps) {
   const router = useRouter()
   const [signingOut, setSigningOut] = useState(false)
+  const [tickers, setTickers] = useState<LiveTicker[]>([])
+  const [pulse, setPulse] = useState<number>(-1)
+
+  useEffect(() => {
+    setTickers(buildTickers())
+    const interval = setInterval(() => {
+      const idx = Math.floor(Math.random() * TICKER_SEEDS.length)
+      setPulse(idx)
+      setTickers(prev => prev.map((t, i) => {
+        if (i !== idx) return t
+        const drift = (Math.random() - 0.5) * 0.0004
+        const newBuy = t.buyPrice * (1 + drift)
+        const newSpread = Math.max(0.1, t.spread + (Math.random() - 0.5) * 0.015)
+        const newSell = newBuy * (1 + newSpread / 100)
+        return {
+          ...t,
+          buyPrice: newBuy, sellPrice: newSell, spread: newSpread,
+          profit: parseFloat(((newSpread / 100) * 1000).toFixed(2)),
+        }
+      }))
+      setTimeout(() => setPulse(-1), 600)
+    }, 2200)
+    return () => clearInterval(interval)
+  }, [])
 
   async function handleSignOut() {
     setSigningOut(true)
@@ -149,30 +203,27 @@ export function ViewerDashboard({ user }: ViewerDashboardProps) {
               </div>
 
               <div className="divide-y divide-white/[0.04]">
-                {MARKET_TICKERS.map((row, i) => (
+                {(tickers.length ? tickers : TICKER_SEEDS.map(s => ({ pair: `${s.symbol}/USDT`, symbol: s.symbol, buyEx: s.buyEx, sellEx: s.sellEx, buyPrice: 0, sellPrice: 0, spread: 0, profit: 0, risk: 'Low' as const }))).map((row, i) => (
                   <div
                     key={row.pair}
-                    className={`px-5 py-3.5 flex items-center gap-3 ${i >= 3 ? 'opacity-40 blur-[2px] select-none' : ''}`}
+                    className={`px-5 py-3.5 flex items-center gap-3 transition-colors duration-300 ${i >= 3 ? 'opacity-40 blur-[2px] select-none pointer-events-none' : ''} ${pulse === i ? 'bg-[#00D4FF]/5' : ''}`}
                   >
                     <div className="w-8 h-8 rounded-lg bg-white/[0.04] border border-white/[0.06] flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
-                      {row.pair.split('/')[0].slice(0, 2)}
+                      {row.symbol.slice(0, 2)}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-white">{row.pair}</p>
                       <p className="text-xs text-[#98A2B3] truncate">{row.buyEx} → {row.sellEx}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-bold text-[#00FF99]">{row.profit}</p>
-                      <p className="text-xs text-[#98A2B3]">{row.spread} spread</p>
+                      <p className="text-sm font-bold text-[#00FF99]">
+                        {row.profit > 0 ? `+$${row.profit.toFixed(2)}` : '—'}<span className="text-[10px] text-[#98A2B3] ml-1">/1k</span>
+                      </p>
+                      <p className="text-xs text-[#98A2B3]">{row.spread > 0 ? `${row.spread.toFixed(3)}%` : '—'} net</p>
                     </div>
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${RISK_COLOR[row.risk]}`}>
                       {row.risk}
                     </span>
-                    {i >= 3 && (
-                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <Lock className="w-4 h-4 text-[#98A2B3]" />
-                      </div>
-                    )}
                   </div>
                 ))}
               </div>

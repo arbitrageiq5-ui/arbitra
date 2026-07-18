@@ -308,6 +308,7 @@ export default function AdminArbitragePanel() {
                       <th className="text-right px-4 py-2.5">Sell Price</th>
                       <th className="text-right px-4 py-2.5">Spread</th>
                       <th className="text-right px-4 py-2.5">Net Profit</th>
+                      <th className="text-right px-4 py-2.5">$ / $1k</th>
                       <th className="text-right px-4 py-2.5">Detected</th>
                     </tr>
                   </thead>
@@ -338,6 +339,11 @@ export default function AdminArbitragePanel() {
                         </td>
                         <td className="px-4 py-3 text-right">
                           <ProfitBadge pct={opp.netProfitPct} />
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <span className="text-green-400 font-bold text-xs">
+                            +${((opp.netProfitPct / 100) * 1000).toFixed(2)}
+                          </span>
                         </td>
                         <td className="px-4 py-3 text-right text-xs text-slate-500">
                           {new Date(opp.detectedAt).toLocaleTimeString()}
@@ -370,43 +376,64 @@ export default function AdminArbitragePanel() {
             </button>
           </div>
 
-          {exchangeStatuses.length === 0 ? (
-            <Card className="bg-slate-900 border-slate-800 p-10 text-center">
-              <Wifi className="w-8 h-8 text-slate-600 mx-auto mb-3" />
-              <p className="text-slate-400 text-sm">Run a scan to check exchange connectivity.</p>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {exchangeStatuses.map(ex => (
-                <Card key={ex.name} className={`bg-slate-900 border p-4 transition-colors ${ex.online ? 'border-green-500/20' : 'border-red-500/20'}`}>
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold border ${
-                        EXCHANGE_COLORS[ex.name] ?? 'bg-slate-800 text-slate-300 border-slate-700'
-                      }`}>
-                        {EXCHANGE_LOGOS[ex.name] ?? ex.label.slice(0, 2).toUpperCase()}
+          {(() => {
+            const KNOWN_EXCHANGES = [
+              { name: 'binance',      label: 'Binance' },
+              { name: 'coinbase',     label: 'Coinbase' },
+              { name: 'kraken',       label: 'Kraken' },
+              { name: 'bybit',        label: 'Bybit' },
+              { name: 'kucoin',       label: 'KuCoin' },
+              { name: 'htx (huobi)',  label: 'HTX (Huobi)' },
+              { name: 'bitfinex',     label: 'Bitfinex' },
+              { name: 'okx',          label: 'OKX' },
+              { name: 'gate.io',      label: 'Gate.io' },
+              { name: 'gemini',       label: 'Gemini' },
+              { name: 'crypto.com',   label: 'Crypto.com' },
+              { name: 'bitget',       label: 'Bitget' },
+            ]
+            // Merge scan results with known list so idle state still shows all exchanges
+            const displayList = KNOWN_EXCHANGES.map(ke => {
+              const live = exchangeStatuses.find(e => e.name === ke.name)
+              return live ?? { name: ke.name, label: ke.label, online: null as unknown as boolean, pricesFetched: null as unknown as number }
+            })
+            return (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {displayList.map(ex => {
+                  const isUnknown = ex.online === null
+                  return (
+                    <Card key={ex.name} className={`bg-slate-900 border p-4 transition-colors ${isUnknown ? 'border-slate-700/60' : ex.online ? 'border-green-500/20' : 'border-red-500/20'}`}>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold border ${
+                            EXCHANGE_COLORS[ex.name] ?? 'bg-slate-800 text-slate-300 border-slate-700'
+                          }`}>
+                            {EXCHANGE_LOGOS[ex.name] ?? ex.label.slice(0, 2).toUpperCase()}
+                          </div>
+                          <span className="text-white font-semibold text-sm">{ex.label}</span>
+                        </div>
+                        {isUnknown
+                          ? <span className="flex items-center gap-1 text-xs text-slate-500"><Clock className="w-3.5 h-3.5" /> Not checked</span>
+                          : ex.online
+                          ? <span className="flex items-center gap-1 text-xs text-green-400"><CheckCircle2 className="w-3.5 h-3.5" /> Online</span>
+                          : <span className="flex items-center gap-1 text-xs text-red-400"><XCircle className="w-3.5 h-3.5" /> Offline</span>
+                        }
                       </div>
-                      <span className="text-white font-semibold text-sm">{ex.label}</span>
-                    </div>
-                    {ex.online
-                      ? <span className="flex items-center gap-1 text-xs text-green-400"><CheckCircle2 className="w-3.5 h-3.5" /> Online</span>
-                      : <span className="flex items-center gap-1 text-xs text-red-400"><XCircle className="w-3.5 h-3.5" /> Offline</span>
-                    }
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div>
-                      <p className="text-slate-500">Prices Fetched</p>
-                      <p className="text-white font-bold">{ex.pricesFetched}</p>
-                    </div>
-                    <div>
-                      <p className="text-slate-500">API Type</p>
-                      <p className="text-slate-300">Public REST</p>
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          )}
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <p className="text-slate-500">Prices Fetched</p>
+                          <p className="text-white font-bold">{isUnknown ? '—' : ex.pricesFetched}</p>
+                        </div>
+                        <div>
+                          <p className="text-slate-500">API Type</p>
+                          <p className="text-slate-300">Public REST</p>
+                        </div>
+                      </div>
+                    </Card>
+                  )
+                })}
+              </div>
+            )
+          })()}
         </div>
       )}
 
