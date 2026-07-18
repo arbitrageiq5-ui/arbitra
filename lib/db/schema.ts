@@ -397,3 +397,22 @@ export const arbitrageConfig = pgTable('arbitrage_config', {
   updatedBy: text('updated_by').references(() => user.id),
   updatedAt: timestamp('updatedAt').notNull().defaultNow(),
 })
+
+// --- Exchange Transfer Logs (admin cross-exchange transfers) ---
+
+export const exchangeTransferLogs = pgTable('exchange_transfer_logs', {
+  id: serial('id').primaryKey(),
+  fromExchange: text('from_exchange').notNull(),
+  toExchange:   text('to_exchange').notNull(),
+  symbol:       text('symbol').notNull(),          // e.g. USDT, BTC, ETH
+  network:      text('network').notNull(),          // e.g. TRC20, BEP20, SOL
+  amount:       decimal('amount', { precision: 18, scale: 8 }).notNull(),
+  fee:          decimal('fee',    { precision: 18, scale: 8 }),
+  address:      text('address'),                   // destination wallet address
+  txId:         text('tx_id'),                     // exchange-returned transaction ID
+  status:       text('status').notNull().default('pending'), // pending | submitted | completed | failed
+  errorMessage: text('error_message'),
+  initiatedBy:  text('initiated_by').references(() => user.id),
+  createdAt:    timestamp('createdAt').notNull().defaultNow(),
+  updatedAt:    timestamp('updatedAt').notNull().defaultNow(),
+})

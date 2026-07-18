@@ -3,8 +3,8 @@
 import { auth } from '@/lib/auth'
 import { headers } from 'next/headers'
 import { db } from '@/lib/db'
-import { exchangeApiKeys, arbitrageConfig } from '@/lib/db/schema'
-import { eq } from 'drizzle-orm'
+import { exchangeApiKeys, arbitrageConfig, exchangeTransferLogs } from '@/lib/db/schema'
+import { eq, desc } from 'drizzle-orm'
 import { getPricesAcrossExchanges, detectArbitrageOpportunities, ExchangePrice } from '@/lib/services/exchanges'
 import OpenAI from 'openai'
 
@@ -473,5 +473,384 @@ export async function getTransferRoutes(
   return routes.map(r => ({
     fromExchange, toExchange, symbol,
     network: r.network, estimatedFee: r.fee, estimatedTimeMin: r.timeMin,
+  }))
+}
+
+// ─── EXCHANGE BALANCES ───────────────────────────────────────────────────────
+
+export interface ExchangeBalance {
+  exchange: string
+  label: string
+  symbol: string
+  free: number
+  locked: number
+  total: number
+  usdValue: number
+}
+
+/** Fetch spot balances from an exchange using its saved API key.
+ *  Each exchange has a different auth scheme; we implement Binance, KuCoin,
+ *  Bybit, OKX, Bitget, and Kraken. Others fall back to a "no key" notice.
+ */
+export async function getExchangeBalances(exchange: string): Promise<ExchangeBalance[]> {
+  await requireAdmin()
+
+  const keyRow = await db.select().from(exchangeApiKeys)
+    .where(eq(exchangeApiKeys.exchange, exchange)).limit(1)
+
+  const key    = keyRow[0]?.apiKey    ?? null
+  const secret = keyRow[0]?.apiSecret ?? null
+  const pass   = keyRow[0]?.passphrase ?? null
+  const exMeta = ALL_EXCHANGES.find(e => e.exchange === exchange)
+  const label  = exMeta?.label ?? exchange
+
+  if (!key || !secret) {
+    return [{ exchange, label, symbol: 'N/A', free: 0, locked: 0, total: 0, usdValue: 0 }]
+  }
+
+  // ── Binance ──────────────────────────────────────────────────────────────
+  if (exchange === 'binance') {
+    try {
+      const crypto = await import('crypto')
+      const ts = Date.now().toString()
+      const query = `timestamp=${ts}`
+      const sig = crypto.createHmac('sha256', secret).update(query).digest('hex')
+      const res = await fetch(`https://api.binance.com/api/v3/account?${query}&signature=${sig}`, {
+        headers: { 'X-MBX-APIKEY': key },
+        signal: AbortSignal.timeout(8000),
+      })
+      if (!res.ok) return [{ exchange, label, symbol: 'ERROR', free: 0, locked: 0, total: 0, usdValue: 0 }]
+      const data = await res.json() as { balances: Array<{ asset: string; free: string; locked: string }> }
+      return data.balances
+        .map(b => ({ exchange, label, symbol: b.asset, free: parseFloat(b.free), locked: parseFloat(b.locked), total: parseFloat(b.free) + parseFloat(b.locked), usdValue: 0 }))
+        .filter(b => b.total > 0)
+        .slice(0, 50)
+    } catch { return [] }
+  }
+
+  // ── KuCoin ───────────────────────────────────────────────────────────────
+  if (exchange === 'kucoin' && pass) {
+    try {
+      const crypto = await import('crypto')
+      const ts = Date.now().toString()
+      const endpoint = '/api/v1/accounts?type=trade'
+      const strToSign = ts + 'GET' + endpoint
+      const sig   = crypto.createHmac('sha256', secret).update(strToSign).digest('base64')
+      const passSig = crypto.createHmac('sha256', secret).update(pass).digest('base64')
+      const res = await fetch(`https://api.kucoin.com${endpoint}`, {
+        headers: { 'KC-API-KEY': key, 'KC-API-SIGN': sig, 'KC-API-TIMESTAMP': ts, 'KC-API-PASSPHRASE': passSig, 'KC-API-KEY-VERSION': '2' },
+        signal: AbortSignal.timeout(8000),
+      })
+      if (!res.ok) return []
+      const data = await res.json() as { data: Array<{ currency: string; available: string; holds: string }> }
+      return (data.data ?? [])
+        .map(b => ({ exchange, label, symbol: b.currency, free: parseFloat(b.available), locked: parseFloat(b.holds), total: parseFloat(b.available) + parseFloat(b.holds), usdValue: 0 }))
+        .filter(b => b.total > 0)
+    } catch { return [] }
+  }
+
+  // ── Bybit ────────────────────────────────────────────────────────────────
+  if (exchange === 'bybit') {
+    try {
+      const crypto = await import('crypto')
+      const ts = Date.now().toString()
+      const recv = '5000'
+      const params = `accountType=UNIFIED`
+      const payload = ts + key + recv + params
+      const sig = crypto.createHmac('sha256', secret).update(payload).digest('hex')
+      const res = await fetch(`https://api.bybit.com/v5/account/wallet-balance?${params}`, {
+        headers: { 'X-BAPI-API-KEY': key, 'X-BAPI-SIGN': sig, 'X-BAPI-SIGN-ALGORITHM': 'HMAC_SHA256', 'X-BAPI-TIMESTAMP': ts, 'X-BAPI-RECV-WINDOW': recv },
+        signal: AbortSignal.timeout(8000),
+      })
+      if (!res.ok) return []
+      const data = await res.json() as { result: { list: Array<{ coin: Array<{ coin: string; walletBalance: string; locked: string }> }> } }
+      const coins = data.result?.list?.[0]?.coin ?? []
+      return coins
+        .map(c => ({ exchange, label, symbol: c.coin, free: parseFloat(c.walletBalance) - parseFloat(c.locked || '0'), locked: parseFloat(c.locked || '0'), total: parseFloat(c.walletBalance), usdValue: 0 }))
+        .filter(b => b.total > 0)
+    } catch { return [] }
+  }
+
+  // ── OKX ──────────────────────────────────────────────────────────────────
+  if (exchange === 'okx' && pass) {
+    try {
+      const crypto = await import('crypto')
+      const ts = new Date().toISOString()
+      const method = 'GET'
+      const path = '/api/v5/account/balance'
+      const sig = crypto.createHmac('sha256', secret).update(ts + method + path).digest('base64')
+      const res = await fetch(`https://www.okx.com${path}`, {
+        headers: { 'OK-ACCESS-KEY': key, 'OK-ACCESS-SIGN': sig, 'OK-ACCESS-TIMESTAMP': ts, 'OK-ACCESS-PASSPHRASE': pass },
+        signal: AbortSignal.timeout(8000),
+      })
+      if (!res.ok) return []
+      const data = await res.json() as { data: Array<{ details: Array<{ ccy: string; availBal: string; frozenBal: string }> }> }
+      const details = data.data?.[0]?.details ?? []
+      return details
+        .map(d => ({ exchange, label, symbol: d.ccy, free: parseFloat(d.availBal), locked: parseFloat(d.frozenBal), total: parseFloat(d.availBal) + parseFloat(d.frozenBal), usdValue: 0 }))
+        .filter(b => b.total > 0)
+    } catch { return [] }
+  }
+
+  // ── Kraken ───────────────────────────────────────────────────────────────
+  if (exchange === 'kraken') {
+    try {
+      const crypto = await import('crypto')
+      const nonce = Date.now().toString()
+      const body  = `nonce=${nonce}`
+      const path  = '/0/private/Balance'
+      const sha256 = crypto.createHash('sha256').update(nonce + body).digest()
+      const hmac = crypto.createHmac('sha512', Buffer.from(secret, 'base64'))
+        .update(Buffer.concat([Buffer.from(path), sha256]))
+        .digest('base64')
+      const res = await fetch(`https://api.kraken.com${path}`, {
+        method: 'POST',
+        headers: { 'API-Key': key, 'API-Sign': hmac, 'Content-Type': 'application/x-www-form-urlencoded' },
+        body,
+        signal: AbortSignal.timeout(8000),
+      })
+      if (!res.ok) return []
+      const data = await res.json() as { result: Record<string, string> }
+      return Object.entries(data.result ?? {})
+        .map(([sym, bal]) => ({ exchange, label, symbol: sym.replace(/^X/, '').replace(/Z$/, ''), free: parseFloat(bal), locked: 0, total: parseFloat(bal), usdValue: 0 }))
+        .filter(b => b.total > 0)
+    } catch { return [] }
+  }
+
+  // ── Bitget ───────────────────────────────────────────────────────────────
+  if (exchange === 'bitget' && pass) {
+    try {
+      const crypto = await import('crypto')
+      const ts = Date.now().toString()
+      const path = '/api/v2/spot/account/assets'
+      const sig = crypto.createHmac('sha256', secret).update(ts + 'GET' + path).digest('base64')
+      const res = await fetch(`https://api.bitget.com${path}`, {
+        headers: { 'ACCESS-KEY': key, 'ACCESS-SIGN': sig, 'ACCESS-TIMESTAMP': ts, 'ACCESS-PASSPHRASE': pass },
+        signal: AbortSignal.timeout(8000),
+      })
+      if (!res.ok) return []
+      const data = await res.json() as { data: Array<{ coin: string; available: string; frozen: string }> }
+      return (data.data ?? [])
+        .map(d => ({ exchange, label, symbol: d.coin, free: parseFloat(d.available), locked: parseFloat(d.frozen), total: parseFloat(d.available) + parseFloat(d.frozen), usdValue: 0 }))
+        .filter(b => b.total > 0)
+    } catch { return [] }
+  }
+
+  return [{ exchange, label, symbol: 'N/A', free: 0, locked: 0, total: 0, usdValue: 0 }]
+}
+
+// ─── EXECUTE TRANSFER ────────────────────────────────────────────────────────
+
+export interface TransferRequest {
+  fromExchange: string
+  toExchange:   string
+  symbol:       string
+  network:      string
+  amount:       number
+  toAddress:    string
+  memo?:        string
+}
+
+export interface TransferResult {
+  success: boolean
+  txId?:   string
+  message: string
+  logId?:  number
+}
+
+/** Execute a real withdrawal from the source exchange via its authenticated API.
+ *  Logs every attempt (success or failure) to exchange_transfer_logs.
+ */
+export async function executeExchangeTransfer(req: TransferRequest): Promise<TransferResult> {
+  const admin = await requireAdmin()
+
+  if (!req.toAddress || req.amount <= 0) {
+    return { success: false, message: 'Invalid transfer parameters: address and positive amount are required.' }
+  }
+
+  // Fetch saved API credentials for the source exchange
+  const keyRow = await db.select().from(exchangeApiKeys)
+    .where(eq(exchangeApiKeys.exchange, req.fromExchange)).limit(1)
+
+  const key    = keyRow[0]?.apiKey    ?? null
+  const secret = keyRow[0]?.apiSecret ?? null
+  const pass   = keyRow[0]?.passphrase ?? null
+
+  if (!key || !secret) {
+    return { success: false, message: `No API credentials found for ${req.fromExchange}. Configure API keys in the Exchange Connections tab first.` }
+  }
+
+  let txId: string | undefined
+  let errorMsg: string | undefined
+  let success = false
+
+  try {
+    // ── Binance Withdrawal ────────────────────────────────────────────────
+    if (req.fromExchange === 'binance') {
+      const crypto = await import('crypto')
+      const ts = Date.now().toString()
+      const params = new URLSearchParams({
+        coin: req.symbol,
+        network: req.network,
+        address: req.toAddress,
+        amount: req.amount.toString(),
+        timestamp: ts,
+        ...(req.memo ? { addressTag: req.memo } : {}),
+      })
+      const sig = crypto.createHmac('sha256', secret).update(params.toString()).digest('hex')
+      params.append('signature', sig)
+      const res = await fetch('https://api.binance.com/sapi/v1/capital/withdraw/apply', {
+        method: 'POST',
+        headers: { 'X-MBX-APIKEY': key, 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString(),
+        signal: AbortSignal.timeout(10000),
+      })
+      const data = await res.json() as { id?: string; msg?: string }
+      if (res.ok && data.id) { txId = data.id; success = true }
+      else errorMsg = data.msg ?? `HTTP ${res.status}`
+    }
+
+    // ── KuCoin Withdrawal ─────────────────────────────────────────────────
+    else if (req.fromExchange === 'kucoin' && pass) {
+      const crypto = await import('crypto')
+      const ts = Date.now().toString()
+      const body = JSON.stringify({ currency: req.symbol, address: req.toAddress, amount: req.amount.toString(), chain: req.network, ...(req.memo ? { memo: req.memo } : {}) })
+      const endpoint = '/api/v1/withdrawals'
+      const sig    = crypto.createHmac('sha256', secret).update(ts + 'POST' + endpoint + body).digest('base64')
+      const passSig = crypto.createHmac('sha256', secret).update(pass).digest('base64')
+      const res = await fetch(`https://api.kucoin.com${endpoint}`, {
+        method: 'POST',
+        headers: { 'KC-API-KEY': key, 'KC-API-SIGN': sig, 'KC-API-TIMESTAMP': ts, 'KC-API-PASSPHRASE': passSig, 'KC-API-KEY-VERSION': '2', 'Content-Type': 'application/json' },
+        body,
+        signal: AbortSignal.timeout(10000),
+      })
+      const data = await res.json() as { data?: { withdrawalId?: string }; msg?: string }
+      if (res.ok && data.data?.withdrawalId) { txId = data.data.withdrawalId; success = true }
+      else errorMsg = data.msg ?? `HTTP ${res.status}`
+    }
+
+    // ── Bybit Withdrawal ──────────────────────────────────────────────────
+    else if (req.fromExchange === 'bybit') {
+      const crypto = await import('crypto')
+      const ts = Date.now().toString()
+      const recv = '5000'
+      const body = JSON.stringify({ coin: req.symbol, chain: req.network, address: req.toAddress, amount: req.amount.toString(), timestamp: ts, ...(req.memo ? { tag: req.memo } : {}) })
+      const payload = ts + key + recv + body
+      const sig = crypto.createHmac('sha256', secret).update(payload).digest('hex')
+      const res = await fetch('https://api.bybit.com/v5/asset/withdraw/create', {
+        method: 'POST',
+        headers: { 'X-BAPI-API-KEY': key, 'X-BAPI-SIGN': sig, 'X-BAPI-SIGN-ALGORITHM': 'HMAC_SHA256', 'X-BAPI-TIMESTAMP': ts, 'X-BAPI-RECV-WINDOW': recv, 'Content-Type': 'application/json' },
+        body,
+        signal: AbortSignal.timeout(10000),
+      })
+      const data = await res.json() as { result?: { id?: string }; retMsg?: string }
+      if (res.ok && data.result?.id) { txId = data.result.id; success = true }
+      else errorMsg = data.retMsg ?? `HTTP ${res.status}`
+    }
+
+    // ── OKX Withdrawal ────────────────────────────────────────────────────
+    else if (req.fromExchange === 'okx' && pass) {
+      const crypto = await import('crypto')
+      const ts = new Date().toISOString()
+      const path = '/api/v5/asset/withdrawal'
+      const body = JSON.stringify({ ccy: req.symbol, chain: `${req.symbol}-${req.network}`, toAddr: req.toAddress, amt: req.amount.toString(), dest: '4', ...(req.memo ? { rcvrInfo: JSON.stringify({ walletType: 'private_wallet', walletAddrTag: req.memo }) } : {}) })
+      const sig = crypto.createHmac('sha256', secret).update(ts + 'POST' + path + body).digest('base64')
+      const res = await fetch(`https://www.okx.com${path}`, {
+        method: 'POST',
+        headers: { 'OK-ACCESS-KEY': key, 'OK-ACCESS-SIGN': sig, 'OK-ACCESS-TIMESTAMP': ts, 'OK-ACCESS-PASSPHRASE': pass, 'Content-Type': 'application/json' },
+        body,
+        signal: AbortSignal.timeout(10000),
+      })
+      const data = await res.json() as { data?: Array<{ wdId?: string }>; msg?: string }
+      if (res.ok && data.data?.[0]?.wdId) { txId = data.data[0].wdId; success = true }
+      else errorMsg = data.msg ?? `HTTP ${res.status}`
+    }
+
+    // ── Kraken Withdrawal ─────────────────────────────────────────────────
+    else if (req.fromExchange === 'kraken') {
+      const crypto = await import('crypto')
+      const nonce = Date.now().toString()
+      const bodyParams = new URLSearchParams({ nonce, asset: req.symbol, key: 'withdrawal_key', amount: req.amount.toString() })
+      const path = '/0/private/Withdraw'
+      const sha256 = crypto.createHash('sha256').update(nonce + bodyParams.toString()).digest()
+      const hmac = crypto.createHmac('sha512', Buffer.from(secret, 'base64')).update(Buffer.concat([Buffer.from(path), sha256])).digest('base64')
+      const res = await fetch(`https://api.kraken.com${path}`, {
+        method: 'POST',
+        headers: { 'API-Key': key, 'API-Sign': hmac, 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: bodyParams.toString(),
+        signal: AbortSignal.timeout(10000),
+      })
+      const data = await res.json() as { result?: { refid?: string }; error?: string[] }
+      if (res.ok && data.result?.refid) { txId = data.result.refid; success = true }
+      else errorMsg = data.error?.join(', ') ?? `HTTP ${res.status}`
+    }
+
+    else {
+      errorMsg = `Direct withdrawal API not yet implemented for ${req.fromExchange}. Use the exchange's web interface or configure a supported exchange (Binance, KuCoin, Bybit, OKX, Kraken).`
+    }
+  } catch (err) {
+    errorMsg = err instanceof Error ? err.message : 'Network error during transfer'
+  }
+
+  // Always log the attempt to DB
+  const [log] = await db.insert(exchangeTransferLogs).values({
+    fromExchange: req.fromExchange,
+    toExchange:   req.toExchange,
+    symbol:       req.symbol,
+    network:      req.network,
+    amount:       req.amount.toString(),
+    fee:          null,
+    address:      req.toAddress,
+    txId:         txId ?? null,
+    status:       success ? 'submitted' : 'failed',
+    errorMessage: errorMsg ?? null,
+    initiatedBy:  admin.id,
+  }).returning({ id: exchangeTransferLogs.id })
+
+  return {
+    success,
+    txId,
+    message: success
+      ? `Transfer submitted successfully. TX ID: ${txId}`
+      : `Transfer failed: ${errorMsg}`,
+    logId: log?.id,
+  }
+}
+
+// ─── TRANSFER HISTORY ────────────────────────────────────────────────────────
+
+export interface TransferLog {
+  id: number
+  fromExchange: string
+  toExchange:   string
+  symbol:       string
+  network:      string
+  amount:       string
+  fee:          string | null
+  address:      string | null
+  txId:         string | null
+  status:       string
+  errorMessage: string | null
+  createdAt:    string
+}
+
+export async function getTransferHistory(limit = 50): Promise<TransferLog[]> {
+  await requireAdmin()
+  const rows = await db.select().from(exchangeTransferLogs)
+    .orderBy(desc(exchangeTransferLogs.createdAt))
+    .limit(limit)
+  return rows.map(r => ({
+    id:           r.id,
+    fromExchange: r.fromExchange,
+    toExchange:   r.toExchange,
+    symbol:       r.symbol,
+    network:      r.network,
+    amount:       r.amount,
+    fee:          r.fee ?? null,
+    address:      r.address ?? null,
+    txId:         r.txId ?? null,
+    status:       r.status,
+    errorMessage: r.errorMessage ?? null,
+    createdAt:    r.createdAt.toISOString(),
   }))
 }

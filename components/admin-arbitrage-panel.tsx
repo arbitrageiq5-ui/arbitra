@@ -6,20 +6,22 @@ import {
   adminFetchLivePrices, testExchangeConnection, testAllExchanges,
   getExchangeApiKeys, saveExchangeApiKey, toggleExchangeEnabled,
   generateAiArbitrageStrategy, getSavedAiStrategy, getTransferRoutes,
+  getExchangeBalances, executeExchangeTransfer, getTransferHistory,
   AdminLivePrice, AdminArbitrageOpp, ExchangeStatus, ExchangeApiKey,
-  AiArbitrageStrategy, TransferRoute,
+  AiArbitrageStrategy, TransferRoute, ExchangeBalance, TransferLog,
 } from '@/app/actions/admin-arbitrage'
 import {
   Activity, RefreshCw, CheckCircle2, XCircle, Wifi, WifiOff,
   ArrowRightLeft, TrendingUp, Zap, Filter, Clock, AlertTriangle,
   Network, BarChart3, Search, Settings, Play, Pause, Key, Eye,
   EyeOff, Save, TestTube2, Bot, Sparkles, ChevronRight,
-  ShieldCheck, ToggleLeft, ToggleRight, DollarSign,
+  ShieldCheck, ToggleLeft, ToggleRight, DollarSign, SendHorizonal,
+  Wallet, ChevronDown, History, Copy, ExternalLink, Loader2,
 } from 'lucide-react'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-type SubTab = 'live-scan' | 'exchange-connections' | 'ai-strategy' | 'transfer-routes' | 'settings'
+type SubTab = 'live-scan' | 'exchange-connections' | 'ai-strategy' | 'transfer' | 'transfer-routes' | 'settings'
 
 const SCAN_SYMBOLS = [
   'BTC', 'ETH', 'BNB', 'SOL', 'XRP', 'DOGE', 'ADA', 'AVAX',
@@ -274,7 +276,8 @@ export default function AdminArbitragePanel() {
     { key: 'live-scan',           label: 'Live Scan',         icon: Activity     },
     { key: 'exchange-connections',label: 'API Connections',   icon: Key          },
     { key: 'ai-strategy',         label: 'AI Auto Setup',     icon: Bot          },
-    { key: 'transfer-routes',     label: 'Transfer Routes',   icon: ArrowRightLeft},
+    { key: 'transfer',            label: 'Transfer',          icon: SendHorizonal},
+    { key: 'transfer-routes',     label: 'Routes',            icon: ArrowRightLeft},
     { key: 'settings',            label: 'Settings',          icon: Settings     },
   ]
 
