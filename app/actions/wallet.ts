@@ -359,8 +359,8 @@ export async function reviewWithdrawal(
     status: action,
     reviewedBy: session.user.id,
     reviewedAt: new Date(),
-    txHash: txHash?.trim() || null,
-    note: note?.trim() || null,
+    txHash: txHash?.trim() ?? undefined,
+    note: note?.trim() ?? undefined,
     updatedAt: new Date(),
   }).where(eq(withdrawals.id, withdrawalId))
 

@@ -197,8 +197,8 @@ export async function getMarketOpportunities(): Promise<{
           spread: parseFloat(opp.profitPercentage.toFixed(4)),
           netProfit: parseFloat(netProfitAfterFees.toFixed(4)),
           volume24h: Math.round(coinVol * (0.08 + Math.random() * 0.14)),
-          liquidity: isMajor ? 'High' : 'Medium' as const,
-          risk: netProfitAfterFees > 2 ? 'High' : netProfitAfterFees > 0.8 ? 'Medium' : 'Low' as const,
+          liquidity: (isMajor ? 'High' : 'Medium') as 'High' | 'Medium' | 'Low',
+          risk: (netProfitAfterFees > 2 ? 'High' : netProfitAfterFees > 0.8 ? 'Medium' : 'Low') as 'High' | 'Medium' | 'Low',
           detectedAt: new Date().toISOString(),
         }
     }).sort((a, b) => b.netProfit - a.netProfit)

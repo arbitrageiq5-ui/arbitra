@@ -100,10 +100,8 @@ export async function submitFundRequest(
       network,
       amount: amount.toString(),
       txHash: txHash.trim(),
-      screenshotUrl: screenshotUrl?.trim() || null,
+      screenshotUrl: screenshotUrl?.trim() ?? '',
       status: 'pending',
-      createdAt: new Date(),
-      updatedAt: new Date(),
     })
     .returning()
 

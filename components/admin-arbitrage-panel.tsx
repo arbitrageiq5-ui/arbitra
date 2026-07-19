@@ -131,14 +131,107 @@ export default function AdminArbitragePanel() {
   const [aiContext, setAiContext] = useState('')
   const [aiError, setAiError] = useState<string | null>(null)
 
-  // Transfer routes
+  // Transfer routes (route planner tab)
   const [trFrom, setTrFrom] = useState('Binance')
   const [trTo, setTrTo] = useState('Kraken')
   const [trSymbol, setTrSymbol] = useState('USDT')
   const [routes, setRoutes] = useState<TransferRoute[]>([])
   const [loadingRoutes, setLoadingRoutes] = useState(false)
 
-  // ── Load API keys when tab opens ─────────────────────────────────────────
+  // Transfer execution tab
+  const [txFromEx, setTxFromEx] = useState('binance')
+  const [txToEx, setTxToEx] = useState('kraken')
+  const [txSymbol, setTxSymbol] = useState('USDT')
+  const [txNetwork, setTxNetwork] = useState('TRC20')
+  const [txAmount, setTxAmount] = useState('')
+  const [txAddress, setTxAddress] = useState('')
+  const [txMemo, setTxMemo] = useState('')
+  const [txBalances, setTxBalances] = useState<ExchangeBalance[]>([])
+  const [loadingBalances, setLoadingBalances] = useState(false)
+  const [txSubmitting, setTxSubmitting] = useState(false)
+  const [txResult, setTxResult] = useState<{ success: boolean; message: string; txId?: string } | null>(null)
+  const [txHistory, setTxHistory] = useState<TransferLog[]>([])
+  const [loadingHistory, setLoadingHistory] = useState(false)
+  const [txConfirmOpen, setTxConfirmOpen] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
+
+  const COIN_NETWORKS: Record<string, string[]> = {
+    USDT: ['TRC20','BEP20','ERC20','SOL'],
+    BTC:  ['BTC'],
+    ETH:  ['ERC20'],
+    BNB:  ['BEP20'],
+    SOL:  ['SOL'],
+    XRP:  ['XRP'],
+    DOGE: ['DOGE'],
+    ADA:  ['ADA'],
+    AVAX: ['AVAX-C'],
+    MATIC:['MATIC'],
+    LINK: ['ERC20','BEP20'],
+    LTC:  ['LTC'],
+    TRX:  ['TRC20'],
+  }
+  const EXCHANGE_LIST = [
+    { value: 'binance',  label: 'Binance'    },
+    { value: 'kucoin',   label: 'KuCoin'     },
+    { value: 'bybit',    label: 'Bybit'      },
+    { value: 'okx',      label: 'OKX'        },
+    { value: 'kraken',   label: 'Kraken'     },
+    { value: 'bitget',   label: 'Bitget'     },
+    { value: 'coinbase', label: 'Coinbase'   },
+    { value: 'gateio',   label: 'Gate.io'    },
+    { value: 'bitfinex', label: 'Bitfinex'   },
+    { value: 'gemini',   label: 'Gemini'     },
+    { value: 'htx',      label: 'HTX'        },
+    { value: 'cryptocom',label: 'Crypto.com' },
+  ]
+  const ALL_COINS = ['USDT','BTC','ETH','BNB','SOL','XRP','DOGE','ADA','AVAX','MATIC','LINK','LTC','TRX','DOT','ATOM','UNI']
+
+  async function loadBalances() {
+    setLoadingBalances(true)
+    try {
+      const bal = await getExchangeBalances(txFromEx)
+      setTxBalances(bal)
+    } catch { setTxBalances([]) }
+    finally { setLoadingBalances(false) }
+  }
+
+  async function loadHistory() {
+    setLoadingHistory(true)
+    try {
+      const h = await getTransferHistory(30)
+      setTxHistory(h)
+    } catch { setTxHistory([]) }
+    finally { setLoadingHistory(false) }
+  }
+
+  async function handleTransferSubmit() {
+    setTxSubmitting(true)
+    setTxResult(null)
+    try {
+      const result = await executeExchangeTransfer({
+        fromExchange: txFromEx,
+        toExchange:   txToEx,
+        symbol:       txSymbol,
+        network:      txNetwork,
+        amount:       parseFloat(txAmount),
+        toAddress:    txAddress,
+        ...(txMemo ? { memo: txMemo } : {}),
+      })
+      setTxResult(result)
+      if (result.success) {
+        setTxAmount('')
+        setTxAddress('')
+        setTxMemo('')
+        loadHistory()
+      }
+    } catch (err) {
+      setTxResult({ success: false, message: err instanceof Error ? err.message : 'Unknown error' })
+    }
+    setTxSubmitting(false)
+    setTxConfirmOpen(false)
+  }
+
+  // ── Load data when tab opens ──────────────────────────────────────────────
   useEffect(() => {
     if (subTab === 'exchange-connections' && apiKeys.length === 0) {
       loadApiKeys()
@@ -146,7 +239,14 @@ export default function AdminArbitragePanel() {
     if (subTab === 'ai-strategy' && !aiStrategy) {
       getSavedAiStrategy().then(s => { if (s) setAiStrategy(s) }).catch(() => {})
     }
+    if (subTab === 'transfer') {
+      loadHistory()
+    }
   }, [subTab])
+
+  useEffect(() => {
+    if (subTab === 'transfer') loadBalances()
+  }, [txFromEx, subTab])
 
   async function loadApiKeys() {
     setLoadingKeys(true)
@@ -158,7 +258,7 @@ export default function AdminArbitragePanel() {
     }
   }
 
-  // ── Live scan ─────────────────────────────────────────────────────────────
+  // ── Live scan ────────────────────────────────────────────────────���────────
   const runScan = useCallback(async () => {
     setScanError(null)
     setScanning(true)
@@ -814,6 +914,323 @@ export default function AdminArbitragePanel() {
                 </Card>
               )}
             </div>
+          )}
+        </div>
+      )}
+
+      {/* ══ TRANSFER TAB ══════════════════════════════════════════════════ */}
+      {subTab === 'transfer' && (
+        <div className="space-y-4">
+
+          {/* Header row */}
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h3 className="text-white font-bold text-base flex items-center gap-2">
+                <SendHorizonal className="w-4 h-4 text-cyan-400" /> Cross-Exchange Transfer
+              </h3>
+              <p className="text-slate-500 text-xs mt-0.5">Move USDT and any coin between exchanges using saved API keys</p>
+            </div>
+            <button
+              onClick={() => { setShowHistory(v => !v); if (!showHistory) loadHistory() }}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 hover:border-slate-600 text-slate-300 text-xs font-medium transition-colors"
+            >
+              <History className="w-3.5 h-3.5" />
+              {showHistory ? 'Hide History' : 'Transfer History'}
+            </button>
+          </div>
+
+          {/* Transfer form */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Left — form */}
+            <Card className="bg-slate-900 border-slate-800 p-5 space-y-4">
+              <h4 className="text-white font-semibold text-sm flex items-center gap-2">
+                <SendHorizonal className="w-4 h-4 text-cyan-400" /> Transfer Details
+              </h4>
+
+              {/* From / To exchange row */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-slate-400 mb-1.5 block">From Exchange</label>
+                  <select value={txFromEx} onChange={e => { setTxFromEx(e.target.value); setTxResult(null) }}
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-cyan-500/50 appearance-none">
+                    {EXCHANGE_LIST.map(e => <option key={e.value} value={e.value}>{e.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-slate-400 mb-1.5 block">To Exchange</label>
+                  <select value={txToEx} onChange={e => { setTxToEx(e.target.value); setTxResult(null) }}
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-cyan-500/50 appearance-none">
+                    {EXCHANGE_LIST.filter(e => e.value !== txFromEx).map(e => <option key={e.value} value={e.value}>{e.label}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* Coin + Network */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-slate-400 mb-1.5 block">Coin</label>
+                  <select value={txSymbol} onChange={e => {
+                    setTxSymbol(e.target.value)
+                    const nets = COIN_NETWORKS[e.target.value]
+                    if (nets) setTxNetwork(nets[0])
+                  }}
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-cyan-500/50 appearance-none">
+                    {ALL_COINS.map(c => <option key={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-slate-400 mb-1.5 block">Network</label>
+                  <select value={txNetwork} onChange={e => setTxNetwork(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-cyan-500/50 appearance-none">
+                    {(COIN_NETWORKS[txSymbol] ?? ['ERC20','BEP20','TRC20']).map(n => <option key={n}>{n}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* Amount */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs text-slate-400">Amount</label>
+                  {txBalances.length > 0 && (
+                    <button
+                      onClick={() => {
+                        const bal = txBalances.find(b => b.symbol === txSymbol || b.symbol === txSymbol.replace('USDT','') )
+                        if (bal) setTxAmount(bal.free.toString())
+                      }}
+                      className="text-[11px] text-cyan-400 hover:text-cyan-300 font-medium"
+                    >
+                      Max: {(txBalances.find(b => b.symbol === txSymbol)?.free ?? 0).toLocaleString(undefined, { maximumFractionDigits: 6 })} {txSymbol}
+                    </button>
+                  )}
+                </div>
+                <input
+                  type="number" value={txAmount} onChange={e => setTxAmount(e.target.value)}
+                  placeholder="0.00"
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-cyan-500/50 placeholder-slate-600"
+                />
+              </div>
+
+              {/* Destination address */}
+              <div>
+                <label className="text-xs text-slate-400 mb-1.5 block">Destination Address <span className="text-red-400">*</span></label>
+                <input
+                  type="text" value={txAddress} onChange={e => setTxAddress(e.target.value)}
+                  placeholder={`${txNetwork} wallet address on ${EXCHANGE_LIST.find(e => e.value === txToEx)?.label}`}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-cyan-500/50 placeholder-slate-600 font-mono text-xs"
+                />
+              </div>
+
+              {/* Memo (optional) */}
+              <div>
+                <label className="text-xs text-slate-400 mb-1.5 block">Memo / Tag <span className="text-slate-600">(optional — required for XRP, ATOM, etc.)</span></label>
+                <input
+                  type="text" value={txMemo} onChange={e => setTxMemo(e.target.value)}
+                  placeholder="Destination tag or memo"
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-cyan-500/50 placeholder-slate-600"
+                />
+              </div>
+
+              {/* Result banner */}
+              {txResult && (
+                <div className={`flex items-start gap-3 p-3 rounded-lg border text-sm ${
+                  txResult.success
+                    ? 'bg-green-500/10 border-green-500/25 text-green-300'
+                    : 'bg-red-500/10 border-red-500/25 text-red-300'
+                }`}>
+                  {txResult.success
+                    ? <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+                    : <XCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  }
+                  <div className="min-w-0">
+                    <p className="font-semibold">{txResult.success ? 'Transfer Submitted' : 'Transfer Failed'}</p>
+                    <p className="text-xs mt-0.5 opacity-80">{txResult.message}</p>
+                    {txResult.txId && (
+                      <p className="text-xs mt-1 font-mono opacity-70 truncate">TX: {txResult.txId}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Warning */}
+              <div className="flex items-start gap-2 p-3 bg-amber-500/5 border border-amber-500/20 rounded-lg">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                <p className="text-amber-300/70 text-[11px] leading-relaxed">
+                  This sends a real withdrawal via the exchange API. Double-check the address and network before confirming. Incorrect addresses may result in permanent loss of funds.
+                </p>
+              </div>
+
+              {/* Submit button */}
+              {!txConfirmOpen ? (
+                <button
+                  onClick={() => setTxConfirmOpen(true)}
+                  disabled={!txAmount || !txAddress || parseFloat(txAmount) <= 0}
+                  className="w-full flex items-center justify-center gap-2 py-3 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-lg text-sm transition-colors"
+                >
+                  <SendHorizonal className="w-4 h-4" />
+                  Review Transfer
+                </button>
+              ) : (
+                <div className="border border-red-500/30 rounded-lg p-4 bg-red-500/5 space-y-3">
+                  <p className="text-white font-bold text-sm text-center">Confirm Transfer</p>
+                  <div className="text-center space-y-1 text-sm">
+                    <p className="text-slate-300">
+                      Send <span className="text-white font-bold">{txAmount} {txSymbol}</span> via <span className="text-cyan-400 font-semibold">{txNetwork}</span>
+                    </p>
+                    <p className="text-slate-400 text-xs">
+                      From <span className="text-white">{EXCHANGE_LIST.find(e=>e.value===txFromEx)?.label}</span> → <span className="text-white">{EXCHANGE_LIST.find(e=>e.value===txToEx)?.label}</span>
+                    </p>
+                    <p className="text-slate-600 text-[10px] font-mono truncate">{txAddress}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => setTxConfirmOpen(false)}
+                      className="flex-1 py-2 bg-slate-700 hover:bg-slate-600 text-white font-medium rounded-lg text-sm transition-colors">
+                      Cancel
+                    </button>
+                    <button onClick={handleTransferSubmit} disabled={txSubmitting}
+                      className="flex-1 flex items-center justify-center gap-2 py-2 bg-red-600 hover:bg-red-500 disabled:opacity-60 text-white font-bold rounded-lg text-sm transition-colors">
+                      {txSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <SendHorizonal className="w-4 h-4" />}
+                      {txSubmitting ? 'Sending...' : 'Confirm & Send'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </Card>
+
+            {/* Right — balances */}
+            <Card className="bg-slate-900 border-slate-800 p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-white font-semibold text-sm flex items-center gap-2">
+                  <Wallet className="w-4 h-4 text-amber-400" />
+                  {EXCHANGE_LIST.find(e => e.value === txFromEx)?.label} Balances
+                </h4>
+                <button onClick={loadBalances} disabled={loadingBalances}
+                  className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-500 hover:text-white transition-colors">
+                  <RefreshCw className={`w-3.5 h-3.5 ${loadingBalances ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
+
+              {loadingBalances ? (
+                <div className="flex items-center justify-center py-10 text-slate-500 text-sm gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Loading balances...
+                </div>
+              ) : txBalances.length === 0 ? (
+                <div className="py-10 text-center">
+                  <Wallet className="w-8 h-8 text-slate-700 mx-auto mb-3" />
+                  <p className="text-slate-500 text-sm">No balances loaded</p>
+                  <p className="text-slate-600 text-xs mt-1">Configure API keys in the <button onClick={() => setSubTab('exchange-connections')} className="text-cyan-400 hover:underline">Connections tab</button>, then click refresh</p>
+                </div>
+              ) : txBalances[0]?.symbol === 'N/A' ? (
+                <div className="py-10 text-center">
+                  <Key className="w-8 h-8 text-slate-700 mx-auto mb-3" />
+                  <p className="text-slate-500 text-sm">API key not configured</p>
+                  <p className="text-slate-600 text-xs mt-1">
+                    <button onClick={() => setSubTab('exchange-connections')} className="text-cyan-400 hover:underline">Add API keys</button> for {EXCHANGE_LIST.find(e=>e.value===txFromEx)?.label} to view live balances
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-1.5 max-h-[380px] overflow-y-auto pr-1">
+                  {txBalances
+                    .sort((a, b) => b.total - a.total)
+                    .map((bal, i) => (
+                      <button
+                        key={i}
+                        onClick={() => {
+                          setTxSymbol(bal.symbol === 'USDT' || ALL_COINS.includes(bal.symbol) ? bal.symbol : txSymbol)
+                          setTxAmount(bal.free.toString())
+                        }}
+                        className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg bg-slate-800/60 hover:bg-slate-700/60 border border-transparent hover:border-slate-600 transition-all text-left group"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-7 h-7 rounded-md bg-slate-700 flex items-center justify-center text-[10px] font-black text-white">
+                            {bal.symbol.slice(0, 3)}
+                          </div>
+                          <div>
+                            <p className="text-white font-semibold text-sm">{bal.symbol}</p>
+                            {bal.locked > 0 && <p className="text-slate-600 text-[10px]">{bal.locked.toFixed(4)} locked</p>}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-white font-mono text-sm">{bal.free.toLocaleString(undefined, { maximumFractionDigits: 6 })}</p>
+                          <p className="text-slate-500 text-[10px] group-hover:text-cyan-400 transition-colors">click to fill</p>
+                        </div>
+                      </button>
+                    ))}
+                </div>
+              )}
+            </Card>
+          </div>
+
+          {/* Transfer History */}
+          {showHistory && (
+            <Card className="bg-slate-900 border-slate-800 p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-white font-semibold text-sm flex items-center gap-2">
+                  <History className="w-4 h-4 text-slate-400" /> Transfer History
+                </h4>
+                <button onClick={loadHistory} disabled={loadingHistory}
+                  className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-500 hover:text-white transition-colors">
+                  <RefreshCw className={`w-3.5 h-3.5 ${loadingHistory ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
+
+              {loadingHistory ? (
+                <div className="flex items-center justify-center py-8 text-slate-500 text-sm gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Loading history...
+                </div>
+              ) : txHistory.length === 0 ? (
+                <div className="py-8 text-center">
+                  <History className="w-8 h-8 text-slate-700 mx-auto mb-2" />
+                  <p className="text-slate-500 text-sm">No transfers yet</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs min-w-[680px]">
+                    <thead>
+                      <tr className="text-slate-500 border-b border-slate-800">
+                        {['Time','From','To','Coin','Network','Amount','Status','TX ID'].map(h => (
+                          <th key={h} className="px-3 py-2 text-left font-medium">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60">
+                      {txHistory.map(row => {
+                        const statusColor =
+                          row.status === 'submitted' || row.status === 'completed' ? 'text-green-400 bg-green-500/10 border-green-500/20'
+                          : row.status === 'failed' ? 'text-red-400 bg-red-500/10 border-red-500/20'
+                          : 'text-amber-400 bg-amber-500/10 border-amber-500/20'
+                        return (
+                          <tr key={row.id} className="hover:bg-slate-800/30 transition-colors">
+                            <td className="px-3 py-2.5 text-slate-500 whitespace-nowrap">
+                              {new Date(row.createdAt).toLocaleString(undefined, { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })}
+                            </td>
+                            <td className="px-3 py-2.5"><ExchangeBadge exchange={row.fromExchange} /></td>
+                            <td className="px-3 py-2.5"><ExchangeBadge exchange={row.toExchange} /></td>
+                            <td className="px-3 py-2.5 text-white font-bold">{row.symbol}</td>
+                            <td className="px-3 py-2.5 text-slate-400 font-mono">{row.network}</td>
+                            <td className="px-3 py-2.5 text-white font-mono">{parseFloat(row.amount).toLocaleString(undefined, { maximumFractionDigits: 6 })}</td>
+                            <td className="px-3 py-2.5">
+                              <span className={`px-2 py-0.5 rounded border text-[10px] font-bold capitalize ${statusColor}`}>
+                                {row.status}
+                              </span>
+                              {row.errorMessage && (
+                                <p className="text-red-400/60 text-[10px] mt-0.5 max-w-[180px] truncate">{row.errorMessage}</p>
+                              )}
+                            </td>
+                            <td className="px-3 py-2.5">
+                              {row.txId ? (
+                                <span className="text-cyan-400 font-mono text-[10px] truncate max-w-[100px] inline-block" title={row.txId}>
+                                  {row.txId.slice(0, 12)}...
+                                </span>
+                              ) : <span className="text-slate-600">—</span>}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Card>
           )}
         </div>
       )}
