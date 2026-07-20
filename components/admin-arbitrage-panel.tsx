@@ -16,12 +16,12 @@ import {
   Network, BarChart3, Search, Settings, Play, Pause, Key, Eye,
   EyeOff, Save, TestTube2, Bot, Sparkles, ChevronRight,
   ShieldCheck, ToggleLeft, ToggleRight, DollarSign, SendHorizonal,
-  Wallet, ChevronDown, History, Copy, ExternalLink, Loader2,
+  Wallet, ChevronDown, History, Copy, ExternalLink, Loader2, Link2,
 } from 'lucide-react'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-type SubTab = 'live-scan' | 'exchange-connections' | 'ai-strategy' | 'transfer' | 'transfer-routes' | 'settings'
+type SubTab = 'live-scan' | 'exchange-connections' | 'balances' | 'ai-strategy' | 'transfer' | 'transfer-routes' | 'settings'
 
 const SCAN_SYMBOLS = [
   'BTC', 'ETH', 'BNB', 'SOL', 'XRP', 'DOGE', 'ADA', 'AVAX',
@@ -186,6 +186,26 @@ export default function AdminArbitragePanel() {
   ]
   const ALL_COINS = ['USDT','BTC','ETH','BNB','SOL','XRP','DOGE','ADA','AVAX','MATIC','LINK','LTC','TRX','DOT','ATOM','UNI']
 
+  // Balances tab state
+  const [allBalances, setAllBalances] = useState<Record<string, ExchangeBalance[]>>({})
+  const [loadingAllBalances, setLoadingAllBalances] = useState(false)
+  const [selectedExchangeForBalance, setSelectedExchangeForBalance] = useState<string | null>(null)
+
+  async function loadAllExchangeBalances() {
+    setLoadingAllBalances(true)
+    const result: Record<string, ExchangeBalance[]> = {}
+    for (const ex of apiKeys.filter(k => k.isEnabled)) {
+      try {
+        const bals = await getExchangeBalances(ex.exchange)
+        result[ex.exchange] = bals
+      } catch {
+        result[ex.exchange] = []
+      }
+    }
+    setAllBalances(result)
+    setLoadingAllBalances(false)
+  }
+
   async function loadBalances() {
     setLoadingBalances(true)
     try {
@@ -238,6 +258,9 @@ export default function AdminArbitragePanel() {
     }
     if (subTab === 'ai-strategy' && !aiStrategy) {
       getSavedAiStrategy().then(s => { if (s) setAiStrategy(s) }).catch(() => {})
+    }
+    if (subTab === 'balances') {
+      loadAllExchangeBalances()
     }
     if (subTab === 'transfer') {
       loadHistory()
@@ -373,8 +396,9 @@ export default function AdminArbitragePanel() {
   ]
 
   const SUB_TABS: { key: SubTab; label: string; icon: React.ElementType }[] = [
-    { key: 'live-scan',           label: 'Live Scan',         icon: Activity     },
+    { key: 'live-scan',               label: 'Live Scan',          icon: Activity         },
     { key: 'exchange-connections',label: 'API Connections',   icon: Key          },
+    { key: 'balances',            label: 'Balances',          icon: Wallet       },
     { key: 'ai-strategy',         label: 'AI Auto Setup',     icon: Bot          },
     { key: 'transfer',            label: 'Transfer',          icon: SendHorizonal},
     { key: 'transfer-routes',     label: 'Routes',            icon: ArrowRightLeft},
@@ -746,6 +770,197 @@ export default function AdminArbitragePanel() {
                 </div>
               </Card>
             </div>
+          )}
+        </div>
+      )}
+
+      {/* ══ BALANCES TAB ═════════════════════════════════════════════════════ */}
+      {subTab === 'balances' && (
+        <div className="space-y-4">
+          {/* Header */}
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h3 className="text-white font-bold text-base flex items-center gap-2">
+                <Wallet className="w-4 h-4 text-cyan-400" /> Exchange Balances & Portfolio
+              </h3>
+              <p className="text-slate-500 text-xs mt-0.5">Real-time balances from all connected exchanges</p>
+            </div>
+            <button onClick={loadAllExchangeBalances} disabled={loadingAllBalances}
+              className="flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-60 text-white font-bold rounded-lg text-xs transition-colors">
+              <RefreshCw className={`w-3.5 h-3.5 ${loadingAllBalances ? 'animate-spin' : ''}`} />
+              {loadingAllBalances ? 'Loading...' : 'Refresh All'}
+            </button>
+          </div>
+
+          {loadingAllBalances && Object.keys(allBalances).length === 0 ? (
+            <Card className="bg-slate-900 border-slate-800 p-12 text-center">
+              <Loader2 className="w-8 h-8 text-slate-500 mx-auto mb-3 animate-spin" />
+              <p className="text-slate-400 text-sm">Loading balances from all exchanges...</p>
+            </Card>
+          ) : Object.keys(allBalances).length === 0 ? (
+            <Card className="bg-slate-900 border-slate-800 p-12 text-center">
+              <Wallet className="w-8 h-8 text-slate-700 mx-auto mb-3" />
+              <p className="text-slate-400 text-sm font-medium">No balances available</p>
+              <p className="text-slate-600 text-xs mt-2">
+                Enable and test exchanges in the <button onClick={() => setSubTab('exchange-connections')} className="text-cyan-400 hover:underline font-medium">API Connections</button> tab first
+              </p>
+            </Card>
+          ) : (
+            <>
+              {/* Summary stats */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {(() => {
+                  let totalCoins = 0; let totalValue = 0; let enabledEx = 0
+                  Object.entries(allBalances).forEach(([_, bals]) => {
+                    totalCoins += bals.filter(b => b.total > 0).length
+                    totalValue += bals.reduce((s, b) => s + (b.usdValue || 0), 0)
+                    enabledEx++
+                  })
+                  return [
+                    { label: 'Total USD Value', value: `$${totalValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}`, icon: DollarSign, color: 'text-green-400' },
+                    { label: 'Active Exchanges', value: enabledEx, icon: Link2, color: 'text-blue-400' },
+                    { label: 'Coins Held', value: totalCoins, icon: TrendingUp, color: 'text-amber-400' },
+                    { label: 'Last Updated', value: new Date().toLocaleTimeString(), icon: Clock, color: 'text-slate-400' },
+                  ].map((stat, i) => (
+                    <Card key={i} className="bg-slate-900 border-slate-800 p-4">
+                      <div className="flex items-start gap-3">
+                        <div className={`w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center shrink-0 ${stat.color}`}>
+                          <stat.icon className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <p className="text-slate-500 text-xs font-medium">{stat.label}</p>
+                          <p className={`text-white font-bold text-lg mt-1 ${stat.color}`}>{stat.value}</p>
+                        </div>
+                      </div>
+                    </Card>
+                  ))
+                })()}
+              </div>
+
+              {/* Exchange balances - grid view */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {Object.entries(allBalances)
+                  .filter(([_, bals]) => bals.length > 0 && bals[0].symbol !== 'N/A')
+                  .map(([exchange, balances]) => {
+                    const totalValue = balances.reduce((s, b) => s + (b.usdValue || 0), 0)
+                    const coinCount = balances.filter(b => b.total > 0).length
+                    const exMeta = EXCHANGE_LIST.find(e => e.value === exchange)
+                    const exLabel = exMeta?.label || exchange
+
+                    return (
+                      <Card key={exchange}
+                        className={`bg-slate-900 border transition-all cursor-pointer ${
+                          selectedExchangeForBalance === exchange
+                            ? 'border-cyan-500/40 ring-2 ring-cyan-500/20'
+                            : 'border-slate-800 hover:border-slate-700'
+                        }`}
+                        onClick={() => setSelectedExchangeForBalance(selectedExchangeForBalance === exchange ? null : exchange)}
+                      >
+                        {/* Exchange header */}
+                        <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-sm font-black border ${EXCHANGE_COLORS[exchange] ?? 'bg-slate-800 text-slate-300 border-slate-700'}`}>
+                              {EXCHANGE_ABBR[exchange] ?? exchange.slice(0, 2).toUpperCase()}
+                            </div>
+                            <div>
+                              <p className="text-white font-bold text-sm">{exLabel}</p>
+                              <p className="text-slate-600 text-[11px]">{coinCount} coins</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-cyan-400 font-bold text-sm">${totalValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+                            <ChevronDown className={`w-4 h-4 text-slate-500 ml-auto mt-1 transition-transform ${selectedExchangeForBalance === exchange ? 'rotate-180' : ''}`} />
+                          </div>
+                        </div>
+
+                        {/* Coins list - expandable */}
+                        {selectedExchangeForBalance === exchange && (
+                          <div className="p-4 space-y-2 max-h-96 overflow-y-auto">
+                            {balances
+                              .filter(b => b.total > 0)
+                              .sort((a, b) => b.total - a.total)
+                              .map((bal, i) => (
+                                <div key={i} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg border border-slate-700/50 hover:border-slate-600 transition-colors">
+                                  <div className="flex items-center gap-2.5">
+                                    <div className="w-8 h-8 rounded-md bg-slate-700 flex items-center justify-center text-[10px] font-black text-white">
+                                      {bal.symbol.slice(0, 3)}
+                                    </div>
+                                    <div>
+                                      <p className="text-white font-semibold text-sm">{bal.symbol}</p>
+                                      {bal.locked > 0 && (
+                                        <p className="text-slate-600 text-[10px]">
+                                          Free: {bal.free.toLocaleString(undefined, { maximumFractionDigits: 6 })} | Locked: {bal.locked.toLocaleString(undefined, { maximumFractionDigits: 6 })}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="text-slate-300 font-mono text-sm">{bal.total.toLocaleString(undefined, { maximumFractionDigits: 6 })}</p>
+                                    {bal.usdValue > 0 && (
+                                      <p className="text-slate-600 text-[10px] font-mono">≈ ${bal.usdValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            {balances.filter(b => b.total > 0).length === 0 && (
+                              <p className="text-center text-slate-500 text-sm py-4">No coins with balance</p>
+                            )}
+                          </div>
+                        )}
+                      </Card>
+                    )
+                  })}
+              </div>
+
+              {/* Detailed table view */}
+              <Card className="bg-slate-900 border-slate-800 p-5">
+                <h4 className="text-white font-semibold text-sm mb-4 flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4 text-slate-400" /> All Balances Detailed View
+                </h4>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs min-w-[700px]">
+                    <thead>
+                      <tr className="border-b border-slate-800 text-slate-500">
+                        <th className="px-4 py-3 text-left font-medium">Exchange</th>
+                        <th className="px-4 py-3 text-left font-medium">Coin</th>
+                        <th className="px-4 py-3 text-right font-medium">Free</th>
+                        <th className="px-4 py-3 text-right font-medium">Locked</th>
+                        <th className="px-4 py-3 text-right font-medium">Total</th>
+                        <th className="px-4 py-3 text-right font-medium">USD Value</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60">
+                      {Object.entries(allBalances)
+                        .flatMap(([exName, bals]) =>
+                          bals
+                            .filter(b => b.total > 0)
+                            .map(bal => ({ ...bal, exchangeName: exName }))
+                        )
+                        .sort((a, b) => (b.usdValue || 0) - (a.usdValue || 0))
+                        .slice(0, 100)
+                        .map((item, i) => (
+                          <tr key={i} className="hover:bg-slate-800/30 transition-colors">
+                            <td className="px-4 py-3"><ExchangeBadge exchange={item.exchangeName} /></td>
+                            <td className="px-4 py-3"><span className="text-white font-semibold">{item.symbol}</span></td>
+                            <td className="px-4 py-3 text-right font-mono text-slate-300">
+                              {item.free.toLocaleString(undefined, { maximumFractionDigits: 6 })}
+                            </td>
+                            <td className="px-4 py-3 text-right font-mono text-slate-500">
+                              {item.locked > 0 ? item.locked.toLocaleString(undefined, { maximumFractionDigits: 6 }) : '—'}
+                            </td>
+                            <td className="px-4 py-3 text-right font-mono text-amber-400 font-bold">
+                              {item.total.toLocaleString(undefined, { maximumFractionDigits: 6 })}
+                            </td>
+                            <td className="px-4 py-3 text-right font-mono text-cyan-400">
+                              {item.usdValue > 0 ? `$${item.usdValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : '—'}
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            </>
           )}
         </div>
       )}
