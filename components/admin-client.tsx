@@ -468,13 +468,13 @@ export default function AdminClient() {
         <div className="max-w-screen-xl mx-auto px-4 md:px-6 flex gap-1">
           {([
             { key: 'users' as Tab,               label: 'Users',             icon: Users,      badge: users.length },
+            { key: 'arbitrage' as Tab,            label: 'Arbitrage',           icon: Activity,      badge: 0 },
             { key: 'deposit-addresses' as Tab,    label: 'Deposit Addresses', icon: Wallet,     badge: activeAddressNetworks.length },
             { key: 'fund-requests' as Tab,        label: 'Fund Requests',     icon: Clock,      badge: pendingCount },
             { key: 'auto-trade' as Tab,           label: 'Auto Trade',        icon: TrendingUp, badge: autoTradePlans.filter(p => p.status === 'active').length },
             { key: 'activation-fees' as Tab,      label: 'Activations',       icon: Gift,        badge: activationFeeReqs.filter(f => f.status === 'pending').length },
             { key: 'withdrawals' as Tab,          label: 'Withdrawals',        icon: ArrowUpCircle, badge: withdrawalReqs.filter(w => w.status === 'pending').length },
             { key: 'wallets' as Tab,              label: 'Wallets',             icon: Wallet,        badge: traderBalances.length },
-            { key: 'arbitrage' as Tab,            label: 'Arbitrage',           icon: Activity,      badge: 0 },
           ]).map(tab => (
             <button
               key={tab.key}
