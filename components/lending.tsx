@@ -55,6 +55,14 @@ export function Lending() {
   const sortedRates = [...rates].sort((a, b) => {
     if (sortBy === 'price') return b.current_price - a.current_price
     if (sortBy === 'volume') return (b.total_volume ?? 0) - (a.total_volume ?? 0)
+    if (sortBy === 'apy') {
+      // Sort by best APY from the lending pools
+      const poolA = pools.find(p => p.id === `pool-${a.id}`)
+      const poolB = pools.find(p => p.id === `pool-${b.id}`)
+      const maxApyA = poolA ? Math.max(...poolA.rates.map(r => r.apy)) : 0
+      const maxApyB = poolB ? Math.max(...poolB.rates.map(r => r.apy)) : 0
+      return maxApyB - maxApyA // Higher APY first
+    }
     return 0
   })
 
@@ -68,19 +76,26 @@ export function Lending() {
       {/* ═══ Header ═══════════════════════════════════════════════════════ */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-white text-2xl font-bold flex items-center gap-2">
-            <Zap className="w-6 h-6 text-amber-400" />
-            Lending & Yields
-          </h2>
-          <p className="text-slate-500 text-sm mt-1">Earn passive income by lending your crypto assets</p>
+          <div className="flex items-center gap-2">
+            <h2 className="text-white text-2xl font-bold flex items-center gap-2">
+              <Zap className="w-6 h-6 text-amber-400" />
+              Lending & Yields
+            </h2>
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-500/10 border border-green-500/30">
+              <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+              <span className="text-green-400 text-xs font-semibold">Live Rates</span>
+            </div>
+          </div>
+          <p className="text-slate-500 text-sm mt-1">Earn passive income by lending your crypto assets • Rates update every 30 seconds</p>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={refresh}
             disabled={refreshing}
-            className="p-2.5 rounded-lg bg-slate-800 border border-slate-700 hover:border-slate-600 text-slate-400 hover:text-white transition-all disabled:opacity-50"
+            className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 disabled:opacity-60 text-white font-medium transition-all text-xs"
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            {refreshing ? 'Updating...' : 'Refresh'}
           </button>
           <button
             onClick={() => setShowHidden(!showHidden)}
@@ -274,7 +289,10 @@ export function Lending() {
           <Info className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
           <div className="text-sm space-y-1">
             <p className="text-slate-300">
-              <span className="font-semibold">Live rates updated every 30 seconds</span> from CoinGecko. APY rates are simulated based on market conditions and may vary by exchange and lock period.
+              <span className="font-semibold">Live coin rates & APYs updated every 30 seconds</span> from CoinGecko. APY is calculated dynamically based on coin volatility, trading volume, and market conditions.
+            </p>
+            <p className="text-slate-500 text-xs">
+              • Higher volatility = higher APY • Lock-in periods offer premium yields • Rates vary by network (Ethereum, BSC, etc.)
             </p>
             <p className="text-slate-500 text-xs">Lending products are subject to risk. Always verify terms before depositing funds.</p>
           </div>
