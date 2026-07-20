@@ -597,115 +597,214 @@ export default function AdminArbitragePanel() {
       {/* ══ EXCHANGE API CONNECTIONS TAB ═══════════════════════════════════ */}
       {subTab === 'exchange-connections' && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between flex-wrap gap-3">
+          {/* Header section */}
+          <div className="flex items-start justify-between flex-wrap gap-4">
             <div>
-              <h3 className="text-white font-semibold text-sm">Exchange API Connections</h3>
-              <p className="text-slate-500 text-xs mt-0.5">Configure API keys for each exchange. Public REST APIs work without keys for price data.</p>
+              <h3 className="text-white font-bold text-base flex items-center gap-2">
+                <Key className="w-5 h-5 text-amber-400" />
+                Exchange API Connections
+              </h3>
+              <p className="text-slate-500 text-xs mt-2">Connect and manage your exchange API keys for automated trading and data fetching. Test connections regularly.</p>
             </div>
             <div className="flex gap-2">
               <button onClick={handleTestAll} disabled={testingAll}
-                className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-60 text-white font-medium rounded-lg text-xs transition-colors border border-slate-600">
-                <TestTube2 className={`w-3.5 h-3.5 ${testingAll ? 'animate-spin' : ''}`} />
-                {testingAll ? 'Testing All...' : 'Test All Connections'}
+                className="flex items-center gap-2 px-4 py-2.5 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-60 text-white font-bold rounded-lg text-xs transition-colors">
+                <TestTube2 className={`w-4 h-4 ${testingAll ? 'animate-spin' : ''}`} />
+                {testingAll ? 'Testing...' : 'Test All'}
               </button>
             </div>
           </div>
 
           {loadingKeys ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {Array.from({ length: 6 }).map((_, i) => (
-                <Card key={i} className="bg-slate-900 border-slate-800 p-4 animate-pulse h-28" />
+                <Card key={i} className="bg-slate-900 border-slate-800 p-5 animate-pulse h-40" />
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {apiKeys.map(ex => {
-                const keyResult = testResults[ex.exchange]
-                const liveStatus = keyResult ?? (ex.lastTestStatus ? { ok: ex.lastTestStatus === 'ok', latencyMs: ex.lastTestMs ?? 0, message: '' } : null)
-                return (
-                  <Card key={ex.exchange}
-                    className={`bg-slate-900 border p-4 transition-colors ${
-                      liveStatus?.ok === true  ? 'border-green-500/20' :
-                      liveStatus?.ok === false ? 'border-red-500/20'   :
-                      'border-slate-800'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-black border ${
-                          EXCHANGE_COLORS[ex.exchange] ?? 'bg-slate-800 text-slate-300 border-slate-700'
-                        }`}>
-                          {EXCHANGE_ABBR[ex.exchange] ?? ex.label.slice(0, 2)}
+            <>
+              {/* Summary stats */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {(() => {
+                  const connected = apiKeys.filter(k => k.apiKey && k.isEnabled).length
+                  const total = apiKeys.length
+                  const online = Object.values(testResults).filter(r => r?.ok).length
+                  return (
+                    <>
+                      <Card className="bg-slate-900 border-slate-800 p-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center">
+                            <Key className="w-5 h-5 text-amber-400" />
+                          </div>
+                          <div>
+                            <p className="text-slate-500 text-xs">Configured</p>
+                            <p className="text-white font-bold text-lg">{connected}/{total}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-white font-semibold text-sm leading-none">{ex.label}</p>
-                          <p className="text-slate-600 text-[10px] mt-0.5">{ex.isPublicOnly ? 'Public API' : 'Authenticated'}</p>
+                      </Card>
+                      <Card className="bg-slate-900 border-slate-800 p-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center">
+                            <Wifi className="w-5 h-5 text-green-400" />
+                          </div>
+                          <div>
+                            <p className="text-slate-500 text-xs">Online</p>
+                            <p className="text-white font-bold text-lg">{online}</p>
+                          </div>
                         </div>
+                      </Card>
+                      <Card className="bg-slate-900 border-slate-800 p-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center">
+                            <Activity className="w-5 h-5 text-blue-400" />
+                          </div>
+                          <div>
+                            <p className="text-slate-500 text-xs">Enabled</p>
+                            <p className="text-white font-bold text-lg">{apiKeys.filter(k => k.isEnabled).length}</p>
+                          </div>
+                        </div>
+                      </Card>
+                    </>
+                  )
+                })()}
+              </div>
+
+              {/* Exchanges grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {apiKeys.map(ex => {
+                  const keyResult = testResults[ex.exchange]
+                  const liveStatus = keyResult ?? (ex.lastTestStatus ? { ok: ex.lastTestStatus === 'ok', latencyMs: ex.lastTestMs ?? 0, message: '' } : null)
+                  const hasKeys = !!ex.apiKey
+                  const isOnline = liveStatus?.ok === true
+                  const isFailing = liveStatus?.ok === false
+
+                  return (
+                    <Card key={ex.exchange}
+                      className={`border transition-all ${
+                        isOnline  ? 'bg-slate-900 border-green-500/30' :
+                        isFailing ? 'bg-slate-900 border-red-500/30'   :
+                        'bg-slate-900 border-slate-800'
+                      }`}
+                    >
+                      {/* Card header */}
+                      <div className="flex items-center justify-between p-5 border-b border-slate-800">
+                        <div className="flex items-center gap-3.5">
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-xs font-black border ${
+                            EXCHANGE_COLORS[ex.exchange] ?? 'bg-slate-800 text-slate-300 border-slate-700'
+                          }`}>
+                            {EXCHANGE_ABBR[ex.exchange] ?? ex.label.slice(0, 2)}
+                          </div>
+                          <div>
+                            <p className="text-white font-bold text-sm">{ex.label}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className={`text-[10px] px-2 py-0.5 rounded-full border ${
+                                ex.isPublicOnly
+                                  ? 'bg-blue-500/10 border-blue-500/30 text-blue-300'
+                                  : 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                              }`}>
+                                {ex.isPublicOnly ? 'Public API' : 'Authenticated'}
+                              </span>
+                              {ex.note && <span className="text-slate-600 text-[10px]">{ex.note}</span>}
+                            </div>
+                          </div>
+                        </div>
+                        {/* Enable/disable toggle */}
+                        <button onClick={() => handleToggleEnabled(ex.exchange, ex.isEnabled)}
+                          className="text-slate-400 hover:text-white transition-colors p-1.5">
+                          {ex.isEnabled
+                            ? <ToggleRight className="w-6 h-6 text-green-400" />
+                            : <ToggleLeft className="w-6 h-6 text-slate-600" />
+                          }
+                        </button>
                       </div>
-                      {/* Enable/disable toggle */}
-                      <button onClick={() => handleToggleEnabled(ex.exchange, ex.isEnabled)}
-                        className="text-slate-400 hover:text-white transition-colors">
-                        {ex.isEnabled
-                          ? <ToggleRight className="w-6 h-6 text-green-400" />
-                          : <ToggleLeft className="w-6 h-6 text-slate-600" />
-                        }
-                      </button>
-                    </div>
 
-                    {/* Status row */}
-                    <div className="flex items-center gap-2 mb-3">
-                      {liveStatus ? (
-                        <>
-                          <StatusDot ok={liveStatus.ok} />
-                          <span className={`text-xs ${liveStatus.ok ? 'text-green-400' : 'text-red-400'}`}>
-                            {liveStatus.ok ? 'Online' : 'Offline'}
-                          </span>
-                          {liveStatus.latencyMs > 0 && <LatencyChip ms={liveStatus.latencyMs} />}
-                        </>
-                      ) : (
-                        <>
-                          <StatusDot idle />
-                          <span className="text-slate-600 text-xs">Not tested</span>
-                        </>
-                      )}
-                      <span className="ml-auto text-[10px] text-slate-600">
-                        {ex.lastTestedAt ? new Date(ex.lastTestedAt).toLocaleTimeString() : ''}
-                      </span>
-                    </div>
+                      {/* Card body */}
+                      <div className="p-5 space-y-3">
+                        {/* Status indicator */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            {isOnline ? (
+                              <>
+                                <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                                <span className="text-green-400 font-semibold text-xs">Online & Ready</span>
+                              </>
+                            ) : isFailing ? (
+                              <>
+                                <div className="w-2 h-2 rounded-full bg-red-400" />
+                                <span className="text-red-400 font-semibold text-xs">Connection Failed</span>
+                              </>
+                            ) : (
+                              <>
+                                <div className="w-2 h-2 rounded-full bg-slate-600" />
+                                <span className="text-slate-400 font-semibold text-xs">Not Tested</span>
+                              </>
+                            )}
+                          </div>
+                          {liveStatus?.latencyMs ? (
+                            <span className="text-[10px] text-slate-500 font-mono">{liveStatus.latencyMs}ms</span>
+                          ) : null}
+                        </div>
 
-                    {/* API key indicator */}
-                    <div className="flex items-center gap-1.5 mb-3">
-                      <Key className="w-3 h-3 text-slate-600" />
-                      <span className="text-[11px] text-slate-500">
-                        {ex.apiKey ? <span className="text-amber-400 font-mono">{ex.apiKey}</span> : 'No API key set'}
-                      </span>
-                    </div>
+                        {/* API key status */}
+                        <div className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg">
+                          <div className="flex items-center gap-2">
+                            <Key className="w-4 h-4 text-slate-600" />
+                            <div>
+                              <p className="text-slate-400 text-xs">API Key</p>
+                              {hasKeys && ex.apiKey ? (
+                                <p className="text-amber-400 font-mono text-[10px]">{ex.apiKey.slice(0, 8)}...{ex.apiKey.slice(-4)}</p>
+                              ) : (
+                                <p className="text-slate-600 text-xs italic">Not configured</p>
+                              )}
+                            </div>
+                          </div>
+                          {hasKeys && (
+                            <div className="w-2 h-2 rounded-full bg-green-400" />
+                          )}
+                        </div>
 
-                    {/* Action buttons */}
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleTestOne(ex.exchange)}
-                        disabled={testingExchange === ex.exchange}
-                        className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-xs text-slate-300 transition-colors disabled:opacity-50"
-                      >
-                        <TestTube2 className={`w-3 h-3 ${testingExchange === ex.exchange ? 'animate-spin' : ''}`} />
-                        {testingExchange === ex.exchange ? 'Testing...' : 'Test'}
-                      </button>
-                      <button
-                        onClick={() => {
-                          setEditingExchange(ex.exchange)
-                          setEditForm({ apiKey: '', apiSecret: '', passphrase: '', note: ex.note ?? '', isEnabled: ex.isEnabled, isPublicOnly: ex.isPublicOnly })
-                        }}
-                        className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 rounded text-xs text-amber-400 transition-colors"
-                      >
-                        <Key className="w-3 h-3" />
-                        Configure
-                      </button>
-                    </div>
-                  </Card>
-                )
-              })}
-            </div>
+                        {/* Last tested */}
+                        {ex.lastTestedAt && (
+                          <div className="text-[10px] text-slate-600 flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            Last tested: {new Date(ex.lastTestedAt).toLocaleTimeString()}
+                          </div>
+                        )}
+
+                        {/* Error message if any */}
+                        {liveStatus?.message && (
+                          <div className="p-2 bg-red-500/10 border border-red-500/30 rounded text-red-300 text-xs">
+                            {liveStatus.message}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Card footer - Actions */}
+                      <div className="flex gap-2 p-5 border-t border-slate-800">
+                        <button
+                          onClick={() => handleTestOne(ex.exchange)}
+                          disabled={testingExchange === ex.exchange}
+                          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
+                        >
+                          <TestTube2 className={`w-3.5 h-3.5 ${testingExchange === ex.exchange ? 'animate-spin' : ''}`} />
+                          {testingExchange === ex.exchange ? 'Testing' : 'Test'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setEditingExchange(ex.exchange)
+                            setEditForm({ apiKey: '', apiSecret: '', passphrase: '', note: ex.note ?? '', isEnabled: ex.isEnabled, isPublicOnly: ex.isPublicOnly })
+                          }}
+                          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-400 text-xs font-medium rounded-lg transition-colors"
+                        >
+                          <Settings className="w-3.5 h-3.5" />
+                          Configure
+                        </button>
+                      </div>
+                    </Card>
+                  )
+                })}
+              </div>
+            </>
           )}
 
           {/* Edit modal */}
