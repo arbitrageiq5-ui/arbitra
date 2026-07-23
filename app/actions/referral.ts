@@ -1,14 +1,65 @@
 'use server'
 
 import { db, pool } from '@/lib/db'
-import { user, activationFees, referralCommissions, depositAddresses as depositAddressesTable } from '@/lib/db/schema'
+import { user, activationFees, referralCommissions, referralIncomeCommissions, depositAddresses as depositAddressesTable } from '@/lib/db/schema'
 import { eq, desc, and, sql } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 import { headers } from 'next/headers'
 
-// Commission amounts by level
+// Commission amounts by level (activation fee flat amounts)
 const LEVEL_COMMISSIONS: Record<number, number> = { 1: 30, 2: 10, 3: 5 }
 const ACTIVATION_FEE = 100
+
+// Income commission rates (% of bot/auto-trade profit)
+const INCOME_COMMISSION_RATES: Record<number, number> = { 1: 0.50, 2: 0.25, 3: 0.20 }
+
+/**
+ * Called whenever a bot or auto-trade cycle generates profit.
+ * Walks up 3 referral levels and credits each referrer their % of income.
+ *
+ * @param earnerUserId  - the trader who generated the income
+ * @param incomeAmount  - gross profit amount in USD
+ * @param sourceType    - 'bot' | 'auto_trade'
+ * @param refId         - optional ID of the source record
+ */
+export async function creditIncomeCommission(
+  earnerUserId: string,
+  incomeAmount: number,
+  sourceType: 'bot' | 'auto_trade',
+  refId?: string,
+) {
+  if (incomeAmount <= 0) return
+
+  let currentUserId = earnerUserId
+
+  for (let level = 1; level <= 3; level++) {
+    const [currentUser] = await db.select({ referredBy: user.referredBy })
+      .from(user).where(eq(user.id, currentUserId)).limit(1)
+    if (!currentUser?.referredBy) break
+
+    const referrerId = currentUser.referredBy
+    const [referrer] = await db.select({ id: user.id, isActivated: user.isActivated })
+      .from(user).where(eq(user.id, referrerId)).limit(1)
+    if (!referrer?.isActivated) { currentUserId = referrerId; continue }
+
+    const pct = INCOME_COMMISSION_RATES[level]
+    const commissionAmount = (incomeAmount * pct) / 100
+
+    await db.insert(referralIncomeCommissions).values({
+      userId:        referrerId,
+      fromUserId:    earnerUserId,
+      level,
+      sourceType,
+      incomeAmount:  incomeAmount.toFixed(8),
+      commissionPct: pct.toFixed(4),
+      amount:        commissionAmount.toFixed(8),
+      refId:         refId ?? null,
+      status:        'paid',
+    })
+
+    currentUserId = referrerId
+  }
+}
 
 // Generate a unique 8-char alphanumeric referral code
 function generateCode(): string {
@@ -98,7 +149,25 @@ export async function getMyReferralData() {
     .where(eq(user.referredBy, session.user.id))
     .orderBy(desc(user.createdAt))
 
-  // Commission summary
+  // Income commissions (bot + auto-trade %)
+  const incomeCommissions = await db
+    .select({
+      id:            referralIncomeCommissions.id,
+      level:         referralIncomeCommissions.level,
+      sourceType:    referralIncomeCommissions.sourceType,
+      incomeAmount:  referralIncomeCommissions.incomeAmount,
+      commissionPct: referralIncomeCommissions.commissionPct,
+      amount:        referralIncomeCommissions.amount,
+      status:        referralIncomeCommissions.status,
+      createdAt:     referralIncomeCommissions.createdAt,
+      fromUser: { name: user.name, email: user.email },
+    })
+    .from(referralIncomeCommissions)
+    .leftJoin(user, eq(referralIncomeCommissions.fromUserId, user.id))
+    .where(eq(referralIncomeCommissions.userId, session.user.id))
+    .orderBy(desc(referralIncomeCommissions.createdAt))
+
+  // Commission summary (activation flat fees)
   const totalEarned = commissions
     .filter(c => c.status === 'paid')
     .reduce((s, c) => s + parseFloat(c.amount as string), 0)
@@ -107,10 +176,20 @@ export async function getMyReferralData() {
     .filter(c => c.status === 'pending')
     .reduce((s, c) => s + parseFloat(c.amount as string), 0)
 
+  // Income commission totals by level
+  const incomeTotalByLevel = { 1: 0, 2: 0, 3: 0 }
+  let totalIncomeEarned = 0
+  for (const ic of incomeCommissions) {
+    const amt = parseFloat(ic.amount as string)
+    const lv = ic.level as 1 | 2 | 3
+    if (lv in incomeTotalByLevel) incomeTotalByLevel[lv] += amt
+    totalIncomeEarned += amt
+  }
+
   const l1Count = directReferrals.length
   const l1Activated = directReferrals.filter(r => r.isActivated).length
 
-  // Count L2 referrals (people referred by your direct referrals)
+  // Count L2 referrals
   const l2Count = l1Count > 0
     ? (await db
         .select({ count: sql<number>`count(*)` })
@@ -133,9 +212,12 @@ export async function getMyReferralData() {
     isActivated: me.isActivated,
     activationFee: activationFee ?? null,
     commissions,
+    incomeCommissions,
     directReferrals,
     totalEarned,
     pendingEarnings,
+    totalIncomeEarned,
+    incomeTotalByLevel,
     l1Count,
     l1Activated,
     l2Count: Number(l2Count),

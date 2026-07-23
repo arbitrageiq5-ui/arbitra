@@ -8,7 +8,7 @@ import { copyToClipboard } from '@/lib/utils'
 import {
   Copy, Check, Users, DollarSign, Gift, ChevronDown, ChevronUp,
   Clock, CheckCircle2, XCircle, AlertCircle, Share2, ExternalLink,
-  Zap, TrendingUp, Lock,
+  Zap, TrendingUp, Lock, Bot, BarChart3, Layers,
 } from 'lucide-react'
 
 type Commission = {
@@ -17,6 +17,18 @@ type Commission = {
   amount: string
   status: string
   paidAt: Date | null
+  createdAt: Date
+  fromUser: { name: string | null; email: string } | null
+}
+
+type IncomeCommission = {
+  id: number
+  level: number
+  sourceType: string
+  incomeAmount: string
+  commissionPct: string
+  amount: string
+  status: string
   createdAt: Date
   fromUser: { name: string | null; email: string } | null
 }
@@ -34,9 +46,12 @@ type ReferralData = {
   isActivated: boolean
   activationFee: { id: number; status: string; txHash: string | null; createdAt: Date } | null
   commissions: Commission[]
+  incomeCommissions: IncomeCommission[]
   directReferrals: DirectReferral[]
   totalEarned: number
   pendingEarnings: number
+  totalIncomeEarned: number
+  incomeTotalByLevel: { 1: number; 2: number; 3: number }
   l1Count: number
   l1Activated: number
   l2Count: number
@@ -59,6 +74,7 @@ export function PassiveIncome() {
   const [submitting, setSubmitting] = useState(false)
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
   const [showAllCommissions, setShowAllCommissions] = useState(false)
+  const [showAllIncomeCommissions, setShowAllIncomeCommissions] = useState(false)
   const [showAllReferrals, setShowAllReferrals] = useState(false)
   const [origin, setOrigin] = useState('')
 
@@ -220,8 +236,8 @@ export function PassiveIncome() {
       {/* Passive Income Summary */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { label: 'Total Earned', value: `$${data.totalEarned.toFixed(2)}`, icon: DollarSign, color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/20' },
-          { label: 'Pending', value: `$${data.pendingEarnings.toFixed(2)}`, icon: Clock, color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
+          { label: 'Activation Commissions', value: `$${data.totalEarned.toFixed(2)}`, icon: DollarSign, color: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/20' },
+          { label: 'Income Commissions', value: `$${data.totalIncomeEarned.toFixed(4)}`, icon: TrendingUp, color: 'text-cyan-400', bg: 'bg-cyan-500/10', border: 'border-cyan-500/20' },
           { label: 'Direct Referrals', value: `${data.l1Count}`, icon: Users, color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20' },
           { label: 'Total Network', value: `${data.l1Count + data.l2Count + data.l3Count}`, icon: Share2, color: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500/20' },
         ].map(({ label, value, icon: Icon, color, bg, border }) => (
@@ -236,36 +252,84 @@ export function PassiveIncome() {
       </div>
 
       {/* Multi-Level Commission Plan */}
-      <Card className="bg-slate-900 border-slate-800 p-5">
-        <h3 className="text-white font-bold text-sm mb-4 flex items-center gap-2">
-          <TrendingUp className="w-4 h-4 text-amber-400" />
+      <Card className="bg-slate-900 border-slate-800 p-5 space-y-5">
+        <h3 className="text-white font-bold text-sm flex items-center gap-2">
+          <Layers className="w-4 h-4 text-amber-400" />
           Multi-Level Commission Plan
         </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {[
-            { level: 1, label: 'Direct Referral', commission: '$30', desc: 'When someone you refer pays the $100 activation fee', count: data.l1Count, activated: data.l1Activated },
-            { level: 2, label: 'Level 2', commission: '$10', desc: 'When your referral\'s referral activates', count: data.l2Count, activated: null },
-            { level: 3, label: 'Level 3', commission: '$5',  desc: 'When level 2\'s referral activates', count: data.l3Count, activated: null },
-          ].map(({ level, label, commission, desc, count, activated }) => {
-            const c = LEVEL_COLORS[level]
-            return (
-              <div key={level} className={`${c.bg} border ${c.border} rounded-xl p-4`}>
+
+        {/* ── Activation Fee Commissions ── */}
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-1 h-4 rounded-full bg-amber-400" />
+            <p className="text-slate-300 text-xs font-semibold uppercase tracking-wider">Activation Fee Commission (one-time per referral)</p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {[
+              { level: 1, label: 'Direct (L1)', commission: '$30', desc: 'Per activated direct referral', count: data.l1Count, activated: data.l1Activated },
+              { level: 2, label: 'Level 2',    commission: '$10', desc: "From your referral's referral", count: data.l2Count, activated: null },
+              { level: 3, label: 'Level 3',    commission: '$5',  desc: "From L2's referral activation", count: data.l3Count, activated: null },
+            ].map(({ level, label, commission, desc, count, activated }) => {
+              const c = LEVEL_COLORS[level]
+              return (
+                <div key={level} className={`${c.bg} border ${c.border} rounded-xl p-4`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className={`text-xs font-bold ${c.text} uppercase tracking-wider`}>{label}</span>
+                    <span className={`text-xs font-semibold ${c.text} bg-slate-900/60 rounded-full px-2 py-0.5`}>{count}</span>
+                  </div>
+                  <p className={`text-2xl font-bold ${c.text}`}>{commission}</p>
+                  <p className="text-slate-500 text-xs mt-1 leading-relaxed">{desc}</p>
+                  {activated !== null && (
+                    <p className="text-slate-400 text-xs mt-2">{activated}/{count} activated</p>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* ── Income-Based Commissions (Bot + Auto Trade) ── */}
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-1 h-4 rounded-full bg-cyan-400" />
+            <p className="text-slate-300 text-xs font-semibold uppercase tracking-wider">Income Commission — Bot & Auto Trade Profits (recurring)</p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {[
+              { level: 1, label: 'Direct (L1)', pct: '0.50%', desc: '0.50% of every Bot/Auto Trade profit your direct referral earns', earned: data.incomeTotalByLevel[1], color: LEVEL_COLORS[1] },
+              { level: 2, label: 'Level 2',     pct: '0.25%', desc: '0.25% of every profit from your 2nd-layer referrals',            earned: data.incomeTotalByLevel[2], color: LEVEL_COLORS[2] },
+              { level: 3, label: 'Level 3',     pct: '0.20%', desc: '0.20% of every profit from your 3rd-layer referrals',            earned: data.incomeTotalByLevel[3], color: LEVEL_COLORS[3] },
+            ].map(({ level, label, pct, desc, earned, color: c }) => (
+              <div key={level} className={`${c.bg} border ${c.border} rounded-xl p-4 relative overflow-hidden`}>
                 <div className="flex items-center justify-between mb-2">
                   <span className={`text-xs font-bold ${c.text} uppercase tracking-wider`}>{label}</span>
-                  <span className={`text-xs font-semibold ${c.text} bg-slate-900/60 rounded-full px-2 py-0.5`}>
-                    {count} members
-                  </span>
+                  <span className={`text-[10px] ${c.text} bg-slate-900/60 rounded-full px-2 py-0.5 font-mono`}>L{level}</span>
                 </div>
-                <p className={`text-2xl font-bold ${c.text}`}>{commission}</p>
-                <p className="text-slate-500 text-xs mt-1 leading-relaxed">{desc}</p>
-                {activated !== null && (
-                  <p className="text-slate-400 text-xs mt-2">
-                    {activated}/{count} activated
-                  </p>
-                )}
+                <div className="flex items-baseline gap-1.5 mb-1">
+                  <p className={`text-3xl font-black ${c.text}`}>{pct}</p>
+                  <span className="text-slate-500 text-xs">of income</span>
+                </div>
+                <p className="text-slate-500 text-xs leading-relaxed mb-3">{desc}</p>
+                <div className={`flex items-center justify-between ${c.bg} rounded-lg px-3 py-2 border ${c.border}`}>
+                  <div className="flex items-center gap-1.5">
+                    <Bot className={`w-3.5 h-3.5 ${c.text}`} />
+                    <span className="text-slate-400 text-xs">Earned so far</span>
+                  </div>
+                  <span className={`font-mono font-bold text-sm ${c.text}`}>${earned.toFixed(4)}</span>
+                </div>
               </div>
-            )
-          })}
+            ))}
+          </div>
+
+          {/* How it works note */}
+          <div className="mt-3 flex items-start gap-2 bg-slate-800/50 border border-slate-700/50 rounded-xl p-3">
+            <BarChart3 className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
+            <p className="text-slate-500 text-xs leading-relaxed">
+              Income commissions are credited automatically every time a referred trader earns profit from their Bot or Auto Trade cycle.
+              Only the <span className="text-slate-300 font-semibold">net profit</span> amount is used — not principal or deposits.
+              Commissions are paid instantly and stack across all 3 levels simultaneously.
+            </p>
+          </div>
         </div>
       </Card>
 
@@ -369,6 +433,85 @@ export function PassiveIncome() {
                 className="w-full py-3 text-xs text-slate-500 hover:text-slate-300 flex items-center justify-center gap-1 border-t border-slate-800 transition-colors"
               >
                 {showAllCommissions ? <><ChevronUp className="w-3.5 h-3.5" />Show less</> : <><ChevronDown className="w-3.5 h-3.5" />Show all {data.commissions.length}</>}
+              </button>
+            )}
+          </>
+        )}
+      </Card>
+
+      {/* Income Commission History */}
+      <Card className="bg-slate-900 border-slate-800 overflow-hidden">
+        <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+          <h3 className="text-white font-bold text-sm flex items-center gap-2">
+            <Bot className="w-4 h-4 text-cyan-400" />
+            Bot & Auto Trade Income Commissions
+          </h3>
+          <span className="text-xs text-slate-500">{data.incomeCommissions.length} records</span>
+        </div>
+        {data.incomeCommissions.length === 0 ? (
+          <div className="px-5 py-10 text-center">
+            <Bot className="w-8 h-8 text-slate-700 mx-auto mb-2" />
+            <p className="text-slate-500 text-sm">No income commissions yet.</p>
+            <p className="text-slate-600 text-xs mt-1">You earn when your referrals generate Bot or Auto Trade profits.</p>
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-800 bg-slate-950/40">
+                    {['From', 'Source', 'Level', 'Their Income', 'Your %', 'Commission', 'Date'].map(h => (
+                      <th key={h} className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {(showAllIncomeCommissions ? data.incomeCommissions : data.incomeCommissions.slice(0, 8)).map((ic, i) => {
+                    const lc = LEVEL_COLORS[ic.level]
+                    return (
+                      <tr key={ic.id} className={`border-b border-slate-800/60 hover:bg-slate-800/30 ${i % 2 !== 0 ? 'bg-slate-900/20' : ''}`}>
+                        <td className="px-4 py-3">
+                          <p className="text-white text-xs font-medium">{ic.fromUser?.name || '—'}</p>
+                          <p className="text-slate-500 text-[10px]">{ic.fromUser?.email}</p>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`flex items-center gap-1 text-xs font-semibold ${ic.sourceType === 'bot' ? 'text-amber-400' : 'text-blue-400'}`}>
+                            {ic.sourceType === 'bot'
+                              ? <><Bot className="w-3 h-3" />Bot</>
+                              : <><TrendingUp className="w-3 h-3" />Auto Trade</>}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`text-xs font-bold ${lc.text} ${lc.bg} border ${lc.border} rounded-full px-2 py-0.5`}>
+                            L{ic.level}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-slate-300 font-mono text-xs">
+                          ${parseFloat(ic.incomeAmount as string).toFixed(4)}
+                        </td>
+                        <td className="px-4 py-3 text-slate-400 font-mono text-xs">
+                          {parseFloat(ic.commissionPct as string).toFixed(2)}%
+                        </td>
+                        <td className="px-4 py-3 text-cyan-400 font-bold font-mono text-xs">
+                          ${parseFloat(ic.amount as string).toFixed(6)}
+                        </td>
+                        <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">
+                          {new Date(ic.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+            {data.incomeCommissions.length > 8 && (
+              <button
+                onClick={() => setShowAllIncomeCommissions(p => !p)}
+                className="w-full py-3 text-xs text-slate-500 hover:text-slate-300 flex items-center justify-center gap-1 border-t border-slate-800 transition-colors"
+              >
+                {showAllIncomeCommissions
+                  ? <><ChevronUp className="w-3.5 h-3.5" />Show less</>
+                  : <><ChevronDown className="w-3.5 h-3.5" />Show all {data.incomeCommissions.length}</>}
               </button>
             )}
           </>

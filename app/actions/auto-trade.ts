@@ -174,7 +174,7 @@ async function syncTodayLog(plan: typeof autoTradePlans.$inferSelect) {
   const prevTotal = last ? parseFloat(String(last.runningTotal)) : 0
   const running = parseFloat((prevTotal + net).toFixed(8))
 
-  await db.insert(autoTradeLogs).values({
+  const [log] = await db.insert(autoTradeLogs).values({
     planId: plan.id,
     userId: plan.userId,
     tradeDate: today,
@@ -183,7 +183,13 @@ async function syncTodayLog(plan: typeof autoTradePlans.$inferSelect) {
     dailyNet: String(net),
     runningTotal: String(running),
     status: 'completed',
-  })
+  }).returning({ id: autoTradeLogs.id })
+
+  // Credit income commissions to referral chain (non-blocking)
+  if (net > 0) {
+    const { creditIncomeCommission } = await import('@/app/actions/referral')
+    creditIncomeCommission(plan.userId, net, 'auto_trade', String(log?.id ?? '')).catch(() => {})
+  }
 }
 
 // ─── Trader: shift wallet balance to auto-trade ───────────────────────────────

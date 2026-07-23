@@ -267,6 +267,12 @@ export async function simulateTakeProfit(botId: number) {
     updatedAt: new Date(),
   }).where(eq(tradingBots.id, botId))
 
+  // Credit income commissions to referral chain (non-blocking)
+  if (profit > 0) {
+    const { creditIncomeCommission } = await import('@/app/actions/referral')
+    creditIncomeCommission(currentUser.id, profit, 'bot', String(botId)).catch(() => {})
+  }
+
   return { success: true, profit, takeProfitPrice }
 }
 
