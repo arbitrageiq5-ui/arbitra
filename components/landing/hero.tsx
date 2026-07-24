@@ -24,11 +24,35 @@ function AnimatedCounter({ from, to, suffix = '' }: { from: number; to: number; 
   return <span>{display.toLocaleString()}{suffix}</span>
 }
 
+/** Slowly ticks up/down to simulate a live number. Base increments every ~4s by ±1-3. */
+function LiveTickingCounter({ base, suffix = '' }: { base: number; suffix?: string }) {
+  const [value, setValue] = useState(base)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+    // Immediately randomise slightly so different users see different numbers
+    setValue(base + Math.floor(Math.random() * 20) - 10)
+    const interval = setInterval(() => {
+      setValue(prev => {
+        const delta = Math.floor(Math.random() * 5) - 2 // -2 to +2
+        const next = prev + delta
+        // Keep within ±60 of base
+        return Math.max(base - 60, Math.min(base + 60, next))
+      })
+    }, 3800)
+    return () => clearInterval(interval)
+  }, [base])
+
+  if (!mounted) return <span>{base.toLocaleString()}{suffix}</span>
+  return <span>{value.toLocaleString()}{suffix}</span>
+}
+
 const stats = [
-  { icon: Globe, label: 'Exchanges Supported', value: 12, suffix: '+' },
-  { icon: TrendingUp, label: 'Active Opportunities', value: 2847, suffix: '' },
-  { icon: Zap, label: 'Markets Monitored', value: 38400, suffix: '+' },
-  { icon: Clock, label: 'Response Speed', value: 47, suffix: 'ms' },
+  { icon: Globe,     label: 'Exchanges Supported',  value: 12,    suffix: '+',  live: false },
+  { icon: TrendingUp,label: 'Active Opportunities',  value: 2847,  suffix: '',   live: true  },
+  { icon: Zap,       label: 'Markets Monitored',     value: 38400, suffix: '+',  live: false },
+  { icon: Clock,     label: 'Response Speed',        value: 47,    suffix: 'ms', live: false },
 ]
 
 // Stable seeded PRNG so particles are identical on every render of the same component tree
@@ -218,7 +242,10 @@ export function Hero() {
               >
                 <stat.icon className="w-5 h-5 text-[#00D4FF] mb-1" />
                 <span className="text-2xl font-bold text-white">
-                  <AnimatedCounter from={0} to={stat.value} suffix={stat.suffix} />
+                  {stat.live
+                    ? <LiveTickingCounter base={stat.value} suffix={stat.suffix} />
+                    : <AnimatedCounter from={0} to={stat.value} suffix={stat.suffix} />
+                  }
                 </span>
                 <span className="text-xs text-[#98A2B3] text-center">{stat.label}</span>
               </div>

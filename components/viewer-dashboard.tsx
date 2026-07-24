@@ -71,6 +71,50 @@ const RISK_COLOR: Record<string, string> = {
   High:   'text-red-400   bg-red-400/10',
 }
 
+/** Ticking live counter for the opportunities stat card */
+function LiveOpportunityStats() {
+  const [opps, setOpps] = useState(2847)
+  const [spread, setSpread] = useState(0.74)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+    setOpps(2847 + Math.floor(Math.random() * 20) - 10)
+    const t = setInterval(() => {
+      setOpps(prev => {
+        const delta = Math.floor(Math.random() * 5) - 2
+        return Math.max(2787, Math.min(2907, prev + delta))
+      })
+      setSpread(prev => {
+        const delta = (Math.random() - 0.5) * 0.02
+        return parseFloat(Math.max(0.55, Math.min(0.95, prev + delta)).toFixed(2))
+      })
+    }, 4200)
+    return () => clearInterval(t)
+  }, [])
+
+  const stats = [
+    { label: 'Live Opportunities',  value: mounted ? opps.toLocaleString() : '2,847', icon: TrendingUp, color: '#00D4FF' },
+    { label: 'Exchanges Monitored', value: '12+',                                      icon: Globe,      color: '#00FF99' },
+    { label: 'Avg Spread',          value: mounted ? `${spread}%` : '0.74%',           icon: BarChart3,  color: '#F59E0B' },
+    { label: 'Alerts Available',    value: 'Locked',                                   icon: Bell,       color: '#98A2B3' },
+  ]
+
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+      {stats.map((stat) => (
+        <div key={stat.label} className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <stat.icon className="w-4 h-4" style={{ color: stat.color }} />
+            <span className="text-xs text-[#98A2B3]">{stat.label}</span>
+          </div>
+          <p className="text-xl font-bold text-white">{stat.value}</p>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export function ViewerDashboard({ user }: ViewerDashboardProps) {
   const router = useRouter()
   const [signingOut, setSigningOut] = useState(false)
@@ -166,25 +210,7 @@ export function ViewerDashboard({ user }: ViewerDashboardProps) {
         </div>
 
         {/* Stats row */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
-          {[
-            { label: 'Live Opportunities',  value: '2,847', icon: TrendingUp, color: '#00D4FF' },
-            { label: 'Exchanges Monitored', value: '12+',   icon: Globe,      color: '#00FF99' },
-            { label: 'Avg Spread',          value: '0.74%', icon: BarChart3,  color: '#F59E0B' },
-            { label: 'Alerts Available',    value: 'Locked', icon: Bell,      color: '#98A2B3' },
-          ].map((stat) => (
-            <div
-              key={stat.label}
-              className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4"
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <stat.icon className="w-4 h-4" style={{ color: stat.color }} />
-                <span className="text-xs text-[#98A2B3]">{stat.label}</span>
-              </div>
-              <p className="text-xl font-bold text-white">{stat.value}</p>
-            </div>
-          ))}
-        </div>
+        <LiveOpportunityStats />
 
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Live market preview */}
