@@ -119,6 +119,7 @@ export default function AdminClient() {
   // Auto Trade Plans
   const [autoTradePlans, setAutoTradePlans] = useState<AutoTradePlan[]>([])
   const [loadingPlans, setLoadingPlans] = useState(false)
+  const [plansError, setPlansError] = useState<string | null>(null)
   const [showCreatePlan, setShowCreatePlan] = useState(false)
   const [planTargetUserId, setPlanTargetUserId] = useState('')
   const [planPrincipal, setPlanPrincipal] = useState('')
@@ -249,18 +250,25 @@ export default function AdminClient() {
 
   const loadAutoTradePlans = async () => {
     setLoadingPlans(true)
+    setPlansError(null)
     try {
       const data = await getAllAutoTradePlans()
       setAutoTradePlans(data as AutoTradePlan[])
-    } catch { /* ignore */ }
+    } catch (err) {
+      setPlansError(err instanceof Error ? err.message : 'Failed to load auto-trade plans')
+    }
     finally { setLoadingPlans(false) }
   }
 
   const handleCreatePlan = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!planTargetUserId) { showToast('Select a user first', 'error'); return }
+    const principal = parseFloat(planPrincipal)
+    if (!Number.isFinite(principal) || principal <= 0) { showToast('Enter a valid principal amount', 'error'); return }
+    if (!planStartDate) { showToast('Select a start date', 'error'); return }
     try {
       setCreatingPlan(true)
-      await createAutoTradePlan(planTargetUserId, parseFloat(planPrincipal), planStartDate, planNote || undefined)
+      await createAutoTradePlan(planTargetUserId, principal, planStartDate, planNote || undefined)
       await loadAutoTradePlans()
       setShowCreatePlan(false)
       setPlanTargetUserId(''); setPlanPrincipal(''); setPlanNote('')
@@ -866,9 +874,21 @@ export default function AdminClient() {
               {loadingPlans ? (
                 <div className="p-12 text-center text-slate-500">
                   <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-amber-400" />
-                  Loading plans...
-                </div>
-              ) : autoTradePlans.length === 0 ? (
+            Loading plans...
+          </div>
+        ) : plansError ? (
+          <div className="p-8 text-center">
+            <AlertCircle className="w-6 h-6 text-red-400 mx-auto mb-2" />
+            <p className="text-red-400 text-sm font-medium mb-1">Could not load auto-trade plans</p>
+            <p className="text-slate-500 text-xs mb-4">{plansError}</p>
+            <button
+              onClick={loadAutoTradePlans}
+              className="text-xs px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        ) : autoTradePlans.length === 0 ? (
                 <div className="p-12 text-center text-slate-500 text-sm">
                   No auto-trade plans yet. Click <span className="text-amber-400">Assign Plan</span> to create one for a trader.
                 </div>
