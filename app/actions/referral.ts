@@ -118,7 +118,7 @@ export async function getMyReferralData() {
     .limit(1)
 
   // All commissions earned by this user
-  const commissions = await db
+  const commissionsRaw = await db
     .select({
       id: referralCommissions.id,
       level: referralCommissions.level,
@@ -126,15 +126,24 @@ export async function getMyReferralData() {
       status: referralCommissions.status,
       paidAt: referralCommissions.paidAt,
       createdAt: referralCommissions.createdAt,
-      fromUser: {
-        name: user.name,
-        email: user.email,
-      },
+      fromUserName: user.name,
+      fromUserEmail: user.email,
     })
     .from(referralCommissions)
     .leftJoin(user, eq(referralCommissions.fromUserId, user.id))
     .where(eq(referralCommissions.userId, session.user.id))
     .orderBy(desc(referralCommissions.createdAt))
+
+  // Reshape to match expected interface
+  const commissions = commissionsRaw.map(c => ({
+    id: c.id,
+    level: c.level,
+    amount: c.amount,
+    status: c.status,
+    paidAt: c.paidAt,
+    createdAt: c.createdAt,
+    fromUser: { name: c.fromUserName, email: c.fromUserEmail },
+  }))
 
   // Direct referrals (L1) — people referred by this user
   const directReferrals = await db
@@ -150,7 +159,7 @@ export async function getMyReferralData() {
     .orderBy(desc(user.createdAt))
 
   // Income commissions (bot + auto-trade %)
-  const incomeCommissions = await db
+  const incomeCommissionsRaw = await db
     .select({
       id:            referralIncomeCommissions.id,
       level:         referralIncomeCommissions.level,
@@ -160,12 +169,26 @@ export async function getMyReferralData() {
       amount:        referralIncomeCommissions.amount,
       status:        referralIncomeCommissions.status,
       createdAt:     referralIncomeCommissions.createdAt,
-      fromUser: { name: user.name, email: user.email },
+      fromUserName:  user.name,
+      fromUserEmail: user.email,
     })
     .from(referralIncomeCommissions)
     .leftJoin(user, eq(referralIncomeCommissions.fromUserId, user.id))
     .where(eq(referralIncomeCommissions.userId, session.user.id))
     .orderBy(desc(referralIncomeCommissions.createdAt))
+
+  // Reshape to match expected interface
+  const incomeCommissions = incomeCommissionsRaw.map(ic => ({
+    id: ic.id,
+    level: ic.level,
+    sourceType: ic.sourceType,
+    incomeAmount: ic.incomeAmount,
+    commissionPct: ic.commissionPct,
+    amount: ic.amount,
+    status: ic.status,
+    createdAt: ic.createdAt,
+    fromUser: { name: ic.fromUserName, email: ic.fromUserEmail },
+  }))
 
   // Commission summary (activation flat fees)
   const totalEarned = commissions
