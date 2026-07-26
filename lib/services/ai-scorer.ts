@@ -1,8 +1,20 @@
 import { OpenAI } from 'openai'
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
+const apiKey = process.env.OPENAI_API_KEY
+let openaiClient: OpenAI | null = null
+
+function getOpenAIClient(): OpenAI {
+  if (!apiKey) {
+    throw new Error(
+      'OPENAI_API_KEY environment variable is not set. ' +
+      'AI scoring features require an OpenAI API key.'
+    )
+  }
+  if (!openaiClient) {
+    openaiClient = new OpenAI({ apiKey })
+  }
+  return openaiClient
+}
 
 export interface OpportunityScoringRequest {
   symbol: string
@@ -84,7 +96,8 @@ Respond with ONLY this JSON structure (no markdown, no explanation):
 }`
 
   try {
-    const response = await openai.chat.completions.create({
+    const client = getOpenAIClient()
+    const response = await client.chat.completions.create({
       model: 'gpt-4-turbo',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.3,
@@ -108,7 +121,12 @@ Respond with ONLY this JSON structure (no markdown, no explanation):
       },
     }
   } catch (error) {
-    console.error('[v0] AI scoring error:', error)
+    const msg = error instanceof Error ? error.message : String(error)
+    if (msg.includes('OPENAI_API_KEY') || msg.includes('credentials')) {
+      console.warn('[v0] AI scoring unavailable: OpenAI API key not configured. Using fallback scoring.')
+    } else {
+      console.error('[v0] AI scoring error:', error)
+    }
     // Fallback scoring based on profit percentage
     const baseScore = Math.min(100, opportunity.profitPercentage * 10)
     return {
