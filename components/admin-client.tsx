@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { authClient } from '@/lib/auth-client'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { getAllUsers, changeUserRole, deleteUser, createAdminUser, resetUserPassword } from '@/app/actions/users'
+import { getAllUsers, changeUserRole, deleteUser, createAdminUser, createProTraderUser, resetUserPassword } from '@/app/actions/users'
 import {
   getAllDepositAddresses, upsertDepositAddress,
   getAllFundRequests, reviewFundRequest,
@@ -108,6 +108,14 @@ export default function AdminClient() {
   const [newAdminPassword, setNewAdminPassword] = useState('')
   const [showNewAdminPassword, setShowNewAdminPassword] = useState(false)
   const [creatingAdmin, setCreatingAdmin] = useState(false)
+
+  // Create Pro Trader modal
+  const [showCreateProTrader, setShowCreateProTrader] = useState(false)
+  const [newProTraderName, setNewProTraderName] = useState('')
+  const [newProTraderEmail, setNewProTraderEmail] = useState('')
+  const [newProTraderPassword, setNewProTraderPassword] = useState('')
+  const [showNewProTraderPassword, setShowNewProTraderPassword] = useState(false)
+  const [creatingProTrader, setCreatingProTrader] = useState(false)
 
   // Reset Password modal
   const [resetTarget, setResetTarget] = useState<User | null>(null)
@@ -221,6 +229,20 @@ export default function AdminClient() {
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to create admin', 'error')
     } finally { setCreatingAdmin(false) }
+  }
+
+  const handleCreateProTrader = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      setCreatingProTrader(true)
+      await createProTraderUser(newProTraderName, newProTraderEmail, newProTraderPassword)
+      await loadUsers()
+      setShowCreateProTrader(false)
+      setNewProTraderName(''); setNewProTraderEmail(''); setNewProTraderPassword('')
+      showToast('Pro Trader account created successfully')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to create Pro Trader', 'error')
+    } finally { setCreatingProTrader(false) }
   }
 
   const handleResetPassword = async (e: React.FormEvent) => {
@@ -521,6 +543,14 @@ export default function AdminClient() {
                 All Users
               </h2>
               <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => setShowCreateProTrader(true)}
+                  className="bg-violet-600 hover:bg-violet-700 text-white gap-2 h-8 text-xs font-semibold"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  Create Pro Trader
+                </Button>
                 <Button
                   size="sm"
                   onClick={() => setShowCreateAdmin(true)}
@@ -1704,6 +1734,120 @@ export default function AdminClient() {
                   className="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-bold"
                 >
                   {resetting ? 'Resetting...' : 'Reset Password'}
+                </Button>
+              </div>
+            </form>
+          </Card>
+        </div>
+      )}
+
+      {/* Create Pro Trader Modal */}
+      {showCreateProTrader && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <Card className="bg-slate-900 border-slate-700 p-6 w-full max-w-md space-y-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-violet-500/20 flex items-center justify-center">
+                  <UserPlus className="w-5 h-5 text-violet-400" />
+                </div>
+                <div>
+                  <h3 className="text-white font-bold text-lg">Create Pro Trader Account</h3>
+                  <p className="text-slate-500 text-xs">Full arbitrage access + all trading bot features</p>
+                </div>
+              </div>
+              <button
+                onClick={() => { setShowCreateProTrader(false); setNewProTraderName(''); setNewProTraderEmail(''); setNewProTraderPassword('') }}
+                className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-500 hover:text-white transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateProTrader} className="space-y-4">
+              <div>
+                <label className="text-slate-400 text-xs font-medium mb-1.5 block">Full Name</label>
+                <input
+                  type="text"
+                  value={newProTraderName}
+                  onChange={e => setNewProTraderName(e.target.value)}
+                  required
+                  placeholder="e.g. Jane Smith"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-white placeholder-slate-600 text-sm focus:outline-none focus:border-violet-500/50 transition-colors"
+                />
+              </div>
+              <div>
+                <label className="text-slate-400 text-xs font-medium mb-1.5 block">Email Address</label>
+                <input
+                  type="email"
+                  value={newProTraderEmail}
+                  onChange={e => setNewProTraderEmail(e.target.value)}
+                  required
+                  placeholder="protrader@example.com"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-white placeholder-slate-600 text-sm focus:outline-none focus:border-violet-500/50 transition-colors"
+                />
+              </div>
+              <div>
+                <label className="text-slate-400 text-xs font-medium mb-1.5 block">Password</label>
+                <div className="relative">
+                  <input
+                    type={showNewProTraderPassword ? 'text' : 'password'}
+                    value={newProTraderPassword}
+                    onChange={e => setNewProTraderPassword(e.target.value)}
+                    required
+                    minLength={8}
+                    placeholder="Minimum 8 characters"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 pr-10 text-white placeholder-slate-600 text-sm focus:outline-none focus:border-violet-500/50 transition-colors"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewProTraderPassword(p => !p)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                  >
+                    {showNewProTraderPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <p className="text-slate-500 text-xs font-medium uppercase tracking-wider">Access Includes</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    'All Arbitrage Features',
+                    'Exchange API Management',
+                    'Trading Bots',
+                    'Portfolio & Analytics',
+                    'Fund Management',
+                    'Audit Log Access',
+                  ].map(item => (
+                    <div key={item} className="flex items-center gap-1.5 text-xs text-violet-300/80">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-violet-400 shrink-0" />
+                      {item}
+                    </div>
+                  ))}
+                </div>
+                <div className="flex items-start gap-2 bg-violet-500/5 border border-violet-500/20 rounded-lg px-3 py-2.5 mt-2">
+                  <Shield className="w-4 h-4 text-violet-400 mt-0.5 shrink-0" />
+                  <p className="text-violet-300/70 text-xs leading-relaxed">
+                    Cannot manage users or change roles. Share credentials securely.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-1">
+                <Button
+                  type="button"
+                  onClick={() => { setShowCreateProTrader(false); setNewProTraderName(''); setNewProTraderEmail(''); setNewProTraderPassword('') }}
+                  variant="ghost"
+                  className="flex-1 border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={creatingProTrader}
+                  className="flex-1 bg-violet-600 hover:bg-violet-700 text-white font-bold"
+                >
+                  {creatingProTrader ? 'Creating...' : 'Create Pro Trader'}
                 </Button>
               </div>
             </form>

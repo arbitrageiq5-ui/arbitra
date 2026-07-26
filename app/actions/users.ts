@@ -212,6 +212,38 @@ export async function createAdminUser(name: string, email: string, password: str
   return { success: true }
 }
 
+// Create a new Pro Trader user (admin only)
+export async function createProTraderUser(name: string, email: string, password: string) {
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session?.user) throw new Error('Unauthorized')
+
+  const currentUser = await db.select().from(user).where(eq(user.id, session.user.id)).limit(1)
+  if (!currentUser[0] || currentUser[0].role !== 'admin') {
+    throw new Error('Only admins can create Pro Trader accounts')
+  }
+
+  const existing = await db.select().from(user).where(eq(user.email, email)).limit(1)
+  if (existing[0]) throw new Error('An account with this email already exists')
+
+  const result = await auth.api.signUpEmail({
+    body: { name, email, password, role: 'protrader' },
+  })
+
+  if (!result?.user) throw new Error('Failed to create Pro Trader account')
+
+  // Ensure role is set correctly
+  await db.update(user).set({ role: 'protrader' }).where(eq(user.email, email))
+
+  await logAudit({
+    userId: session.user.id,
+    action: AuditActions.ADMIN_USER_ROLE_CHANGE,
+    resource: 'users',
+    details: { createdProTraderEmail: email },
+  })
+
+  return { success: true }
+}
+
 // Reset a user's password (admin only) — uses Better Auth's internal hash
 export async function resetUserPassword(userId: string, newPassword: string) {
   const session = await auth.api.getSession({ headers: await headers() })
