@@ -19,6 +19,19 @@ export const DCA_PAIRS = [
   { symbol: 'TRX/USDT',   base: 'TRX',   quote: 'USDT', name: 'TRON' },
 ] as const
 
+// Precious metals pairs — traded via CoinSwitch & Delta Exchange
+export const PRECIOUS_METALS_PAIRS = [
+  { symbol: 'XAU/USDT', base: 'XAU', quote: 'USDT', name: 'Gold',   icon: '⬛', usdApprox: 1950  },
+  { symbol: 'XAG/USDT', base: 'XAG', quote: 'USDT', name: 'Silver', icon: '⬜', usdApprox: 23    },
+  { symbol: 'XAUT/USDT',base: 'XAUT',quote: 'USDT', name: 'Tether Gold (XAUT)', icon: '🟡', usdApprox: 1950 },
+  { symbol: 'PAXG/USDT',base: 'PAXG',quote: 'USDT', name: 'PAX Gold (PAXG)',    icon: '🟡', usdApprox: 1950 },
+] as const
+
+// Exchanges that support Gold / Silver spot trading
+export const PRECIOUS_METALS_EXCHANGES = ['coinswitch', 'delta', 'binance', 'okx', 'bitget'] as const
+
+export type PreciousMetalsPair = typeof PRECIOUS_METALS_PAIRS[number]
+
 export type DcaConfig = {
   baseOrderSize: number        // USDT for first buy
   safetyOrderSize: number      // USDT per safety order

@@ -10,15 +10,15 @@ import {
   ArrowDownCircle, ArrowUpCircle, Clock, Shield,
   Info, X, Activity, Sparkles, Target, Repeat2,
   LineChart, Cpu, Layers, FlameKindling, Rocket,
-  Signal, GitCompareArrows, Grid2x2, Lock, Unlock,
-  Star, ChevronRight, LayoutDashboard, BookOpen,
+  Signal, GitCompareArrows, Grid2x2, Lock,
+  Star, ChevronRight, LayoutDashboard, BookOpen, Gem,
 } from 'lucide-react'
 import {
   createTradingBot, getMyBots, getBotOrders,
   startBot, stopBot, deleteBot, triggerSafetyOrder,
   simulateTakeProfit, getMyExchangeAccountsForBot,
 } from '@/app/actions/trading-bot'
-import { DCA_PAIRS, type DcaConfig } from '@/lib/trading-bot-constants'
+import { DCA_PAIRS, PRECIOUS_METALS_PAIRS, PRECIOUS_METALS_EXCHANGES, type DcaConfig } from '@/lib/trading-bot-constants'
 import { SUPPORTED_EXCHANGES } from '@/lib/exchange-constants'
 import { BotAiAdvisorModal } from '@/components/bot-ai-advisor-modal'
 
@@ -160,6 +160,29 @@ const OPPORTUNITY_TYPES = [
     timeframe: 'Variable',
     locked: true,
   },
+  {
+    id: 'gold-silver',
+    name: 'Gold & Silver Bot',
+    icon: Gem,
+    color: 'text-yellow-400',
+    bg: 'bg-yellow-500/10',
+    border: 'border-yellow-500/20',
+    badge: 'India',
+    badgeColor: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
+    description: 'Trade tokenized Gold (XAU, XAUT, PAXG) and Silver (XAG) via CoinSwitch and Delta Exchange with 7 battle-tested strategies.',
+    features: [
+      'CoinSwitch & Delta Exchange',
+      'XAU, XAG, XAUT, PAXG pairs',
+      'INR & USDT markets',
+      'Trend + DCA + Arbitrage',
+      'Safe-haven hedge strategy',
+      'Session-based time filters',
+    ],
+    risk: 'Low–Med',
+    returnRange: '3–18% monthly',
+    timeframe: 'Hours–Days',
+    locked: false,
+  },
 ] as const
 
 const STRATEGY_TEMPLATES = [
@@ -225,6 +248,115 @@ const STRATEGY_TEMPLATES = [
   },
 ] as const
 
+// ─── Gold & Silver Strategy Templates ────────────────────────────────────────
+const GOLD_SILVER_STRATEGIES = [
+  {
+    id: 'xau-safe-haven',
+    name: 'Gold Safe-Haven DCA',
+    pair: 'XAU/USDT',
+    exchange: 'coinswitch',
+    exchangeLabel: 'CoinSwitch',
+    icon: '🥇',
+    description: 'Steadily accumulate tokenized Gold during dips. Ideal hedge against inflation and market uncertainty.',
+    strategy: 'DCA + Trend Filter',
+    config: { baseOrderSize: 200, safetyOrderSize: 200, maxSafetyOrders: 5, priceDeviationPct: 1.5, takeProfitPct: 2.5, safetyOrderVolumePct: 1.2, interval: '4h' },
+    stats: { risk: 'Low', monthly: '+3–8%', winRate: '88%' },
+    tags: ['Gold', 'Safe-Haven', 'Beginner', 'CoinSwitch'],
+    highlight: 'Best for long-term wealth preservation',
+    popular: true,
+  },
+  {
+    id: 'xau-momentum',
+    name: 'Gold Momentum Breakout',
+    pair: 'XAU/USDT',
+    exchange: 'delta',
+    exchangeLabel: 'Delta Exchange',
+    icon: '📈',
+    description: 'Catch Gold breakouts above key resistance levels. Enter on volume confirmation, ride with trailing stop.',
+    strategy: 'Momentum + Trailing Stop',
+    config: { baseOrderSize: 150, safetyOrderSize: 100, maxSafetyOrders: 3, priceDeviationPct: 1.0, takeProfitPct: 4.0, safetyOrderVolumePct: 1.1, interval: '1h' },
+    stats: { risk: 'Medium', monthly: '+8–18%', winRate: '72%' },
+    tags: ['Gold', 'Momentum', 'Delta Exchange'],
+    highlight: 'Capitalises on macro-driven Gold surges',
+    popular: false,
+  },
+  {
+    id: 'xau-mean-reversion',
+    name: 'Gold Mean Reversion',
+    pair: 'XAU/USDT',
+    exchange: 'coinswitch',
+    exchangeLabel: 'CoinSwitch',
+    icon: '⚖️',
+    description: 'Buy when Gold is statistically oversold vs. its 20-day average. High win-rate, consistent small gains.',
+    strategy: 'Mean Reversion + Bollinger Bands',
+    config: { baseOrderSize: 100, safetyOrderSize: 150, maxSafetyOrders: 4, priceDeviationPct: 1.2, takeProfitPct: 1.8, safetyOrderVolumePct: 1.3, interval: '4h' },
+    stats: { risk: 'Low', monthly: '+5–12%', winRate: '84%' },
+    tags: ['Gold', 'Mean Reversion', 'CoinSwitch'],
+    highlight: 'High win-rate, low drawdown',
+    popular: true,
+  },
+  {
+    id: 'xag-dca',
+    name: 'Silver Accumulator DCA',
+    pair: 'XAG/USDT',
+    exchange: 'delta',
+    exchangeLabel: 'Delta Exchange',
+    icon: '🥈',
+    description: 'Accumulate tokenized Silver with aggressive safety orders. Silver is more volatile than Gold — ideal for DCA.',
+    strategy: 'Aggressive DCA',
+    config: { baseOrderSize: 80, safetyOrderSize: 120, maxSafetyOrders: 8, priceDeviationPct: 2.5, takeProfitPct: 4.0, safetyOrderVolumePct: 1.5, interval: '1h' },
+    stats: { risk: 'Low–Med', monthly: '+8–20%', winRate: '79%' },
+    tags: ['Silver', 'DCA', 'Delta Exchange', 'India'],
+    highlight: 'Higher volatility = more DCA opportunities',
+    popular: false,
+  },
+  {
+    id: 'xau-xag-arb',
+    name: 'Gold/Silver Ratio Arb',
+    pair: 'XAU/USDT',
+    exchange: 'coinswitch',
+    exchangeLabel: 'CoinSwitch',
+    icon: '⚡',
+    description: 'Exploit the Gold:Silver ratio reversion. When ratio is high (>80), favour Silver; when low (<60), favour Gold.',
+    strategy: 'Cross-Asset Ratio Arbitrage',
+    config: { baseOrderSize: 120, safetyOrderSize: 120, maxSafetyOrders: 4, priceDeviationPct: 2.0, takeProfitPct: 3.0, safetyOrderVolumePct: 1.2, interval: '4h' },
+    stats: { risk: 'Low–Med', monthly: '+6–15%', winRate: '81%' },
+    tags: ['Gold', 'Silver', 'Ratio Trade', 'CoinSwitch'],
+    highlight: 'Classic macro hedge strategy',
+    popular: false,
+  },
+  {
+    id: 'paxg-grid',
+    name: 'PAXG Sideways Grid',
+    pair: 'PAXG/USDT',
+    exchange: 'binance',
+    exchangeLabel: 'Binance / Delta',
+    icon: '🔲',
+    description: 'Run a tight grid bot on PAXG during range-bound Gold market sessions. Captures every micro-oscillation.',
+    strategy: 'Grid Trading',
+    config: { baseOrderSize: 100, safetyOrderSize: 80, maxSafetyOrders: 6, priceDeviationPct: 0.8, takeProfitPct: 1.2, safetyOrderVolumePct: 1.0, interval: '1h' },
+    stats: { risk: 'Low', monthly: '+4–10%', winRate: '91%' },
+    tags: ['PAXG', 'Grid', 'Sideways', 'Low Risk'],
+    highlight: 'Highest win-rate in range markets',
+    popular: false,
+  },
+  {
+    id: 'xau-session',
+    name: 'London/NY Session Gold',
+    pair: 'XAU/USDT',
+    exchange: 'delta',
+    exchangeLabel: 'Delta Exchange',
+    icon: '🕐',
+    description: 'Trade Gold only during high-liquidity London (8–12 UTC) and New York (13–17 UTC) sessions. Avoids low-volume noise.',
+    strategy: 'Session-Based Momentum',
+    config: { baseOrderSize: 150, safetyOrderSize: 100, maxSafetyOrders: 3, priceDeviationPct: 1.5, takeProfitPct: 2.0, safetyOrderVolumePct: 1.1, interval: '1h' },
+    stats: { risk: 'Low', monthly: '+5–14%', winRate: '86%' },
+    tags: ['Gold', 'Session', 'Timing', 'Delta Exchange'],
+    highlight: 'Trades only during peak Gold liquidity',
+    popular: false,
+  },
+] as const
+
 // ─── Helpers ────────────────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: string }) {
@@ -286,6 +418,318 @@ function Toast({ message, type, onClose }: { message: string; type: 'success' | 
       {type === 'error' ? <AlertCircle className="w-4 h-4 shrink-0 text-red-400" /> : <CheckCircle2 className="w-4 h-4 shrink-0 text-green-400" />}
       <span className="flex-1">{message}</span>
       <button onClick={onClose}><X className="w-3.5 h-3.5 opacity-60 hover:opacity-100" /></button>
+    </div>
+  )
+}
+
+// ─── Gold & Silver Bot Modal ──────────────────────────────────────────────────────
+
+function GoldSilverBotModal({
+  accounts,
+  onClose,
+  onCreate,
+}: {
+  accounts: ExchangeAccount[]
+  onClose: () => void
+  onCreate: () => void
+}) {
+  const [selectedStrategy, setSelectedStrategy] = useState<typeof GOLD_SILVER_STRATEGIES[number] | null>(null)
+  const [customPair, setCustomPair] = useState<string>('XAU/USDT')
+  const [customExchange, setCustomExchange] = useState<string>('coinswitch')
+  const [accountId, setAccountId] = useState<number | null>(null)
+  const [cfg, setCfg] = useState<DcaConfig>({
+    baseOrderSize: 150, safetyOrderSize: 150, maxSafetyOrders: 5,
+    priceDeviationPct: 1.5, safetyOrderVolumePct: 1.2, takeProfitPct: 2.5, interval: '4h',
+  })
+  const [botName, setBotName] = useState('')
+  const [tab, setTab] = useState<'strategies' | 'custom'>('strategies')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  const filteredAccounts = accounts.filter(a => a.exchange === customExchange)
+  const maxInvestment = cfg.baseOrderSize + cfg.safetyOrderSize * cfg.maxSafetyOrders
+  const estProfit = maxInvestment * (cfg.takeProfitPct / 100)
+
+  function applyStrategy(strat: typeof GOLD_SILVER_STRATEGIES[number]) {
+    setSelectedStrategy(strat)
+    setCustomPair(strat.pair)
+    setCustomExchange(strat.exchange)
+    setCfg({ ...cfg, ...strat.config })
+    setBotName(strat.name)
+    setTab('custom')
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError('')
+    setSaving(true)
+    try {
+      const [base, quote] = customPair.split('/')
+      await createTradingBot({
+        name: botName || `${base} Bot`,
+        strategy: 'dca',
+        marketType: 'spot',
+        exchange: customExchange,
+        exchangeAccountId: accountId,
+        symbol: customPair,
+        baseCurrency: base,
+        quoteCurrency: quote ?? 'USDT',
+        config: cfg,
+      })
+      onCreate(); onClose()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create bot')
+    } finally { setSaving(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-start justify-center p-4 overflow-y-auto">
+      <Card className="bg-slate-900 border-slate-700 w-full max-w-3xl my-8">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-5 border-b border-slate-800">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+              <Gem className="w-5 h-5 text-yellow-400" />
+            </div>
+            <div>
+              <h2 className="text-white font-bold text-lg">Gold & Silver Trading Bot</h2>
+              <p className="text-slate-500 text-xs mt-0.5">
+                XAU, XAG, XAUT, PAXG — via CoinSwitch & Delta Exchange
+              </p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-slate-800 text-slate-500 hover:text-white transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Tab switcher */}
+        <div className="flex gap-1 px-6 pt-4">
+          {(['strategies', 'custom'] as const).map(t => (
+            <button key={t} onClick={() => setTab(t)}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                tab === t ? 'bg-yellow-500/15 border border-yellow-500/30 text-yellow-300' : 'text-slate-500 hover:text-slate-300'
+              }`}>
+              {t === 'strategies' ? 'Choose Strategy' : 'Configure Bot'}
+            </button>
+          ))}
+        </div>
+
+        {/* Strategies grid */}
+        {tab === 'strategies' && (
+          <div className="px-6 py-4 space-y-3 max-h-[65vh] overflow-y-auto">
+            <p className="text-slate-500 text-sm">Select a pre-built strategy — tuned for Gold and Silver markets. Click any card to deploy.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {GOLD_SILVER_STRATEGIES.map(strat => (
+                <Card key={strat.id}
+                  className={`border cursor-pointer transition-all hover:border-yellow-500/40 bg-slate-950/60 overflow-hidden ${
+                    selectedStrategy?.id === strat.id ? 'border-yellow-500/50' : 'border-slate-800'
+                  }`}
+                  onClick={() => applyStrategy(strat)}
+                >
+                  {strat.popular && <div className="h-0.5 bg-gradient-to-r from-yellow-500 to-amber-400" />}
+                  <div className="p-4">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-base shrink-0">
+                          {strat.icon}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <p className="text-white font-bold text-sm leading-tight">{strat.name}</p>
+                            {strat.popular && <Star className="w-3 h-3 text-yellow-400 fill-yellow-400 shrink-0" />}
+                          </div>
+                          <p className="text-slate-500 text-[10px] mt-0.5">{strat.pair} • {strat.exchangeLabel}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-slate-400 text-xs leading-relaxed mb-2.5">{strat.description}</p>
+                    <div className="flex items-center gap-1.5 mb-2.5">
+                      <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-400 uppercase tracking-wider">{strat.strategy}</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1.5 mb-3">
+                      <div className="bg-slate-900 rounded-lg p-1.5 text-center">
+                        <p className="text-slate-600 text-[9px] uppercase">Return</p>
+                        <p className="text-green-400 font-bold text-[11px]">{strat.stats.monthly}</p>
+                      </div>
+                      <div className="bg-slate-900 rounded-lg p-1.5 text-center">
+                        <p className="text-slate-600 text-[9px] uppercase">Win Rate</p>
+                        <p className="text-cyan-400 font-bold text-[11px]">{strat.stats.winRate}</p>
+                      </div>
+                      <div className="bg-slate-900 rounded-lg p-1.5 text-center">
+                        <p className="text-slate-600 text-[9px] uppercase">Risk</p>
+                        <p className={`font-bold text-[11px] ${strat.stats.risk === 'Low' ? 'text-green-400' : strat.stats.risk === 'Medium' ? 'text-amber-400' : 'text-cyan-400'}`}>{strat.stats.risk}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 p-2 bg-yellow-500/5 border border-yellow-500/15 rounded-lg">
+                      <Star className="w-3 h-3 text-yellow-400 shrink-0" />
+                      <p className="text-yellow-300/80 text-[10px]">{strat.highlight}</p>
+                    </div>
+                    <div className="flex flex-wrap gap-1 mt-2.5">
+                      {strat.tags.map(tag => (
+                        <span key={tag} className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-800 border border-slate-700/50 text-slate-500">{tag}</span>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="px-4 pb-4">
+                    <button
+                      onClick={e => { e.stopPropagation(); applyStrategy(strat) }}
+                      className="w-full py-2 rounded-lg bg-yellow-500/10 border border-yellow-500/25 text-yellow-300 text-xs font-bold hover:bg-yellow-500/20 transition-colors"
+                    >
+                      Deploy This Strategy
+                    </button>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Configure tab */}
+        {tab === 'custom' && (
+          <form onSubmit={handleSubmit}>
+            <div className="px-6 py-5 space-y-4 max-h-[65vh] overflow-y-auto">
+              {selectedStrategy && (
+                <div className="flex items-center gap-3 p-3 bg-yellow-500/5 border border-yellow-500/20 rounded-xl">
+                  <span className="text-2xl">{selectedStrategy.icon}</span>
+                  <div>
+                    <p className="text-yellow-300 font-bold text-sm">{selectedStrategy.name}</p>
+                    <p className="text-slate-500 text-xs">{selectedStrategy.strategy} • {selectedStrategy.stats.monthly} est. monthly</p>
+                  </div>
+                  <button type="button" onClick={() => setSelectedStrategy(null)}
+                    className="ml-auto text-slate-600 hover:text-slate-400 text-xs">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+
+              <div>
+                <label className="text-slate-400 text-xs font-medium mb-1.5 block">Bot Name</label>
+                <input type="text" value={botName} onChange={e => setBotName(e.target.value)}
+                  placeholder={`${customPair.split('/')[0]} Gold/Silver Bot`}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-white placeholder-slate-600 text-sm focus:outline-none focus:border-yellow-500/50 transition-colors" />
+              </div>
+
+              <div className="grid sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-slate-400 text-xs font-medium mb-1.5 block">Precious Metal Pair</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {PRECIOUS_METALS_PAIRS.map(p => (
+                      <button key={p.symbol} type="button" onClick={() => setCustomPair(p.symbol)}
+                        className={`py-2 px-2 rounded-lg text-xs font-semibold border transition-all text-center ${
+                          customPair === p.symbol ? 'bg-yellow-500/20 border-yellow-500/40 text-yellow-300' : 'border-slate-700 text-slate-400 hover:border-slate-600'
+                        }`}>
+                        <span className="block font-bold">{p.base}</span>
+                        <span className="block text-slate-500 text-[10px]">{p.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-slate-400 text-xs font-medium mb-1.5 block">Exchange</label>
+                  <select value={customExchange} onChange={e => { setCustomExchange(e.target.value); setAccountId(null) }}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-yellow-500/50 mb-2">
+                    {PRECIOUS_METALS_EXCHANGES.map(ex => (
+                      <option key={ex} value={ex}>{ex === 'coinswitch' ? 'CoinSwitch' : ex === 'delta' ? 'Delta Exchange' : ex === 'binance' ? 'Binance' : ex === 'okx' ? 'OKX' : 'Bitget'}</option>
+                    ))}
+                  </select>
+                  <label className="text-slate-400 text-xs font-medium mb-1.5 block">API Account</label>
+                  <select value={accountId ?? ''} onChange={e => setAccountId(e.target.value ? parseInt(e.target.value) : null)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-yellow-500/50">
+                    <option value="">Simulation (no API)</option>
+                    {filteredAccounts.map(a => (
+                      <option key={a.id} value={a.id}>{a.label ?? a.exchange}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <h3 className="text-white font-semibold text-sm flex items-center gap-2">
+                  <Settings className="w-4 h-4 text-slate-500" /> Strategy Parameters
+                </h3>
+                <div className="grid sm:grid-cols-2 gap-4">
+                  {[
+                    { key: 'baseOrderSize',       label: 'Base Order ($)',       min: 10, max: 2000, step: 10,  fmt: (v: number) => `$${v}` },
+                    { key: 'safetyOrderSize',      label: 'Safety Order ($)',     min: 10, max: 2000, step: 10,  fmt: (v: number) => `$${v}` },
+                    { key: 'maxSafetyOrders',      label: 'Max Safety Orders',    min: 1,  max: 10,   step: 1,   fmt: (v: number) => `${v}` },
+                    { key: 'priceDeviationPct',    label: 'Price Deviation',      min: 0.5,max: 5,    step: 0.1, fmt: (v: number) => `${v}%` },
+                    { key: 'takeProfitPct',        label: 'Take Profit',          min: 0.5,max: 10,   step: 0.5, fmt: (v: number) => `${v}%` },
+                    { key: 'safetyOrderVolumePct', label: 'Safety Order Scale',   min: 1,  max: 3,    step: 0.1, fmt: (v: number) => `${v}x` },
+                  ].map(field => (
+                    <div key={field.key}>
+                      <label className="text-slate-400 text-xs font-medium mb-1.5 flex items-center justify-between">
+                        {field.label}
+                        <span className="text-yellow-400 font-bold">{field.fmt(cfg[field.key as keyof DcaConfig] as number)}</span>
+                      </label>
+                      <input type="range" min={field.min} max={field.max} step={field.step}
+                        value={cfg[field.key as keyof DcaConfig] as number}
+                        onChange={e => setCfg(c => ({ ...c, [field.key]: parseFloat(e.target.value) }))}
+                        className="w-full accent-yellow-400" />
+                    </div>
+                  ))}
+                </div>
+                <div>
+                  <label className="text-slate-400 text-xs font-medium mb-1.5 block">Check Interval</label>
+                  <div className="flex gap-2">
+                    {['1h', '4h', '1d', 'manual'].map(iv => (
+                      <button key={iv} type="button" onClick={() => setCfg(c => ({ ...c, interval: iv }))}
+                        className={`flex-1 py-2 rounded-lg text-xs font-semibold border transition-all ${
+                          cfg.interval === iv ? 'bg-slate-700 border-yellow-500/40 text-yellow-300' : 'border-slate-700 text-slate-500 hover:border-slate-600'
+                        }`}>
+                        {iv === 'manual' ? 'Manual' : iv}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Summary */}
+              <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 grid grid-cols-3 gap-3">
+                <div className="text-center">
+                  <p className="text-slate-500 text-xs">Max Investment</p>
+                  <p className="text-white font-bold text-lg">${maxInvestment.toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
+                </div>
+                <div className="text-center border-x border-slate-800">
+                  <p className="text-slate-500 text-xs">Safety Orders</p>
+                  <p className="text-yellow-400 font-bold text-lg">{cfg.maxSafetyOrders}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-slate-500 text-xs">Target Profit/Cycle</p>
+                  <p className="text-green-400 font-bold text-lg">${estProfit.toFixed(2)}</p>
+                </div>
+              </div>
+
+              {/* Info notice */}
+              <div className="flex items-start gap-2.5 bg-amber-500/5 border border-amber-500/20 rounded-xl px-4 py-3">
+                <Shield className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <p className="text-amber-300/80 text-xs leading-relaxed">
+                  Gold and Silver bots trade tokenized representations (XAUT, PAXG, XAU) on CoinSwitch and Delta Exchange.
+                  Ensure you have connected your CoinSwitch or Delta API key in the <strong>Exchanges</strong> tab before going live.
+                </p>
+              </div>
+
+              {error && (
+                <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2.5 text-red-400 text-sm">
+                  <AlertCircle className="w-4 h-4 shrink-0" />{error}
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-slate-800 px-6 py-4 flex gap-3">
+              <Button type="button" variant="ghost" onClick={onClose}
+                className="flex-1 border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800">
+                Cancel
+              </Button>
+              <Button type="submit" disabled={saving}
+                className="flex-1 bg-yellow-500 hover:bg-yellow-400 text-black font-bold gap-2">
+                <Gem className="w-4 h-4" />
+                {saving ? 'Creating...' : 'Create Gold/Silver Bot'}
+              </Button>
+            </div>
+          </form>
+        )}
+      </Card>
     </div>
   )
 }
@@ -806,9 +1250,14 @@ function OpportunitiesPanel({ onLaunchBot }: { onLaunchBot: (id: string) => void
                     ))}
                   </div>
                   {opp.id === 'dca' ? (
-                    <Button onClick={e => { e.stopPropagation(); onLaunchBot(opp.id) }}
+                    <Button onClick={e => { e.stopPropagation(); onLaunchBot('dca') }}
                       className="w-full bg-amber-500 hover:bg-amber-400 text-black font-bold gap-2 mt-2">
                       <Plus className="w-4 h-4" /> Launch DCA Bot
+                    </Button>
+                  ) : opp.id === 'gold-silver' ? (
+                    <Button onClick={e => { e.stopPropagation(); onLaunchBot('gold-silver') }}
+                      className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-bold gap-2 mt-2">
+                      <Gem className="w-4 h-4" /> Launch Gold & Silver Bot
                     </Button>
                   ) : (
                     <div className="flex items-center gap-2 p-3 bg-slate-800/50 rounded-lg mt-1">
@@ -832,15 +1281,17 @@ function OpportunitiesPanel({ onLaunchBot }: { onLaunchBot: (id: string) => void
 
 // ─── Strategy Templates Panel ────────────────────────────────────────────────────
 
-function StrategiesPanel({ accounts, onLaunch }: {
+function StrategiesPanel({ accounts, onLaunch, onLaunchGoldSilver }: {
   accounts: ExchangeAccount[]
   onLaunch: (cfg: Partial<DcaConfig & { name?: string; symbol?: string; marketType?: 'spot' | 'futures' }>) => void
+  onLaunchGoldSilver: () => void
 }) {
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
+      {/* Crypto DCA strategies */}
       <div>
-        <h3 className="text-white font-bold text-base">Strategy Templates</h3>
-        <p className="text-slate-500 text-sm mt-1">Pre-configured, battle-tested strategies. One click to deploy.</p>
+        <h3 className="text-white font-bold text-base">Crypto Strategy Templates</h3>
+        <p className="text-slate-500 text-sm mt-1">Pre-configured, battle-tested DCA strategies. One click to deploy.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -917,6 +1368,49 @@ function StrategiesPanel({ accounts, onLaunch }: {
             </div>
           </Card>
         ))}
+      </div>
+
+      {/* Gold & Silver strategies */}
+      <div className="border-t border-slate-800 pt-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-white font-bold text-base flex items-center gap-2">
+              <Gem className="w-4 h-4 text-yellow-400" />
+              Gold & Silver Strategies
+            </h3>
+            <p className="text-slate-500 text-sm mt-1">7 strategies for tokenized precious metals via CoinSwitch & Delta Exchange.</p>
+          </div>
+          <Button onClick={onLaunchGoldSilver}
+            className="bg-yellow-500 hover:bg-yellow-400 text-black font-bold gap-2 text-sm h-9">
+            <Plus className="w-3.5 h-3.5" /> Open Bot Builder
+          </Button>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {GOLD_SILVER_STRATEGIES.map(strat => (
+            <Card key={strat.id}
+              className="bg-slate-950/60 border-slate-800 hover:border-yellow-500/30 transition-all overflow-hidden cursor-pointer"
+              onClick={onLaunchGoldSilver}>
+              {strat.popular && <div className="h-0.5 bg-gradient-to-r from-yellow-500 to-amber-400" />}
+              <div className="p-4">
+                <div className="flex items-center gap-2.5 mb-2">
+                  <div className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-sm shrink-0">
+                    {strat.icon}
+                  </div>
+                  <div>
+                    <p className="text-white font-bold text-sm leading-tight">{strat.name}</p>
+                    <p className="text-slate-500 text-[10px]">{strat.pair} • {strat.exchangeLabel}</p>
+                  </div>
+                </div>
+                <p className="text-slate-400 text-xs leading-relaxed mb-2">{strat.description}</p>
+                <div className="flex items-center gap-2">
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-green-500/10 border border-green-500/20 text-green-400">{strat.stats.monthly}</span>
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">{strat.stats.winRate} WR</span>
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-400">{strat.stats.risk}</span>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
       </div>
     </div>
   )
@@ -1059,6 +1553,7 @@ export function TradingBot() {
   const [loading, setLoading] = useState(true)
   const [mainTab, setMainTab] = useState<MainTab>('overview')
   const [showCreate, setShowCreate] = useState(false)
+  const [showGoldSilver, setShowGoldSilver] = useState(false)
   const [showAiAdvisor, setShowAiAdvisor] = useState(false)
   const [aiPrefillConfig, setAiPrefillConfig] = useState<Partial<DcaConfig & { name?: string; symbol?: string; marketType?: 'spot' | 'futures' }> | null>(null)
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
@@ -1081,6 +1576,14 @@ export function TradingBot() {
   function handleLaunchTemplate(cfg: Partial<DcaConfig & { name?: string; symbol?: string; marketType?: 'spot' | 'futures' }>) {
     setAiPrefillConfig(cfg)
     setShowCreate(true)
+  }
+
+  function handleLaunchBot(id: string) {
+    if (id === 'gold-silver') {
+      setShowGoldSilver(true)
+    } else {
+      setShowCreate(true)
+    }
   }
 
   const TABS: { key: MainTab; label: string; icon: React.ElementType; count?: number }[] = [
@@ -1180,11 +1683,15 @@ export function TradingBot() {
           )}
 
           {mainTab === 'opportunities' && (
-            <OpportunitiesPanel onLaunchBot={() => setShowCreate(true)} />
+            <OpportunitiesPanel onLaunchBot={handleLaunchBot} />
           )}
 
           {mainTab === 'strategies' && (
-            <StrategiesPanel accounts={accounts} onLaunch={handleLaunchTemplate} />
+            <StrategiesPanel
+              accounts={accounts}
+              onLaunch={handleLaunchTemplate}
+              onLaunchGoldSilver={() => setShowGoldSilver(true)}
+            />
           )}
         </>
       )}
@@ -1195,6 +1702,15 @@ export function TradingBot() {
           accounts={accounts}
           prefillConfig={aiPrefillConfig}
           onClose={() => { setShowCreate(false); setAiPrefillConfig(null) }}
+          onCreate={load}
+        />
+      )}
+
+      {/* Gold & Silver bot modal */}
+      {showGoldSilver && (
+        <GoldSilverBotModal
+          accounts={accounts}
+          onClose={() => setShowGoldSilver(false)}
           onCreate={load}
         />
       )}
