@@ -1670,6 +1670,11 @@ export default function AdminArbitragePanel() {
                     </Card>
                   )
                 })}
+                      </div>
+                    </div>
+                  )
+                })
+              })()}
               </div>
             </>
           )}
@@ -1862,7 +1867,7 @@ export default function AdminArbitragePanel() {
         </div>
       )}
 
-      {/* ══ BALANCES TAB ═════════════════════════════════════════════════════ */}
+      {/* ══ BALANCES TAB ══════════════════════���══════════════════════════════ */}
       {subTab === 'balances' && (
         <div className="space-y-4">
           {/* Header */}
