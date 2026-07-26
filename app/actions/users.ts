@@ -2,7 +2,7 @@
 
 import { auth } from '@/lib/auth'
 import { db, pool } from '@/lib/db'
-import { user } from '@/lib/db/schema'
+import { user, session } from '@/lib/db/schema'
 import { eq, sql } from 'drizzle-orm'
 import { headers } from 'next/headers'
 import { UserRole } from '@/lib/roles'
@@ -78,8 +78,18 @@ export async function changeUserRole(userId: string, newRole: UserRole) {
     throw new Error('You cannot change your own role')
   }
 
+  // Validate role is an accepted value
+  const validRoles: UserRole[] = ['viewer', 'trader', 'protrader', 'admin']
+  if (!validRoles.includes(newRole)) {
+    throw new Error(`Invalid role: ${newRole}`)
+  }
+
   // Update the role
   await db.update(user).set({ role: newRole }).where(eq(user.id, userId))
+
+  // Invalidate all existing sessions for that user so their next request
+  // picks up the new role from the DB (Better Auth caches role in session).
+  await db.delete(session).where(eq(session.userId, userId))
 
   // Log the action
   await logAudit({
