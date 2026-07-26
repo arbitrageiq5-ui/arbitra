@@ -154,6 +154,7 @@ export default function AdminArbitragePanel() {
   const [filterMinProfit, setFilterMinProfit] = useState(0)
   const [filterBuyEx, setFilterBuyEx] = useState('')
   const [filterSellEx, setFilterSellEx] = useState('')
+  const [filterBlockchain, setFilterBlockchain] = useState('')
   const [sortByProfit, setSortByProfit] = useState<'asc' | 'desc'>('desc')
   const [selectedSymbols, setSelectedSymbols] = useState<string[]>(SCAN_SYMBOLS)
   const [minProfitThreshold, setMinProfitThreshold] = useState(0.3)
@@ -548,6 +549,23 @@ export default function AdminArbitragePanel() {
       if (o.netProfitPct < filterMinProfit) return false
       if (filterBuyEx  && !o.buyExchange.toLowerCase().includes(filterBuyEx.toLowerCase()))  return false
       if (filterSellEx && !o.sellExchange.toLowerCase().includes(filterSellEx.toLowerCase())) return false
+      // Blockchain filter: check if the symbol/coin exists on that blockchain
+      if (filterBlockchain) {
+        const coinBlockchains: Record<string, string[]> = {
+          'BTC':   ['BTC', 'Polygon', 'Avalanche'],
+          'ETH':   ['ERC20', 'Polygon', 'BSC', 'Avalanche'],
+          'USDT':  ['ERC20', 'TRC20', 'BEP20', 'SOL', 'Polygon', 'Avalanche'],
+          'BNB':   ['BEP20', 'ERC20'],
+          'SOL':   ['SOL'],
+          'XRP':   ['XRP', 'ERC20'],
+          'ADA':   ['ADA'],
+          'DOGE':  ['DOGE'],
+          'MATIC': ['Polygon'],
+          'LINK':  ['ERC20', 'BEP20', 'Polygon'],
+        }
+        const available = coinBlockchains[o.symbol] || []
+        if (!available.some(b => b.toUpperCase().includes(filterBlockchain.toUpperCase()))) return false
+      }
       return true
     })
     .sort((a, b) => sortByProfit === 'desc' ? b.netProfitPct - a.netProfitPct : a.netProfitPct - b.netProfitPct)
@@ -649,10 +667,20 @@ export default function AdminArbitragePanel() {
           )}
 
           {/* Filters */}
-          <Card className="bg-slate-900 border-slate-800 p-4">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <Card className="bg-slate-900 border-slate-800 p-4 space-y-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Filter className="w-4 h-4 text-amber-400" />
+              <p className="text-xs text-slate-400 font-semibold">Market Filters</p>
+              {(filterSymbol || filterMinProfit > 0 || filterBuyEx || filterSellEx || filterBlockchain) && (
+                <button onClick={() => { setFilterSymbol(''); setFilterMinProfit(0); setFilterBuyEx(''); setFilterSellEx(''); setFilterBlockchain('') }}
+                  className="ml-auto text-xs text-slate-500 hover:text-amber-400 transition-colors">
+                  Clear all filters
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               <div>
-                <label className="text-xs text-slate-400 mb-1 block">Coin</label>
+                <label className="text-xs text-slate-400 mb-1.5 block font-medium">Coin</label>
                 <div className="relative">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
                   <input value={filterSymbol} onChange={e => setFilterSymbol(e.target.value)}
@@ -661,19 +689,65 @@ export default function AdminArbitragePanel() {
                 </div>
               </div>
               <div>
-                <label className="text-xs text-slate-400 mb-1 block">Min Profit %</label>
+                <label className="text-xs text-slate-400 mb-1.5 block font-medium">Min Profit %</label>
                 <input type="number" min="0" step="0.1" value={filterMinProfit}
                   onChange={e => setFilterMinProfit(parseFloat(e.target.value) || 0)}
                   className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-amber-500/50" />
               </div>
               <div>
-                <label className="text-xs text-slate-400 mb-1 block">Buy Exchange</label>
-                <input value={filterBuyEx} onChange={e => setFilterBuyEx(e.target.value)}
-                  placeholder="Binance..."
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-amber-500/50" />
+                <label className="text-xs text-slate-400 mb-1.5 block font-medium">Buy Exchange</label>
+                <select value={filterBuyEx} onChange={e => setFilterBuyEx(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-amber-500/50">
+                  <option value="">All exchanges</option>
+                  <option value="binance">Binance</option>
+                  <option value="okx">OKX</option>
+                  <option value="bybit">Bybit</option>
+                  <option value="kucoin">KuCoin</option>
+                  <option value="kraken">Kraken</option>
+                  <option value="coinbase">Coinbase</option>
+                  <option value="gateio">Gate.io</option>
+                  <option value="bitfinex">Bitfinex</option>
+                  <option value="coinswitch">CoinSwitch</option>
+                  <option value="delta">Delta</option>
+                  <option value="wazirx">WazirX</option>
+                </select>
               </div>
               <div>
-                <label className="text-xs text-slate-400 mb-1 block">Sort</label>
+                <label className="text-xs text-slate-400 mb-1.5 block font-medium">Sell Exchange</label>
+                <select value={filterSellEx} onChange={e => setFilterSellEx(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-amber-500/50">
+                  <option value="">All exchanges</option>
+                  <option value="binance">Binance</option>
+                  <option value="okx">OKX</option>
+                  <option value="bybit">Bybit</option>
+                  <option value="kucoin">KuCoin</option>
+                  <option value="kraken">Kraken</option>
+                  <option value="coinbase">Coinbase</option>
+                  <option value="gateio">Gate.io</option>
+                  <option value="bitfinex">Bitfinex</option>
+                  <option value="coinswitch">CoinSwitch</option>
+                  <option value="delta">Delta</option>
+                  <option value="wazirx">WazirX</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-slate-400 mb-1.5 block font-medium">Blockchain</label>
+                <select value={filterBlockchain} onChange={e => setFilterBlockchain(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-amber-500/50">
+                  <option value="">All blockchains</option>
+                  <option value="ERC20">Ethereum (ERC20)</option>
+                  <option value="BEP20">Binance (BEP20)</option>
+                  <option value="TRC20">TRON (TRC20)</option>
+                  <option value="SOL">Solana (SOL)</option>
+                  <option value="Polygon">Polygon</option>
+                  <option value="Avalanche">Avalanche</option>
+                  <option value="BTC">Bitcoin</option>
+                  <option value="XRP">XRP Ledger</option>
+                  <option value="ADA">Cardano</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-slate-400 mb-1.5 block font-medium">Sort</label>
                 <select value={sortByProfit} onChange={e => setSortByProfit(e.target.value as 'asc' | 'desc')}
                   className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-amber-500/50">
                   <option value="desc">Highest profit first</option>
@@ -1155,7 +1229,7 @@ export default function AdminArbitragePanel() {
                         <div className="flex justify-between text-slate-300"><span>Trade Size</span><span>${netBreakdown.tradeAmountUsd.toLocaleString()}</span></div>
                         <div className="flex justify-between text-green-400"><span>+ Gross Profit</span><span>+${netBreakdown.grossProfit.toFixed(2)}</span></div>
                         <div className="border-t border-slate-800 my-1" />
-                        <div className="flex justify-between text-red-400"><span>− Trading Fees</span><span>-${(netBreakdown.tradingFeeBuy + netBreakdown.tradingFeeSell).toFixed(2)}</span></div>
+                        <div className="flex justify-between text-red-400"><span>��� Trading Fees</span><span>-${(netBreakdown.tradingFeeBuy + netBreakdown.tradingFeeSell).toFixed(2)}</span></div>
                         <div className="flex justify-between text-red-400"><span>− Withdrawal Fee</span><span>-${netBreakdown.withdrawalFee.toFixed(2)}</span></div>
                         <div className="flex justify-between text-red-400"><span>− Network Fee</span><span>-${netBreakdown.networkFee.toFixed(2)}</span></div>
                         <div className="flex justify-between text-red-400"><span>− Slippage</span><span>-${netBreakdown.estimatedSlippage.toFixed(2)}</span></div>
