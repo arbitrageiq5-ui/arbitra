@@ -93,7 +93,7 @@ export interface ExchangeApiKey {
 
 // ─── EXCHANGE API KEY MANAGEMENT ───────────────────────────────────────────
 
-export const ALL_EXCHANGES = [
+const ALL_EXCHANGES = [
   { exchange: 'binance',   label: 'Binance',     url: 'https://api.binance.com',           hasPassphrase: false, docsUrl: 'https://www.binance.com/en/my/settings/api-management',   docsLabel: 'Binance API Mgmt',    tradingFee: '0.10%', requiresIpWhitelist: true,  permissions: ['Read Info', 'Spot Trading', 'Withdrawals'], color: '#F0B90B' },
   { exchange: 'kraken',    label: 'Kraken',      url: 'https://api.kraken.com',            hasPassphrase: false, docsUrl: 'https://www.kraken.com/u/security/api',                    docsLabel: 'Kraken API Settings', tradingFee: '0.16%', requiresIpWhitelist: false, permissions: ['Query Funds', 'Query Orders', 'Create Orders', 'Withdraw Funds'], color: '#5741D9' },
   { exchange: 'coinbase',  label: 'Coinbase',    url: 'https://api.coinbase.com',          hasPassphrase: false, docsUrl: 'https://www.coinbase.com/settings/api',                    docsLabel: 'Coinbase API Keys',   tradingFee: '0.60%', requiresIpWhitelist: false, permissions: ['View', 'Trade', 'Transfer'], color: '#0052FF' },
