@@ -414,41 +414,99 @@ function simulatePricesForSymbol(symbol: string, seed: number): ExchangePrice[] 
 }
 
 // ─── Main entry point ─────────────────────────────────────────────────────────
+// Priority order for price data:
+//   1. CCXT (authenticated if API keys are set in env, otherwise public mode)
+//   2. Direct REST fetchers (custom per-exchange implementations above)
+//   3. CoinGecko (authoritative reference price — fills gaps, not for arb)
+//   4. Seeded simulation (last resort — clearly marked, always works offline)
 
-export async function getPricesAcrossExchanges(symbols: string[]): Promise<ExchangePrice[]> {
-  const results: ExchangePrice[] = []
-  const seed = Math.floor(Date.now() / 15000) // 15-second window
+export async function getPricesAcrossExchanges(
+  symbols: string[],
+  dbKeys: Record<string, { apiKey?: string | null; secret?: string | null; passphrase?: string | null }> = {},
+): Promise<ExchangePrice[]> {
+  const seed = Math.floor(Date.now() / 15000) // 15-second window for sim
 
-  // Try to fetch live prices — collect successful ones, simulate the rest
+  // ── Layer 1: CCXT live prices ─────────────────────────────────────────────
+  let ccxtPrices: ExchangePrice[] = []
+  try {
+    const { fetchPricesViaCcxt } = await import('@/lib/services/ccxt-fetcher')
+    const raw = await fetchPricesViaCcxt(symbols, dbKeys)
+    ccxtPrices = raw.map(r => ({
+      symbol:    r.symbol,
+      exchange:  r.exchange,
+      price:     r.price,
+      timestamp: r.timestamp,
+    }))
+  } catch {
+    // CCXT unavailable (e.g. edge runtime) — continue to REST
+  }
+
+  // ── Layer 2: Direct REST fetchers ─────────────────────────────────────────
+  // Run in parallel; skip exchanges already covered by CCXT
+  const ccxtExchangesCovered = new Set(ccxtPrices.map(p => p.exchange.toLowerCase()))
+
+  const restPrices: ExchangePrice[] = []
   await Promise.all(
     symbols.map(async (symbol) => {
-      const fetched: ExchangePrice[] = []
-
-      const exchangeResults = await Promise.all(
-        EXCHANGE_FETCHERS.map(async ({ name, fetch }) => {
-          const price = await fetch(symbol)
-          return price ? { symbol, exchange: name, price, timestamp: Date.now() } : null
-        })
+      const restResults = await Promise.all(
+        EXCHANGE_FETCHERS
+          .filter(f => !ccxtExchangesCovered.has(f.name.toLowerCase()))
+          .map(async ({ name, fetch }) => {
+            const price = await fetch(symbol)
+            return price ? { symbol, exchange: name, price, timestamp: Date.now() } : null
+          })
       )
-
-      for (const r of exchangeResults) {
-        if (r) fetched.push(r)
-      }
-
-      if (fetched.length >= 2) {
-        // Got real prices from at least 2 exchanges — use them
-        results.push(...fetched)
-      } else {
-        // Not enough real prices — use seeded simulation so scanner always works
-        results.push(...simulatePricesForSymbol(symbol, seed + symbol.charCodeAt(0) * 997))
+      for (const r of restResults) {
+        if (r) restPrices.push(r)
       }
     })
   )
 
-  return results
+  // ── Merge CCXT + REST ─────────────────────────────────────────────────────
+  // For each (symbol, exchange) keep only one price — CCXT takes priority
+  const merged = new Map<string, ExchangePrice>()
+  for (const p of [...ccxtPrices, ...restPrices]) {
+    const key = `${p.symbol}::${p.exchange}`
+    if (!merged.has(key)) merged.set(key, p) // CCXT first wins
+  }
+  const livePrices = Array.from(merged.values())
+
+  // ── Layer 3: CoinGecko reference prices ───────────────────────────────────
+  // Use CoinGecko to fill any symbol that got ZERO live prices from CCXT/REST
+  const symbolsWithLive = new Set(livePrices.map(p => p.symbol))
+  const missingSymbols  = symbols.filter(s => !symbolsWithLive.has(s))
+
+  if (missingSymbols.length > 0) {
+    try {
+      const { fetchPricesViaCoingecko } = await import('@/lib/services/ccxt-fetcher')
+      const cgPrices = await fetchPricesViaCoingecko(missingSymbols)
+      for (const p of cgPrices) livePrices.push(p)
+    } catch { /* CoinGecko down — fall through to simulation */ }
+  }
+
+  // Also always fetch CoinGecko for all symbols to use as cross-check reference
+  // (adds a "CoinGecko" entry so arbitrage against CG reference price is visible)
+  try {
+    const { fetchPricesViaCoingecko } = await import('@/lib/services/ccxt-fetcher')
+    const cgAll = await fetchPricesViaCoingecko(symbols)
+    for (const p of cgAll) {
+      const key = `${p.symbol}::${p.exchange}`
+      if (!merged.has(key)) livePrices.push(p)
+    }
+  } catch { /* optional — skip */ }
+
+  // ── Layer 4: Seeded simulation for any remaining gaps ─────────────────────
+  const symbolsWithAnyPrice = new Set(livePrices.map(p => p.symbol))
+  for (const symbol of symbols) {
+    if (!symbolsWithAnyPrice.has(symbol)) {
+      livePrices.push(...simulatePricesForSymbol(symbol, seed + symbol.charCodeAt(0) * 997))
+    }
+  }
+
+  return livePrices
 }
 
-// ─── Arbitrage detection ──────────────────────────────────────────────────────
+// ─── Arbitrage detection ─────────────────────────────────���────────────────────
 
 export function detectArbitrageOpportunities(
   prices: ExchangePrice[],

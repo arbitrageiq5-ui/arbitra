@@ -324,11 +324,41 @@ export async function testAllExchanges(): Promise<Record<string, { ok: boolean; 
 
 // ─── LIVE PRICE SCAN ────────────────────────────────────────────────────────
 
+// Complete display name map — covers all exchanges in our API list
 const EXCHANGE_DISPLAY_NAMES: Record<string, string> = {
-  binance: 'Binance', kraken: 'Kraken', coinbase: 'Coinbase', bybit: 'Bybit',
-  kucoin: 'KuCoin', huobi: 'HTX (Huobi)', bitfinex: 'Bitfinex', okx: 'OKX',
-  'gate.io': 'Gate.io', gemini: 'Gemini', 'crypto.com': 'Crypto.com', bitget: 'Bitget',
-  coingecko: 'CoinGecko',
+  // Global
+  binance:    'Binance',
+  bybit:      'Bybit',
+  kucoin:     'KuCoin',
+  okx:        'OKX',
+  kraken:     'Kraken',
+  coinbase:   'Coinbase',
+  htx:        'HTX',
+  bitfinex:   'Bitfinex',
+  'gate.io':  'Gate.io',
+  gate:       'Gate.io',
+  gemini:     'Gemini',
+  'crypto.com': 'Crypto.com',
+  cryptocom:  'Crypto.com',
+  bitget:     'Bitget',
+  mexc:       'MEXC',
+  phemex:     'Phemex',
+  poloniex:   'Poloniex',
+  bingx:      'BingX',
+  lbank:      'LBank',
+  upbit:      'Upbit',
+  bitstamp:   'Bitstamp',
+  deribit:    'Deribit',
+  // India
+  coindcx:    'CoinDCX',
+  coinswitch: 'CoinSwitch',
+  wazirx:     'WazirX',
+  bitbns:     'BitBns',
+  zebpay:     'ZebPay',
+  delta:      'Delta Exchange',
+  mudrex:     'Mudrex',
+  // Reference
+  coingecko:  'CoinGecko',
 }
 
 export async function adminFetchLivePrices(symbols: string[]): Promise<{
@@ -338,10 +368,21 @@ export async function adminFetchLivePrices(symbols: string[]): Promise<{
 }> {
   await requireAdmin()
 
+  // Load saved API keys from DB to pass to CCXT for authenticated access
+  let dbKeys: Record<string, { apiKey?: string | null; secret?: string | null; passphrase?: string | null }> = {}
+  try {
+    const keyRows = await db.select().from(exchangeApiKeys)
+    dbKeys = Object.fromEntries(
+      keyRows
+        .filter(r => r.isEnabled && r.apiKey && r.apiSecret)
+        .map(r => [r.exchange, { apiKey: r.apiKey, secret: r.apiSecret, passphrase: r.passphrase }])
+    )
+  } catch { /* proceed without DB keys */ }
+
   const start = Date.now()
   let livePrices: ExchangePrice[] = []
   try {
-    livePrices = await getPricesAcrossExchanges(symbols)
+    livePrices = await getPricesAcrossExchanges(symbols, dbKeys)
   } catch {
     livePrices = []
   }
@@ -355,15 +396,22 @@ export async function adminFetchLivePrices(symbols: string[]): Promise<{
   })
   const totalMs = Date.now() - start
 
+  // Statuses for every exchange we track (not just the ones that responded)
   const allExchangeKeys = Object.keys(EXCHANGE_DISPLAY_NAMES)
-  const exchangeStatuses: ExchangeStatus[] = allExchangeKeys.map(key => ({
-    name: key,
-    label: EXCHANGE_DISPLAY_NAMES[key] ?? key,
-    online: !!exchangeMap[key],
-    latencyMs: totalMs,
-    pricesFetched: exchangeMap[key]?.count ?? 0,
-    lastChecked: new Date().toISOString(),
-  }))
+  const exchangeStatuses: ExchangeStatus[] = allExchangeKeys.map(key => {
+    const displayName = EXCHANGE_DISPLAY_NAMES[key] ?? key
+    // Match by display name too (CCXT may return full name e.g. "Gate.io")
+    const byName = livePrices.filter(p => p.exchange.toLowerCase() === displayName.toLowerCase())
+    const count  = (exchangeMap[key]?.count ?? 0) + (byName.length > 0 && !exchangeMap[key] ? byName.length : 0)
+    return {
+      name: key,
+      label: displayName,
+      online: count > 0,
+      latencyMs: totalMs,
+      pricesFetched: count,
+      lastChecked: new Date().toISOString(),
+    }
+  })
 
   // Load bot config for net profit calculation
   let botCfg: { minProfitPct: number; safetyBufferPct: number; tradingFeePct: number|null; withdrawalFeeOverride: number|null; networkFeeOverride: number|null; tradeAmountUsd: number; maxSlippagePct: number; maxTransferTimeMin: number }
