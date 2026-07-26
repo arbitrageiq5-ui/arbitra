@@ -565,7 +565,7 @@ export default function AdminArbitragePanel() {
         ))}
       </div>
 
-      {/* ══ LIVE SCAN TAB ════════════��═════════════════════════════════════ */}
+      {/* ══ LIVE SCAN TAB ════════════��═���═══════════════════════════════════ */}
       {subTab === 'live-scan' && (
         <div className="space-y-4">
 
@@ -1671,10 +1671,7 @@ export default function AdminArbitragePanel() {
                   )
                 })}
               </div>
-            </div>
-          )
-        })}
-          </>
+            </>
           )}
 
           {/* Configure modal */}
