@@ -7,8 +7,11 @@ import {
   getExchangeApiKeys, saveExchangeApiKey, toggleExchangeEnabled,
   generateAiArbitrageStrategy, getSavedAiStrategy, getTransferRoutes,
   getExchangeBalances, executeExchangeTransfer, getTransferHistory,
+  getBotConfig, saveBotConfig, getBotAnalytics, executeBotTrade, evaluateRiskFilters,
   AdminLivePrice, AdminArbitrageOpp, ExchangeStatus, ExchangeApiKey,
   AiArbitrageStrategy, TransferRoute, ExchangeBalance, TransferLog,
+  BotConfig, BotAnalytics, RiskFilterResult, NetProfitBreakdown,
+  calcNetProfit,
 } from '@/app/actions/admin-arbitrage'
 import {
   Activity, RefreshCw, CheckCircle2, XCircle, Wifi, WifiOff,
@@ -17,11 +20,14 @@ import {
   EyeOff, Save, TestTube2, Bot, Sparkles, ChevronRight,
   ShieldCheck, ToggleLeft, ToggleRight, DollarSign, SendHorizonal,
   Wallet, ChevronDown, History, Copy, ExternalLink, Loader2, Link2,
+  FlaskConical, LineChart, Shield, Target, Cpu, TrendingDown,
+  CheckCircle, XCircle as XCircleIcon, Minus, Percent, Timer,
+  BadgeDollarSign, Layers, SlidersHorizontal,
 } from 'lucide-react'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-type SubTab = 'live-scan' | 'exchange-connections' | 'balances' | 'ai-strategy' | 'transfer' | 'transfer-routes' | 'settings'
+type SubTab = 'live-scan' | 'exchange-connections' | 'balances' | 'ai-strategy' | 'transfer' | 'transfer-routes' | 'bot-engine' | 'analytics' | 'settings'
 
 const SCAN_SYMBOLS = [
   'BTC', 'ETH', 'BNB', 'SOL', 'XRP', 'DOGE', 'ADA', 'AVAX',
@@ -186,6 +192,23 @@ export default function AdminArbitragePanel() {
   ]
   const ALL_COINS = ['USDT','BTC','ETH','BNB','SOL','XRP','DOGE','ADA','AVAX','MATIC','LINK','LTC','TRX','DOT','ATOM','UNI']
 
+  // Bot engine state
+  const [botConfig, setBotConfig] = useState<BotConfig | null>(null)
+  const [loadingBotConfig, setLoadingBotConfig] = useState(false)
+  const [savingBotConfig, setSavingBotConfig] = useState(false)
+  const [botRunning, setBotRunning] = useState(false)
+  const [botLog, setBotLog] = useState<string[]>([])
+  const [selectedOppForExec, setSelectedOppForExec] = useState<AdminArbitrageOpp | null>(null)
+  const [execResult, setExecResult] = useState<{ success: boolean; message: string } | null>(null)
+  const [executingTrade, setExecutingTrade] = useState(false)
+  const [riskFilters, setRiskFilters] = useState<RiskFilterResult[]>([])
+  const [loadingRisk, setLoadingRisk] = useState(false)
+  const [netBreakdown, setNetBreakdown] = useState<NetProfitBreakdown | null>(null)
+
+  // Analytics state
+  const [analytics, setAnalytics] = useState<BotAnalytics | null>(null)
+  const [loadingAnalytics, setLoadingAnalytics] = useState(false)
+
   // Balances tab state
   const [allBalances, setAllBalances] = useState<Record<string, ExchangeBalance[]>>({})
   const [loadingAllBalances, setLoadingAllBalances] = useState(false)
@@ -251,6 +274,75 @@ export default function AdminArbitragePanel() {
     setTxConfirmOpen(false)
   }
 
+  async function loadBotConfig() {
+    setLoadingBotConfig(true)
+    try {
+      const cfg = await getBotConfig()
+      setBotConfig(cfg)
+      setBotRunning(cfg.isRunning)
+    } catch { /* ignore */ }
+    finally { setLoadingBotConfig(false) }
+  }
+
+  async function handleSaveBotConfig(partial: Partial<BotConfig>) {
+    if (!botConfig) return
+    const updated = { ...botConfig, ...partial }
+    setBotConfig(updated)
+    setSavingBotConfig(true)
+    try { await saveBotConfig(partial) } catch { /* ignore */ }
+    finally { setSavingBotConfig(false) }
+  }
+
+  async function handleToggleBot() {
+    if (!botConfig) return
+    const next = !botRunning
+    setBotRunning(next)
+    setBotLog(prev => [...prev, `[${new Date().toLocaleTimeString()}] Bot ${next ? 'started' : 'stopped'} in ${botConfig.executionMode} mode`])
+    await handleSaveBotConfig({ isRunning: next })
+  }
+
+  async function handleExecTrade(opp: AdminArbitrageOpp) {
+    if (!botConfig) return
+    setExecutingTrade(true)
+    setExecResult(null)
+    setBotLog(prev => [...prev, `[${new Date().toLocaleTimeString()}] Executing trade: ${opp.symbol} BUY ${opp.buyExchange} → SELL ${opp.sellExchange}`])
+    try {
+      const res = await executeBotTrade(opp, botConfig)
+      setExecResult({ success: res.success, message: res.message })
+      setBotLog(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${res.success ? 'SUCCESS' : 'FAILED'}: ${res.message}`])
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Unknown error'
+      setExecResult({ success: false, message: msg })
+    } finally {
+      setExecutingTrade(false)
+    }
+  }
+
+  async function handleEvalRisk(opp: AdminArbitrageOpp) {
+    if (!botConfig) return
+    setLoadingRisk(true)
+    setSelectedOppForExec(opp)
+    try {
+      const filters = await evaluateRiskFilters(opp, botConfig)
+      setRiskFilters(filters)
+      const bd = calcNetProfit(
+        opp.symbol, opp.buyExchange, opp.sellExchange,
+        opp.buyPrice, opp.sellPrice, botConfig.tradeAmountUsd, botConfig,
+      )
+      setNetBreakdown(bd)
+    } catch { /* ignore */ }
+    finally { setLoadingRisk(false) }
+  }
+
+  async function loadAnalytics() {
+    setLoadingAnalytics(true)
+    try {
+      const a = await getBotAnalytics()
+      setAnalytics(a)
+    } catch { /* ignore */ }
+    finally { setLoadingAnalytics(false) }
+  }
+
   // ── Load data when tab opens ──────────────────────────────────────────────
   useEffect(() => {
     if (subTab === 'exchange-connections' && apiKeys.length === 0) {
@@ -264,6 +356,12 @@ export default function AdminArbitragePanel() {
     }
     if (subTab === 'transfer') {
       loadHistory()
+    }
+    if (subTab === 'bot-engine' && !botConfig) {
+      loadBotConfig()
+    }
+    if (subTab === 'analytics' && !analytics) {
+      loadAnalytics()
     }
   }, [subTab])
 
@@ -396,13 +494,15 @@ export default function AdminArbitragePanel() {
   ]
 
   const SUB_TABS: { key: SubTab; label: string; icon: React.ElementType }[] = [
-    { key: 'live-scan',               label: 'Live Scan',          icon: Activity         },
-    { key: 'exchange-connections',label: 'API Connections',   icon: Key          },
-    { key: 'balances',            label: 'Balances',          icon: Wallet       },
-    { key: 'ai-strategy',         label: 'AI Auto Setup',     icon: Bot          },
-    { key: 'transfer',            label: 'Transfer',          icon: SendHorizonal},
-    { key: 'transfer-routes',     label: 'Routes',            icon: ArrowRightLeft},
-    { key: 'settings',            label: 'Settings',          icon: Settings     },
+    { key: 'live-scan',            label: 'Live Scan',       icon: Activity          },
+    { key: 'bot-engine',           label: 'Bot Engine',      icon: Cpu               },
+    { key: 'analytics',            label: 'Analytics',       icon: LineChart         },
+    { key: 'exchange-connections', label: 'API Keys',        icon: Key               },
+    { key: 'balances',             label: 'Balances',        icon: Wallet            },
+    { key: 'ai-strategy',          label: 'AI Strategy',     icon: Bot               },
+    { key: 'transfer',             label: 'Transfer',        icon: SendHorizonal     },
+    { key: 'transfer-routes',      label: 'Routes',          icon: ArrowRightLeft    },
+    { key: 'settings',             label: 'Settings',        icon: Settings          },
   ]
 
   return (
@@ -534,36 +634,74 @@ export default function AdminArbitragePanel() {
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b border-slate-800 text-slate-500 text-left">
-                      <th className="px-4 py-3 font-medium">Symbol</th>
-                      <th className="px-4 py-3 font-medium">Buy From</th>
-                      <th className="px-4 py-3 font-medium text-right">Buy Price</th>
-                      <th className="px-4 py-3 font-medium">Sell To</th>
-                      <th className="px-4 py-3 font-medium text-right">Sell Price</th>
-                      <th className="px-4 py-3 font-medium text-right">Spread</th>
-                      <th className="px-4 py-3 font-medium text-right">Net Profit</th>
-                      <th className="px-4 py-3 font-medium text-right">$ / 1k</th>
-                      <th className="px-4 py-3 font-medium text-right">Detected</th>
+                      <th className="px-3 py-3 font-medium">Status</th>
+                      <th className="px-3 py-3 font-medium">Symbol</th>
+                      <th className="px-3 py-3 font-medium">Route</th>
+                      <th className="px-3 py-3 font-medium text-right">Buy</th>
+                      <th className="px-3 py-3 font-medium text-right">Sell</th>
+                      <th className="px-3 py-3 font-medium text-right">Spread</th>
+                      <th className="px-3 py-3 font-medium text-right">Fees</th>
+                      <th className="px-3 py-3 font-medium text-right">Slippage</th>
+                      <th className="px-3 py-3 font-medium text-right">Net Profit</th>
+                      <th className="px-3 py-3 font-medium text-right">Transfer</th>
+                      <th className="px-3 py-3 font-medium text-right">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/60">
                     {filtered.map(opp => (
-                      <tr key={opp.id} className="hover:bg-slate-800/40 transition-colors">
-                        <td className="px-4 py-3">
+                      <tr key={opp.id} className={`hover:bg-slate-800/40 transition-colors ${!opp.viable ? 'opacity-60' : ''}`}>
+                        <td className="px-3 py-3">
+                          {opp.viable
+                            ? <span className="flex items-center gap-1 text-green-400"><CheckCircle className="w-3.5 h-3.5" /><span className="text-[10px] font-bold">VIABLE</span></span>
+                            : <span className="flex items-center gap-1 text-red-400"><XCircleIcon className="w-3.5 h-3.5" /><span className="text-[10px] font-bold">REJECT</span></span>
+                          }
+                        </td>
+                        <td className="px-3 py-3">
                           <span className="text-white font-bold">{opp.symbol}</span>
                           <span className="text-slate-600">/USDT</span>
                         </td>
-                        <td className="px-4 py-3"><ExchangeBadge exchange={opp.buyExchange} /></td>
-                        <td className="px-4 py-3 text-right font-mono text-slate-300">
-                          ${opp.buyPrice < 1 ? opp.buyPrice.toFixed(6) : opp.buyPrice.toLocaleString(undefined, { maximumFractionDigits: 4 })}
+                        <td className="px-3 py-3">
+                          <div className="flex items-center gap-1.5">
+                            <ExchangeBadge exchange={opp.buyExchange} />
+                            <ArrowRightLeft className="w-3 h-3 text-slate-600" />
+                            <ExchangeBadge exchange={opp.sellExchange} />
+                          </div>
                         </td>
-                        <td className="px-4 py-3"><ExchangeBadge exchange={opp.sellExchange} /></td>
-                        <td className="px-4 py-3 text-right font-mono text-slate-300">
-                          ${opp.sellPrice < 1 ? opp.sellPrice.toFixed(6) : opp.sellPrice.toLocaleString(undefined, { maximumFractionDigits: 4 })}
+                        <td className="px-3 py-3 text-right font-mono text-slate-400 text-[11px]">
+                          ${opp.buyPrice < 1 ? opp.buyPrice.toFixed(5) : opp.buyPrice.toLocaleString(undefined, { maximumFractionDigits: 3 })}
                         </td>
-                        <td className="px-4 py-3 text-right"><span className="text-cyan-400 font-semibold">+{opp.profitPct.toFixed(3)}%</span></td>
-                        <td className="px-4 py-3 text-right"><ProfitBadge pct={opp.netProfitPct} /></td>
-                        <td className="px-4 py-3 text-right"><span className="text-green-400 font-bold">+${opp.profitPer1k.toFixed(2)}</span></td>
-                        <td className="px-4 py-3 text-right text-slate-500">{new Date(opp.detectedAt).toLocaleTimeString()}</td>
+                        <td className="px-3 py-3 text-right font-mono text-slate-400 text-[11px]">
+                          ${opp.sellPrice < 1 ? opp.sellPrice.toFixed(5) : opp.sellPrice.toLocaleString(undefined, { maximumFractionDigits: 3 })}
+                        </td>
+                        <td className="px-3 py-3 text-right"><span className="text-cyan-400 font-semibold">+{opp.profitPct.toFixed(3)}%</span></td>
+                        <td className="px-3 py-3 text-right">
+                          <div className="text-right">
+                            <span className="text-red-400 font-mono text-[10px]">-${opp.tradingFeeUsd.toFixed(2)}</span>
+                            <span className="text-slate-600 text-[9px] block">+wd ${opp.withdrawalFeeUsd.toFixed(2)}</span>
+                          </div>
+                        </td>
+                        <td className="px-3 py-3 text-right">
+                          <span className="text-orange-400 font-mono text-[10px]">-${opp.slippageUsd.toFixed(2)}</span>
+                        </td>
+                        <td className="px-3 py-3 text-right">
+                          <ProfitBadge pct={opp.netProfitPct} />
+                          <span className={`block text-[10px] font-mono mt-0.5 ${opp.netProfitUsd >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {opp.netProfitUsd >= 0 ? '+' : ''}${opp.netProfitUsd.toFixed(2)}
+                          </span>
+                        </td>
+                        <td className="px-3 py-3 text-right">
+                          <span className="text-slate-400 text-[10px] flex items-center justify-end gap-1">
+                            <Timer className="w-3 h-3" />{opp.estimatedTransferMin}m
+                          </span>
+                        </td>
+                        <td className="px-3 py-3 text-right">
+                          <button
+                            onClick={() => { setSubTab('bot-engine'); loadBotConfig().then(() => { setSelectedOppForExec(opp); handleEvalRisk(opp) }) }}
+                            className="px-2.5 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-400 text-[10px] font-bold rounded-lg transition-colors whitespace-nowrap"
+                          >
+                            Evaluate
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -590,6 +728,608 @@ export default function AdminArbitragePanel() {
                 ))}
               </div>
             </div>
+          )}
+        </div>
+      )}
+
+      {/* ══ BOT ENGINE TAB ════════════════════════════════════════════════ */}
+      {subTab === 'bot-engine' && (
+        <div className="space-y-4">
+
+          {/* Header */}
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h3 className="text-white font-bold text-base flex items-center gap-2">
+                <Cpu className="w-5 h-5 text-amber-400" />
+                Arbitrage Bot Engine
+              </h3>
+              <p className="text-slate-500 text-xs mt-0.5">Configure execution parameters, risk filters, and net profit formula. Monitor and control live bot operation.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              {savingBotConfig && <span className="text-slate-500 text-xs flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Saving...</span>}
+              <button
+                onClick={() => loadBotConfig()}
+                disabled={loadingBotConfig}
+                className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-medium rounded-lg transition-colors"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loadingBotConfig ? 'animate-spin' : ''}`} />
+                Reload
+              </button>
+            </div>
+          </div>
+
+          {loadingBotConfig ? (
+            <Card className="bg-slate-900 border-slate-800 p-12 text-center">
+              <Loader2 className="w-8 h-8 text-slate-500 mx-auto mb-3 animate-spin" />
+              <p className="text-slate-400 text-sm">Loading bot configuration...</p>
+            </Card>
+          ) : botConfig && (
+            <div className="space-y-4">
+
+              {/* Bot status + master controls */}
+              <Card className={`border-2 p-5 ${botRunning ? 'bg-green-950/30 border-green-500/40' : 'bg-slate-900 border-slate-700'}`}>
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${botRunning ? 'bg-green-500/20' : 'bg-slate-800'}`}>
+                      <Cpu className={`w-6 h-6 ${botRunning ? 'text-green-400' : 'text-slate-500'}`} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-white font-bold text-base">Arbitrage Bot</span>
+                        {botRunning
+                          ? <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 border border-green-500/30 font-bold animate-pulse">RUNNING</span>
+                          : <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-700 text-slate-400 border border-slate-600 font-bold">STOPPED</span>
+                        }
+                      </div>
+                      <p className="text-slate-400 text-xs mt-0.5">Mode: <span className="text-amber-400 font-medium capitalize">{botConfig.executionMode}</span> · Order: <span className="text-cyan-400 font-medium capitalize">{botConfig.orderType}</span> · Pre-funded: <span className={`font-medium ${botConfig.preFundedMode ? 'text-green-400' : 'text-slate-500'}`}>{botConfig.preFundedMode ? 'On' : 'Off'}</span></p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleToggleBot}
+                      className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-colors ${
+                        botRunning
+                          ? 'bg-red-500/20 border border-red-500/40 text-red-400 hover:bg-red-500/30'
+                          : 'bg-green-500 hover:bg-green-400 text-black'
+                      }`}
+                    >
+                      {botRunning ? <><Pause className="w-4 h-4" /> Stop Bot</> : <><Play className="w-4 h-4" /> Start Bot</>}
+                    </button>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Bot log */}
+              {botLog.length > 0 && (
+                <Card className="bg-slate-950 border-slate-800 p-4">
+                  <p className="text-slate-500 text-xs font-medium uppercase tracking-wider mb-2 flex items-center gap-1.5"><Activity className="w-3 h-3" /> Bot Log</p>
+                  <div className="space-y-1 max-h-32 overflow-y-auto">
+                    {botLog.slice(-10).reverse().map((line, i) => (
+                      <p key={i} className="text-xs font-mono text-slate-400">{line}</p>
+                    ))}
+                  </div>
+                </Card>
+              )}
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+                {/* Execution Mode + Order Settings */}
+                <Card className="bg-slate-900 border-slate-800 p-5 space-y-4">
+                  <h4 className="text-white font-bold text-sm flex items-center gap-2"><Target className="w-4 h-4 text-amber-400" /> Execution Engine</h4>
+
+                  <div>
+                    <label className="text-xs text-slate-400 mb-1.5 block">Execution Mode</label>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {(['monitor','semi-auto','full-auto'] as const).map(mode => (
+                        <button key={mode} onClick={() => handleSaveBotConfig({ executionMode: mode })}
+                          className={`py-2 rounded-lg text-xs font-semibold border transition-colors capitalize ${
+                            botConfig.executionMode === mode
+                              ? 'bg-amber-500/20 border-amber-500/50 text-amber-300'
+                              : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'
+                          }`}
+                        >{mode}</button>
+                      ))}
+                    </div>
+                    <p className="text-slate-600 text-[10px] mt-1.5">
+                      {botConfig.executionMode === 'monitor' && 'Monitor only — no trades executed. Alerts still fire.'}
+                      {botConfig.executionMode === 'semi-auto' && 'Requires manual confirm per trade before execution.'}
+                      {botConfig.executionMode === 'full-auto' && 'Fully autonomous — executes trades automatically when filters pass.'}
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-slate-400 mb-1.5 block">Order Type</label>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {(['market','limit'] as const).map(ot => (
+                        <button key={ot} onClick={() => handleSaveBotConfig({ orderType: ot })}
+                          className={`py-2 rounded-lg text-xs font-semibold border transition-colors capitalize ${
+                            botConfig.orderType === ot
+                              ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300'
+                              : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'
+                          }`}
+                        >{ot} Orders</button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 bg-slate-800/60 rounded-lg">
+                    <div>
+                      <p className="text-white text-xs font-semibold">Pre-Funded Mode</p>
+                      <p className="text-slate-500 text-[10px] mt-0.5">Accounts funded on all exchanges — buy and sell simultaneously without waiting for transfers</p>
+                    </div>
+                    <button onClick={() => handleSaveBotConfig({ preFundedMode: !botConfig.preFundedMode })} className="ml-3">
+                      {botConfig.preFundedMode
+                        ? <ToggleRight className="w-7 h-7 text-green-400" />
+                        : <ToggleLeft className="w-7 h-7 text-slate-600" />
+                      }
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-slate-400 mb-1 block">Trade Amount ($)</label>
+                      <input type="number" min="10" value={botConfig.tradeAmountUsd}
+                        onChange={e => handleSaveBotConfig({ tradeAmountUsd: parseFloat(e.target.value) || 1000 })}
+                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-amber-500/50" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-400 mb-1 block">Max Order Size ($)</label>
+                      <input type="number" min="100" value={botConfig.maxOrderSizeUsd}
+                        onChange={e => handleSaveBotConfig({ maxOrderSizeUsd: parseFloat(e.target.value) || 10000 })}
+                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-amber-500/50" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 mb-1 block">Scan Interval (seconds)</label>
+                    <input type="number" min="5" max="300" value={botConfig.scanIntervalSeconds}
+                      onChange={e => handleSaveBotConfig({ scanIntervalSeconds: parseInt(e.target.value) || 30 })}
+                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-amber-500/50" />
+                  </div>
+                </Card>
+
+                {/* Net Profit Formula */}
+                <Card className="bg-slate-900 border-slate-800 p-5 space-y-4">
+                  <h4 className="text-white font-bold text-sm flex items-center gap-2"><BadgeDollarSign className="w-4 h-4 text-green-400" /> Net Profit Formula</h4>
+
+                  <div className="bg-slate-950/80 rounded-lg p-3 text-xs font-mono space-y-1.5 border border-slate-800">
+                    <p className="text-slate-300">Net Profit =</p>
+                    <p className="text-green-400 pl-2">Sell Value</p>
+                    <p className="text-red-400 pl-2">− Buy Value</p>
+                    <p className="text-red-400 pl-2">− Trading Fees</p>
+                    <p className="text-red-400 pl-2">− Withdrawal Fees</p>
+                    <p className="text-red-400 pl-2">− Network Fees</p>
+                    <p className="text-red-400 pl-2">− Estimated Slippage</p>
+                    <p className="text-orange-400 pl-2">− Safety Buffer ({botConfig.safetyBufferPct}%)</p>
+                    <p className="text-slate-500 mt-1 border-t border-slate-800 pt-1">Execute only if:</p>
+                    <p className="text-amber-400 pl-2">Net Profit % &gt;= {botConfig.minProfitPct}%</p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs text-slate-400 mb-1 block">Min Profit % (Net)</label>
+                        <input type="number" step="0.01" min="0" value={botConfig.minProfitPct}
+                          onChange={e => handleSaveBotConfig({ minProfitPct: parseFloat(e.target.value) || 0.5 })}
+                          className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-amber-500/50" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-slate-400 mb-1 block">Min Profit USD</label>
+                        <input type="number" step="1" min="0" value={botConfig.minProfitUsd}
+                          onChange={e => handleSaveBotConfig({ minProfitUsd: parseFloat(e.target.value) || 5 })}
+                          className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-amber-500/50" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-400 mb-1 block">Safety Buffer % (of trade size)</label>
+                      <input type="number" step="0.01" min="0" max="2" value={botConfig.safetyBufferPct}
+                        onChange={e => handleSaveBotConfig({ safetyBufferPct: parseFloat(e.target.value) || 0.1 })}
+                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-amber-500/50" />
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <label className="text-xs text-slate-400 mb-1 block">Fee Override % <span className="text-slate-600">(blank=auto)</span></label>
+                        <input type="number" step="0.01" min="0" placeholder="auto"
+                          value={botConfig.tradingFeePct ?? ''}
+                          onChange={e => handleSaveBotConfig({ tradingFeePct: e.target.value ? parseFloat(e.target.value) : null })}
+                          className="w-full px-2 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-amber-500/50" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-slate-400 mb-1 block">WD Fee $ <span className="text-slate-600">(blank=auto)</span></label>
+                        <input type="number" step="0.1" min="0" placeholder="auto"
+                          value={botConfig.withdrawalFeeOverride ?? ''}
+                          onChange={e => handleSaveBotConfig({ withdrawalFeeOverride: e.target.value ? parseFloat(e.target.value) : null })}
+                          className="w-full px-2 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-amber-500/50" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-slate-400 mb-1 block">Net Fee $ <span className="text-slate-600">(blank=auto)</span></label>
+                        <input type="number" step="0.1" min="0" placeholder="auto"
+                          value={botConfig.networkFeeOverride ?? ''}
+                          onChange={e => handleSaveBotConfig({ networkFeeOverride: e.target.value ? parseFloat(e.target.value) : null })}
+                          className="w-full px-2 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-amber-500/50" />
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+
+                {/* Risk Filters */}
+                <Card className="bg-slate-900 border-slate-800 p-5 space-y-4">
+                  <h4 className="text-white font-bold text-sm flex items-center gap-2"><Shield className="w-4 h-4 text-red-400" /> Risk Filters</h4>
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs text-slate-400 mb-1 block">Max Slippage %</label>
+                        <input type="number" step="0.01" min="0" value={botConfig.maxSlippagePct}
+                          onChange={e => handleSaveBotConfig({ maxSlippagePct: parseFloat(e.target.value) || 0.3 })}
+                          className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-red-500/50" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-slate-400 mb-1 block">Max Transfer Time (min)</label>
+                        <input type="number" min="1" value={botConfig.maxTransferTimeMin}
+                          onChange={e => handleSaveBotConfig({ maxTransferTimeMin: parseInt(e.target.value) || 30 })}
+                          className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-red-500/50" />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs text-slate-400 mb-1 block">Max API Latency (ms)</label>
+                        <input type="number" min="100" value={botConfig.maxApiLatencyMs}
+                          onChange={e => handleSaveBotConfig({ maxApiLatencyMs: parseInt(e.target.value) || 2000 })}
+                          className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-red-500/50" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-slate-400 mb-1 block">Min Liquidity ($)</label>
+                        <input type="number" min="1000" value={botConfig.minLiquidityUsd}
+                          onChange={e => handleSaveBotConfig({ minLiquidityUsd: parseFloat(e.target.value) || 50000 })}
+                          className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-red-500/50" />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs text-slate-400 mb-1 block">Max Daily Loss ($)</label>
+                        <input type="number" min="0" value={botConfig.maxDailyLossUsd}
+                          onChange={e => handleSaveBotConfig({ maxDailyLossUsd: parseFloat(e.target.value) || 500 })}
+                          className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-red-500/50" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-slate-400 mb-1 block">Max Open Positions</label>
+                        <input type="number" min="1" max="20" value={botConfig.maxOpenPositions}
+                          onChange={e => handleSaveBotConfig({ maxOpenPositions: parseInt(e.target.value) || 3 })}
+                          className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-red-500/50" />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs text-slate-400 mb-1 block">Max Position Size ($)</label>
+                        <input type="number" min="100" value={botConfig.maxPositionSizeUsd}
+                          onChange={e => handleSaveBotConfig({ maxPositionSizeUsd: parseFloat(e.target.value) || 5000 })}
+                          className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-red-500/50" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-slate-400 mb-1 block">Min Exchange Risk Score (0-10)</label>
+                        <input type="number" min="0" max="10" step="0.5" value={botConfig.minExchangeRiskScore}
+                          onChange={e => handleSaveBotConfig({ minExchangeRiskScore: parseFloat(e.target.value) || 7 })}
+                          className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-red-500/50" />
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+
+                {/* Risk filter evaluator */}
+                <Card className="bg-slate-900 border-slate-800 p-5 space-y-4">
+                  <h4 className="text-white font-bold text-sm flex items-center gap-2"><FlaskConical className="w-4 h-4 text-purple-400" /> Risk Filter Evaluator</h4>
+                  <p className="text-slate-500 text-xs">Select an opportunity from Live Scan then evaluate all risk filters against it.</p>
+
+                  {opportunities.length === 0 ? (
+                    <div className="p-3 bg-slate-800/60 rounded-lg text-slate-500 text-xs">
+                      Run a Live Scan first to load opportunities, then return here to evaluate.
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="text-xs text-slate-400 mb-1.5 block">Choose Opportunity</label>
+                      <select
+                        value={selectedOppForExec?.id ?? ''}
+                        onChange={e => {
+                          const opp = opportunities.find(o => o.id === e.target.value) ?? null
+                          setSelectedOppForExec(opp)
+                          setRiskFilters([])
+                          setNetBreakdown(null)
+                        }}
+                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-xs focus:outline-none focus:border-amber-500/50"
+                      >
+                        <option value="">-- Select opportunity --</option>
+                        {opportunities.slice(0, 20).map(o => (
+                          <option key={o.id} value={o.id}>
+                            {o.symbol}: {o.buyExchange} → {o.sellExchange} (+{o.profitPct.toFixed(3)}%)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {selectedOppForExec && (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleEvalRisk(selectedOppForExec)}
+                        disabled={loadingRisk}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 text-purple-300 text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        <FlaskConical className={`w-3.5 h-3.5 ${loadingRisk ? 'animate-spin' : ''}`} />
+                        Evaluate Risk Filters
+                      </button>
+                      <button
+                        onClick={() => handleExecTrade(selectedOppForExec)}
+                        disabled={executingTrade || botConfig.executionMode === 'monitor'}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black text-xs font-bold rounded-lg transition-colors"
+                      >
+                        <Zap className={`w-3.5 h-3.5 ${executingTrade ? 'animate-spin' : ''}`} />
+                        {executingTrade ? 'Executing...' : 'Execute Trade'}
+                      </button>
+                    </div>
+                  )}
+
+                  {execResult && (
+                    <div className={`p-3 rounded-lg border text-xs ${execResult.success ? 'bg-green-500/10 border-green-500/30 text-green-300' : 'bg-red-500/10 border-red-500/30 text-red-300'}`}>
+                      {execResult.success ? <CheckCircle className="w-3.5 h-3.5 inline mr-1.5" /> : <AlertTriangle className="w-3.5 h-3.5 inline mr-1.5" />}
+                      {execResult.message}
+                    </div>
+                  )}
+
+                  {/* Net profit breakdown */}
+                  {netBreakdown && (
+                    <div className="space-y-2">
+                      <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">Net Profit Breakdown</p>
+                      <div className="bg-slate-950/80 rounded-lg p-3 space-y-1.5 border border-slate-800 text-xs font-mono">
+                        <div className="flex justify-between text-slate-300"><span>Trade Size</span><span>${netBreakdown.tradeAmountUsd.toLocaleString()}</span></div>
+                        <div className="flex justify-between text-green-400"><span>+ Gross Profit</span><span>+${netBreakdown.grossProfit.toFixed(2)}</span></div>
+                        <div className="border-t border-slate-800 my-1" />
+                        <div className="flex justify-between text-red-400"><span>− Trading Fees</span><span>-${(netBreakdown.tradingFeeBuy + netBreakdown.tradingFeeSell).toFixed(2)}</span></div>
+                        <div className="flex justify-between text-red-400"><span>− Withdrawal Fee</span><span>-${netBreakdown.withdrawalFee.toFixed(2)}</span></div>
+                        <div className="flex justify-between text-red-400"><span>− Network Fee</span><span>-${netBreakdown.networkFee.toFixed(2)}</span></div>
+                        <div className="flex justify-between text-red-400"><span>− Slippage</span><span>-${netBreakdown.estimatedSlippage.toFixed(2)}</span></div>
+                        <div className="flex justify-between text-orange-400"><span>− Safety Buffer</span><span>-${netBreakdown.safetyBuffer.toFixed(2)}</span></div>
+                        <div className="border-t border-slate-700 my-1" />
+                        <div className={`flex justify-between font-bold text-sm ${netBreakdown.viable ? 'text-green-400' : 'text-red-400'}`}>
+                          <span>= Net Profit</span>
+                          <span>{netBreakdown.netProfit >= 0 ? '+' : ''}${netBreakdown.netProfit.toFixed(2)} ({netBreakdown.netProfitPct.toFixed(3)}%)</span>
+                        </div>
+                        <div className="flex justify-between text-slate-500 text-[10px]"><span>Transfer Time</span><span>~{netBreakdown.estimatedTransferMin}m</span></div>
+                      </div>
+                      {netBreakdown.rejectReason && (
+                        <div className="p-2 bg-red-500/10 border border-red-500/30 rounded text-red-400 text-[10px] flex items-start gap-1.5">
+                          <XCircleIcon className="w-3 h-3 mt-0.5 shrink-0" />
+                          {netBreakdown.rejectReason}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Risk filters table */}
+                  {riskFilters.length > 0 && (
+                    <div className="space-y-1.5">
+                      <p className="text-slate-400 text-xs font-medium uppercase tracking-wider">Risk Filter Results</p>
+                      <div className="rounded-lg border border-slate-800 overflow-hidden">
+                        {riskFilters.map((f, i) => (
+                          <div key={i} className={`flex items-start gap-3 px-3 py-2.5 border-b border-slate-800/60 last:border-0 ${f.passed ? '' : 'bg-red-950/20'}`}>
+                            {f.passed
+                              ? <CheckCircle className="w-3.5 h-3.5 text-green-400 mt-0.5 shrink-0" />
+                              : <XCircleIcon className="w-3.5 h-3.5 text-red-400 mt-0.5 shrink-0" />
+                            }
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between">
+                                <span className={`text-xs font-medium ${f.passed ? 'text-slate-300' : 'text-red-300'}`}>{f.filter}</span>
+                                <span className="text-[10px] font-mono text-slate-500">{f.value}</span>
+                              </div>
+                              <p className="text-slate-600 text-[10px] truncate">{f.description}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </Card>
+
+              </div>
+
+              {/* Alerts config */}
+              <Card className="bg-slate-900 border-slate-800 p-5">
+                <h4 className="text-white font-bold text-sm flex items-center gap-2 mb-4"><Zap className="w-4 h-4 text-yellow-400" /> Alert Configuration</h4>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+                  {([
+                    { label: 'On Opportunity', key: 'alertOnOpportunity' as keyof BotConfig },
+                    { label: 'On Execution',   key: 'alertOnExecution'  as keyof BotConfig },
+                    { label: 'On Failure',     key: 'alertOnFailure'    as keyof BotConfig },
+                    { label: 'Low Balance',    key: 'alertOnLowBalance' as keyof BotConfig },
+                  ] as const).map(({ label, key }) => (
+                    <div key={key} className="flex items-center justify-between p-3 bg-slate-800/60 rounded-lg">
+                      <span className="text-slate-400 text-xs">{label}</span>
+                      <button onClick={() => handleSaveBotConfig({ [key]: !botConfig[key] } as Partial<BotConfig>)}>
+                        {botConfig[key]
+                          ? <ToggleRight className="w-5 h-5 text-green-400" />
+                          : <ToggleLeft className="w-5 h-5 text-slate-600" />
+                        }
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-slate-400 mb-1 block">Telegram Chat ID</label>
+                    <input value={botConfig.telegramChatId ?? ''}
+                      onChange={e => handleSaveBotConfig({ telegramChatId: e.target.value || null })}
+                      placeholder="-100123456789"
+                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-amber-500/50 font-mono" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 mb-1 block">Discord Webhook URL</label>
+                    <input value={botConfig.discordWebhook ?? ''}
+                      onChange={e => handleSaveBotConfig({ discordWebhook: e.target.value || null })}
+                      placeholder="https://discord.com/api/webhooks/..."
+                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-amber-500/50" />
+                  </div>
+                </div>
+              </Card>
+
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ══ ANALYTICS TAB ═════════════════════════════════════════════════════ */}
+      {subTab === 'analytics' && (
+        <div className="space-y-4">
+
+          {/* Header */}
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h3 className="text-white font-bold text-base flex items-center gap-2">
+                <LineChart className="w-5 h-5 text-amber-400" />
+                Bot Analytics & P&L
+              </h3>
+              <p className="text-slate-500 text-xs mt-0.5">Performance metrics, profitability stats, and trading history.</p>
+            </div>
+            <button onClick={loadAnalytics} disabled={loadingAnalytics}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-medium rounded-lg transition-colors">
+              <RefreshCw className={`w-3.5 h-3.5 ${loadingAnalytics ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+          </div>
+
+          {loadingAnalytics ? (
+            <Card className="bg-slate-900 border-slate-800 p-12 text-center">
+              <Loader2 className="w-8 h-8 text-slate-500 mx-auto mb-3 animate-spin" />
+              <p className="text-slate-400 text-sm">Loading analytics...</p>
+            </Card>
+          ) : analytics && (
+            <div className="space-y-4">
+
+              {/* KPI row */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  { label: 'Net P&L',          value: `$${analytics.netProfitUsd.toFixed(2)}`,      sub: `Gross $${analytics.totalProfitUsd.toFixed(2)}`,       color: analytics.netProfitUsd >= 0 ? 'text-green-400' : 'text-red-400', icon: TrendingUp  },
+                  { label: 'Win Rate',          value: `${analytics.winRate.toFixed(1)}%`,           sub: `${analytics.successfulTrades}/${analytics.executedTrades} trades`,  color: 'text-amber-400',  icon: Target    },
+                  { label: 'Sharpe Ratio',      value: analytics.sharpeRatio.toFixed(2),             sub: '> 1.0 is good',                                       color: analytics.sharpeRatio > 1 ? 'text-green-400' : analytics.sharpeRatio > 0 ? 'text-amber-400' : 'text-red-400', icon: BarChart3 },
+                  { label: 'Max Drawdown',      value: `${analytics.maxDrawdownPct.toFixed(1)}%`,    sub: 'Peak-to-trough',                                      color: analytics.maxDrawdownPct > 20 ? 'text-red-400' : 'text-cyan-400', icon: TrendingDown },
+                ].map(stat => (
+                  <Card key={stat.label} className="bg-slate-900 border-slate-800 p-4">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="text-slate-500 text-xs mb-1">{stat.label}</p>
+                        <p className={`font-bold text-xl leading-none ${stat.color}`}>{stat.value}</p>
+                        <p className="text-slate-600 text-[10px] mt-1">{stat.sub}</p>
+                      </div>
+                      <stat.icon className={`w-5 h-5 ${stat.color} opacity-50`} />
+                    </div>
+                  </Card>
+                ))}
+              </div>
+
+              {/* Secondary KPIs */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  { label: 'Total Opportunities', value: analytics.totalOpportunities.toString(),  color: 'text-slate-300' },
+                  { label: 'Executed Trades',      value: analytics.executedTrades.toString(),      color: 'text-slate-300' },
+                  { label: 'Avg ROI Per Trade',    value: `${analytics.avgRoiPct.toFixed(3)}%`,    color: analytics.avgRoiPct > 0 ? 'text-green-400' : 'text-slate-400' },
+                  { label: 'Best Trade',           value: `$${analytics.bestTradeProfitUsd.toFixed(2)}`, color: 'text-green-400' },
+                ].map(s => (
+                  <Card key={s.label} className="bg-slate-900 border-slate-800 p-3 text-center">
+                    <p className="text-slate-500 text-xs mb-1">{s.label}</p>
+                    <p className={`font-bold text-lg ${s.color}`}>{s.value}</p>
+                  </Card>
+                ))}
+              </div>
+
+              {/* Daily P&L chart (text-based sparkline) */}
+              <Card className="bg-slate-900 border-slate-800 p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-white font-bold text-sm flex items-center gap-2"><LineChart className="w-4 h-4 text-cyan-400" /> Daily P&L (14 days)</h4>
+                  <span className="text-slate-500 text-xs">
+                    Total: <span className={analytics.dailyProfit.reduce((s, d) => s + d.profit, 0) >= 0 ? 'text-green-400' : 'text-red-400'}>
+                      ${analytics.dailyProfit.reduce((s, d) => s + d.profit, 0).toFixed(2)}
+                    </span>
+                  </span>
+                </div>
+                {/* Visual bar chart */}
+                <div className="flex items-end gap-1 h-24">
+                  {analytics.dailyProfit.map((d, i) => {
+                    const maxAbs = Math.max(...analytics.dailyProfit.map(x => Math.abs(x.profit)), 1)
+                    const heightPct = Math.abs(d.profit) / maxAbs * 100
+                    const isPos = d.profit >= 0
+                    return (
+                      <div key={i} className="flex-1 flex flex-col items-center justify-end group relative h-full">
+                        <div
+                          style={{ height: `${Math.max(heightPct, 2)}%` }}
+                          className={`w-full rounded-sm transition-all ${isPos ? 'bg-green-500/60 group-hover:bg-green-400' : 'bg-red-500/60 group-hover:bg-red-400'}`}
+                        />
+                        <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-slate-800 border border-slate-700 rounded px-1.5 py-0.5 text-[9px] text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                          {d.date.slice(5)}: {isPos ? '+' : ''}${d.profit.toFixed(0)} ({d.trades} trades)
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+                <div className="flex justify-between mt-1">
+                  <span className="text-slate-600 text-[9px]">{analytics.dailyProfit[0]?.date.slice(5)}</span>
+                  <span className="text-slate-600 text-[9px]">{analytics.dailyProfit.at(-1)?.date.slice(5)}</span>
+                </div>
+              </Card>
+
+              {/* Top pairs + summary row */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+                <Card className="bg-slate-900 border-slate-800 p-5">
+                  <h4 className="text-white font-bold text-sm flex items-center gap-2 mb-3"><Layers className="w-4 h-4 text-amber-400" /> Top Trading Pairs</h4>
+                  {analytics.topPairs.length === 0 ? (
+                    <p className="text-slate-500 text-xs">No executed trades yet. Run the bot to generate data.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {analytics.topPairs.map((p, i) => (
+                        <div key={i} className="flex items-center justify-between py-2 border-b border-slate-800/60 last:border-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-slate-600 text-xs w-4">{i + 1}</span>
+                            <span className="text-white text-xs font-bold">{p.symbol}</span>
+                            <ExchangeBadge exchange={p.buyEx} />
+                            <ArrowRightLeft className="w-3 h-3 text-slate-600" />
+                            <ExchangeBadge exchange={p.sellEx} />
+                          </div>
+                          <div className="text-right">
+                            <p className={`text-xs font-bold ${p.totalProfit > 0 ? 'text-green-400' : 'text-slate-500'}`}>
+                              {p.totalProfit > 0 ? '+' : ''}${p.totalProfit.toFixed(2)}
+                            </p>
+                            <p className="text-slate-600 text-[10px]">{p.count} trades</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Card>
+
+                <Card className="bg-slate-900 border-slate-800 p-5 space-y-3">
+                  <h4 className="text-white font-bold text-sm flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-green-400" /> Risk Summary</h4>
+                  <div className="space-y-2">
+                    {[
+                      { label: 'Total Fees Paid',       value: `$${analytics.totalFeesUsd.toFixed(2)}`,        color: 'text-red-400'    },
+                      { label: 'Avg Transfer Time',     value: `${analytics.avgTransferTimeMin}m`,              color: 'text-slate-300'  },
+                      { label: 'Failed Trades',         value: analytics.failedTrades.toString(),              color: analytics.failedTrades > 0 ? 'text-red-400' : 'text-green-400' },
+                      { label: 'Max Drawdown',          value: `${analytics.maxDrawdownPct.toFixed(1)}%`,      color: analytics.maxDrawdownPct > 15 ? 'text-red-400' : 'text-amber-400' },
+                      { label: 'Sharpe Ratio',          value: analytics.sharpeRatio.toFixed(2),               color: analytics.sharpeRatio > 1 ? 'text-green-400' : 'text-amber-400' },
+                    ].map(r => (
+                      <div key={r.label} className="flex items-center justify-between">
+                        <span className="text-slate-400 text-xs">{r.label}</span>
+                        <span className={`text-xs font-bold ${r.color}`}>{r.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              </div>
+
+            </div>
+          )}
+
+          {!analytics && !loadingAnalytics && (
+            <Card className="bg-slate-900 border-slate-800 p-12 text-center">
+              <BarChart3 className="w-10 h-10 text-slate-700 mx-auto mb-3" />
+              <p className="text-slate-400 text-sm font-medium">Click Refresh to load analytics data</p>
+            </Card>
           )}
         </div>
       )}
