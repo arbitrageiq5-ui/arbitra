@@ -7,7 +7,14 @@ import { exchangeApiKeys, arbitrageConfig, exchangeTransferLogs, arbitrageOpport
 import { eq, desc } from 'drizzle-orm'
 import { getPricesAcrossExchanges, detectArbitrageOpportunities, ExchangePrice } from '@/lib/services/exchanges'
 // ─── Inline profit calculator (private — not exported, avoids 'use server' object export error) ───
-const _EXFEE: Record<string, number> = { binance:0.1,kraken:0.16,coinbase:0.6,bybit:0.1,kucoin:0.1,htx:0.2,bitfinex:0.2,okx:0.08,gateio:0.2,gemini:0.35,cryptocom:0.075,bitget:0.1,poloniex:0.14,mexc:0.0 }
+const _EXFEE: Record<string, number> = {
+  // Global
+  binance:0.1, okx:0.08, bybit:0.1, kucoin:0.1, kraken:0.16, coinbase:0.6,
+  htx:0.2, bitfinex:0.2, gateio:0.2, gemini:0.35, cryptocom:0.075, bitget:0.1,
+  mexc:0.0, phemex:0.1, bitstamp:0.3, poloniex:0.14, upbit:0.05, deribit:0.03,
+  // India
+  coindcx:0.2, coinswitch:0.25, wazirx:0.2, bitbns:0.25, zebpay:0.15,
+}
 const _WDFEE: Record<string,Record<string,number>> = { USDT:{binance:1.0,kucoin:1.0,bybit:1.0,okx:1.0,kraken:2.0,default:1.5},BTC:{binance:4.0,kucoin:3.5,bybit:4.0,okx:3.5,kraken:4.0,default:4.0},ETH:{binance:2.0,kucoin:1.8,bybit:2.0,okx:1.8,kraken:2.5,default:2.0},SOL:{binance:0.01,kucoin:0.02,bybit:0.01,okx:0.01,default:0.02},default:{default:2.0} }
 const _NETFEE: Record<string,number> = { TRC20:1.0,BEP20:0.5,ERC20:5.0,SOL:0.01,BTC:3.0,AVAX:0.5,XRP:0.01,default:2.0 }
 const _BESTNET: Record<string,string> = { USDT:'TRC20',BTC:'BTC',ETH:'ERC20',BNB:'BEP20',SOL:'SOL',XRP:'XRP',ADA:'BEP20',AVAX:'AVAX',default:'BEP20' }
@@ -110,24 +117,40 @@ export interface ExchangeApiKey {
   hasPassphrase: boolean
   permissions: string[]
   color: string
+  region: string
 }
 
 // ─── EXCHANGE API KEY MANAGEMENT ───────────────────────────────────────────
 
 const ALL_EXCHANGES = [
-  { exchange: 'binance',   label: 'Binance',     url: 'https://api.binance.com',           hasPassphrase: false, docsUrl: 'https://www.binance.com/en/my/settings/api-management',   docsLabel: 'Binance API Mgmt',    tradingFee: '0.10%', requiresIpWhitelist: true,  permissions: ['Read Info', 'Spot Trading', 'Withdrawals'], color: '#F0B90B' },
-  { exchange: 'kraken',    label: 'Kraken',      url: 'https://api.kraken.com',            hasPassphrase: false, docsUrl: 'https://www.kraken.com/u/security/api',                    docsLabel: 'Kraken API Settings', tradingFee: '0.16%', requiresIpWhitelist: false, permissions: ['Query Funds', 'Query Orders', 'Create Orders', 'Withdraw Funds'], color: '#5741D9' },
-  { exchange: 'coinbase',  label: 'Coinbase',    url: 'https://api.coinbase.com',          hasPassphrase: false, docsUrl: 'https://www.coinbase.com/settings/api',                    docsLabel: 'Coinbase API Keys',   tradingFee: '0.60%', requiresIpWhitelist: false, permissions: ['View', 'Trade', 'Transfer'], color: '#0052FF' },
-  { exchange: 'bybit',     label: 'Bybit',       url: 'https://api.bybit.com',             hasPassphrase: false, docsUrl: 'https://www.bybit.com/app/user/api-management',            docsLabel: 'Bybit API Mgmt',      tradingFee: '0.10%', requiresIpWhitelist: true,  permissions: ['Read-Write', 'Spot Trading', 'Wallet Transfer'], color: '#F7A600' },
-  { exchange: 'kucoin',    label: 'KuCoin',      url: 'https://api.kucoin.com',            hasPassphrase: true,  docsUrl: 'https://www.kucoin.com/account/api',                       docsLabel: 'KuCoin API Keys',     tradingFee: '0.10%', requiresIpWhitelist: false, permissions: ['General', 'Spot Trading', 'Margin Trading', 'Transfer'], color: '#23AF91' },
-  { exchange: 'htx',       label: 'HTX (Huobi)', url: 'https://api.huobi.pro',             hasPassphrase: false, docsUrl: 'https://www.htx.com/en-us/apikey/createKey/',              docsLabel: 'HTX API Center',      tradingFee: '0.20%', requiresIpWhitelist: true,  permissions: ['Read Only', 'Trade', 'Withdraw'], color: '#2F80ED' },
-  { exchange: 'bitfinex',  label: 'Bitfinex',    url: 'https://api.bitfinex.com',          hasPassphrase: false, docsUrl: 'https://setting.bitfinex.com/api',                         docsLabel: 'Bitfinex API Keys',   tradingFee: '0.20%', requiresIpWhitelist: false, permissions: ['Account Read', 'Orders', 'Wallets'], color: '#16B157' },
-  { exchange: 'okx',       label: 'OKX',         url: 'https://www.okx.com/api/v5',        hasPassphrase: true,  docsUrl: 'https://www.okx.com/account/my-api',                       docsLabel: 'OKX API Mgmt',        tradingFee: '0.08%', requiresIpWhitelist: true,  permissions: ['Read', 'Trade', 'Withdraw'], color: '#1677FF' },
-  { exchange: 'gateio',    label: 'Gate.io',     url: 'https://api.gateio.ws/api/v4',      hasPassphrase: false, docsUrl: 'https://www.gate.io/myaccount/apiv4keys',                  docsLabel: 'Gate.io API Keys',    tradingFee: '0.20%', requiresIpWhitelist: false, permissions: ['Spot Read', 'Spot Trade', 'Wallet'], color: '#FF6B00' },
-  { exchange: 'gemini',    label: 'Gemini',      url: 'https://api.gemini.com',            hasPassphrase: false, docsUrl: 'https://exchange.gemini.com/settings/api',                 docsLabel: 'Gemini API Settings', tradingFee: '0.35%', requiresIpWhitelist: false, permissions: ['Auditor', 'Trader', 'Fund Manager'], color: '#00DCFA' },
-  { exchange: 'cryptocom', label: 'Crypto.com',  url: 'https://api.crypto.com/v2',         hasPassphrase: false, docsUrl: 'https://crypto.com/exchange/personal/api-management',      docsLabel: 'Crypto.com API Mgmt', tradingFee: '0.075%',requiresIpWhitelist: false, permissions: ['Read', 'Trading', 'Wallet'], color: '#1199FA' },
-  { exchange: 'bitget',    label: 'Bitget',      url: 'https://api.bitget.com/v2',         hasPassphrase: true,  docsUrl: 'https://www.bitget.com/account/newapi',                    docsLabel: 'Bitget API Keys',     tradingFee: '0.10%', requiresIpWhitelist: false, permissions: ['Read Only', 'Spot Trade', 'Withdraw'], color: '#00CDD5' },
-  { exchange: 'coingecko', label: 'CoinGecko',   url: 'https://api.coingecko.com/api/v3',  hasPassphrase: false, docsUrl: 'https://www.coingecko.com/en/developers/dashboard',        docsLabel: 'CoinGecko API',       tradingFee: 'N/A',   requiresIpWhitelist: false, permissions: ['Public Data', 'Pro: Market Data', 'Pro: NFT Data'], color: '#8DC63F' },
+  // ── Global Tier-1 ──────────────────────────────────────────────────────────
+  { exchange: 'binance',    label: 'Binance',       url: 'https://api.binance.com',              hasPassphrase: false, docsUrl: 'https://www.binance.com/en/my/settings/api-management',        docsLabel: 'Binance API Mgmt',       tradingFee: '0.10%',  requiresIpWhitelist: true,  permissions: ['Read Info', 'Spot Trading', 'Withdrawals'],               color: '#F0B90B', region: 'Global'  },
+  { exchange: 'okx',        label: 'OKX',           url: 'https://www.okx.com/api/v5',           hasPassphrase: true,  docsUrl: 'https://www.okx.com/account/my-api',                           docsLabel: 'OKX API Mgmt',           tradingFee: '0.08%',  requiresIpWhitelist: true,  permissions: ['Read', 'Trade', 'Withdraw'],                              color: '#1677FF', region: 'Global'  },
+  { exchange: 'bybit',      label: 'Bybit',         url: 'https://api.bybit.com',                hasPassphrase: false, docsUrl: 'https://www.bybit.com/app/user/api-management',                docsLabel: 'Bybit API Mgmt',         tradingFee: '0.10%',  requiresIpWhitelist: true,  permissions: ['Read-Write', 'Spot Trading', 'Wallet Transfer'],          color: '#F7A600', region: 'Global'  },
+  { exchange: 'kucoin',     label: 'KuCoin',        url: 'https://api.kucoin.com',               hasPassphrase: true,  docsUrl: 'https://www.kucoin.com/account/api',                           docsLabel: 'KuCoin API Keys',        tradingFee: '0.10%',  requiresIpWhitelist: false, permissions: ['General', 'Spot Trading', 'Margin Trading', 'Transfer'],  color: '#23AF91', region: 'Global'  },
+  { exchange: 'kraken',     label: 'Kraken',        url: 'https://api.kraken.com',               hasPassphrase: false, docsUrl: 'https://www.kraken.com/u/security/api',                        docsLabel: 'Kraken API Settings',    tradingFee: '0.16%',  requiresIpWhitelist: false, permissions: ['Query Funds', 'Query Orders', 'Create Orders', 'Withdraw Funds'], color: '#5741D9', region: 'Global' },
+  { exchange: 'coinbase',   label: 'Coinbase',      url: 'https://api.coinbase.com',             hasPassphrase: false, docsUrl: 'https://www.coinbase.com/settings/api',                        docsLabel: 'Coinbase API Keys',      tradingFee: '0.60%',  requiresIpWhitelist: false, permissions: ['View', 'Trade', 'Transfer'],                              color: '#0052FF', region: 'Global'  },
+  { exchange: 'htx',        label: 'HTX (Huobi)',   url: 'https://api.huobi.pro',                hasPassphrase: false, docsUrl: 'https://www.htx.com/en-us/apikey/createKey/',                  docsLabel: 'HTX API Center',         tradingFee: '0.20%',  requiresIpWhitelist: true,  permissions: ['Read Only', 'Trade', 'Withdraw'],                         color: '#2F80ED', region: 'Global'  },
+  { exchange: 'bitfinex',   label: 'Bitfinex',      url: 'https://api.bitfinex.com',             hasPassphrase: false, docsUrl: 'https://setting.bitfinex.com/api',                             docsLabel: 'Bitfinex API Keys',      tradingFee: '0.20%',  requiresIpWhitelist: false, permissions: ['Account Read', 'Orders', 'Wallets'],                      color: '#16B157', region: 'Global'  },
+  { exchange: 'gateio',     label: 'Gate.io',       url: 'https://api.gateio.ws/api/v4',         hasPassphrase: false, docsUrl: 'https://www.gate.io/myaccount/apiv4keys',                      docsLabel: 'Gate.io API Keys',       tradingFee: '0.20%',  requiresIpWhitelist: false, permissions: ['Spot Read', 'Spot Trade', 'Wallet'],                      color: '#FF6B00', region: 'Global'  },
+  { exchange: 'gemini',     label: 'Gemini',        url: 'https://api.gemini.com',               hasPassphrase: false, docsUrl: 'https://exchange.gemini.com/settings/api',                     docsLabel: 'Gemini API Settings',    tradingFee: '0.35%',  requiresIpWhitelist: false, permissions: ['Auditor', 'Trader', 'Fund Manager'],                      color: '#00DCFA', region: 'Global'  },
+  { exchange: 'cryptocom',  label: 'Crypto.com',    url: 'https://api.crypto.com/v2',            hasPassphrase: false, docsUrl: 'https://crypto.com/exchange/personal/api-management',          docsLabel: 'Crypto.com API Mgmt',    tradingFee: '0.075%', requiresIpWhitelist: false, permissions: ['Read', 'Trading', 'Wallet'],                              color: '#1199FA', region: 'Global'  },
+  { exchange: 'bitget',     label: 'Bitget',        url: 'https://api.bitget.com/v2',            hasPassphrase: true,  docsUrl: 'https://www.bitget.com/account/newapi',                        docsLabel: 'Bitget API Keys',        tradingFee: '0.10%',  requiresIpWhitelist: false, permissions: ['Read Only', 'Spot Trade', 'Withdraw'],                    color: '#00CDD5', region: 'Global'  },
+  { exchange: 'mexc',       label: 'MEXC',          url: 'https://api.mexc.com',                 hasPassphrase: false, docsUrl: 'https://www.mexc.com/user/openapi',                            docsLabel: 'MEXC API Keys',          tradingFee: '0.00%',  requiresIpWhitelist: false, permissions: ['Account Read', 'Spot Trade', 'Withdraw'],                 color: '#00B4D8', region: 'Global'  },
+  { exchange: 'phemex',     label: 'Phemex',        url: 'https://api.phemex.com',               hasPassphrase: false, docsUrl: 'https://phemex.com/user-center/apikey',                        docsLabel: 'Phemex API Keys',        tradingFee: '0.10%',  requiresIpWhitelist: false, permissions: ['Account Read', 'Trading', 'Asset Management'],            color: '#6C63FF', region: 'Global'  },
+  { exchange: 'bitstamp',   label: 'Bitstamp',      url: 'https://www.bitstamp.net/api/v2',      hasPassphrase: false, docsUrl: 'https://www.bitstamp.net/account/security/api/',               docsLabel: 'Bitstamp API Keys',      tradingFee: '0.30%',  requiresIpWhitelist: false, permissions: ['Account Balance', 'User Transactions', 'Open Orders', 'Withdraw'], color: '#E83B2D', region: 'Global' },
+  { exchange: 'poloniex',   label: 'Poloniex',      url: 'https://api.poloniex.com',             hasPassphrase: false, docsUrl: 'https://poloniex.com/apiKeys',                                 docsLabel: 'Poloniex API Keys',      tradingFee: '0.14%',  requiresIpWhitelist: false, permissions: ['Read', 'Trade', 'Withdraw'],                              color: '#3CC29E', region: 'Global'  },
+  { exchange: 'upbit',      label: 'Upbit',         url: 'https://api.upbit.com',                hasPassphrase: false, docsUrl: 'https://upbit.com/mypage/open_api_info',                       docsLabel: 'Upbit Open API',         tradingFee: '0.05%',  requiresIpWhitelist: true,  permissions: ['Asset Read', 'Order Read', 'Order Write', 'Withdraw'],    color: '#005BEA', region: 'Korea'   },
+  { exchange: 'deribit',    label: 'Deribit',       url: 'https://www.deribit.com/api/v2',       hasPassphrase: false, docsUrl: 'https://www.deribit.com/account/BTC/API',                      docsLabel: 'Deribit API Keys',       tradingFee: '0.03%',  requiresIpWhitelist: false, permissions: ['Account Read', 'Trade', 'Wallet'],                        color: '#F4821E', region: 'Global'  },
+  // ── India-focused ──────────────────────────────────────────────────────────
+  { exchange: 'coindcx',    label: 'CoinDCX',       url: 'https://api.coindcx.com',              hasPassphrase: false, docsUrl: 'https://coindcx.com/trade/api',                                docsLabel: 'CoinDCX API',            tradingFee: '0.20%',  requiresIpWhitelist: false, permissions: ['User Info', 'Trade', 'Balances', 'Withdraw'],             color: '#1347D5', region: 'India'   },
+  { exchange: 'coinswitch', label: 'CoinSwitch',    url: 'https://coinswitch.co/api',            hasPassphrase: false, docsUrl: 'https://coinswitch.co/pro/api',                                docsLabel: 'CoinSwitch Pro API',     tradingFee: '0.25%',  requiresIpWhitelist: false, permissions: ['Portfolio', 'Orders', 'Withdraw'],                        color: '#7B2FF7', region: 'India'   },
+  { exchange: 'wazirx',     label: 'WazirX',        url: 'https://api.wazirx.com/sapi/v1',       hasPassphrase: false, docsUrl: 'https://wazirx.com/settings/keys',                             docsLabel: 'WazirX API Keys',        tradingFee: '0.20%',  requiresIpWhitelist: false, permissions: ['User Data', 'Trading', 'Withdrawal'],                     color: '#3CC8C8', region: 'India'   },
+  { exchange: 'bitbns',     label: 'BitBns',        url: 'https://bitbns.com/order',             hasPassphrase: false, docsUrl: 'https://bitbns.com/api-trade/',                                docsLabel: 'BitBns API Docs',        tradingFee: '0.25%',  requiresIpWhitelist: false, permissions: ['Balance', 'Orders', 'Deposit/Withdraw'],                  color: '#F7931A', region: 'India'   },
+  { exchange: 'zebpay',     label: 'ZebPay',        url: 'https://api.zebpay.com',               hasPassphrase: false, docsUrl: 'https://zebpay.com/api',                                       docsLabel: 'ZebPay API',             tradingFee: '0.15%',  requiresIpWhitelist: false, permissions: ['Trade', 'Wallet', 'Withdraw'],                            color: '#1B88F4', region: 'India'   },
+  // ── Data / Reference ───────────────────────────────────────────────────────
+  { exchange: 'coingecko',  label: 'CoinGecko',     url: 'https://api.coingecko.com/api/v3',     hasPassphrase: false, docsUrl: 'https://www.coingecko.com/en/developers/dashboard',            docsLabel: 'CoinGecko API',          tradingFee: 'N/A',    requiresIpWhitelist: false, permissions: ['Public Data', 'Pro: Market Data', 'Pro: NFT Data'],       color: '#8DC63F', region: 'Data'    },
+  { exchange: 'coinmarketcap', label: 'CoinMarketCap', url: 'https://pro-api.coinmarketcap.com', hasPassphrase: false, docsUrl: 'https://coinmarketcap.com/api/',                               docsLabel: 'CMC API Keys',           tradingFee: 'N/A',    requiresIpWhitelist: false, permissions: ['Quotes', 'Historical Data', 'Listings'],                  color: '#17C784', region: 'Data'    },
 ]
 
 export async function getExchangeApiKeys(): Promise<ExchangeApiKey[]> {
@@ -157,6 +180,7 @@ export async function getExchangeApiKeys(): Promise<ExchangeApiKey[]> {
       hasPassphrase: ex.hasPassphrase,
       permissions: ex.permissions,
       color: ex.color,
+      region: ex.region,
     }
   })
 }
@@ -518,7 +542,7 @@ export async function getSavedAiStrategy(): Promise<AiArbitrageStrategy | null> 
   return row[0].configValue as unknown as AiArbitrageStrategy
 }
 
-// ─── TRANSFER ROUTES ────────────────────────────────────────────────────────
+// ─── TRANSFER ROUTES ────────────────────────��───────────────────────────────
 
 export async function getTransferRoutes(
   fromExchange: string,

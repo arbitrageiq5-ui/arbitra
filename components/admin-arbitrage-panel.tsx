@@ -37,26 +37,47 @@ const SCAN_SYMBOLS = [
 ]
 
 const EXCHANGE_COLORS: Record<string, string> = {
-  binance:   'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
-  kraken:    'bg-purple-500/20 text-purple-300 border-purple-500/30',
-  coinbase:  'bg-blue-500/20 text-blue-300 border-blue-500/30',
-  bybit:     'bg-orange-500/20 text-orange-300 border-orange-500/30',
-  kucoin:    'bg-green-500/20 text-green-300 border-green-500/30',
-  htx:       'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
-  bitfinex:  'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
-  okx:       'bg-slate-500/20 text-slate-300 border-slate-600',
-  gateio:    'bg-red-500/20 text-red-300 border-red-500/30',
-  gemini:    'bg-sky-500/20 text-sky-300 border-sky-500/30',
-  cryptocom: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
-  bitget:    'bg-teal-500/20 text-teal-300 border-teal-500/30',
-  coingecko: 'bg-lime-500/20 text-lime-300 border-lime-500/30',
+  // Global Tier-1
+  binance:       'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
+  okx:           'bg-blue-500/20 text-blue-300 border-blue-500/30',
+  bybit:         'bg-orange-500/20 text-orange-300 border-orange-500/30',
+  kucoin:        'bg-green-500/20 text-green-300 border-green-500/30',
+  kraken:        'bg-purple-500/20 text-purple-300 border-purple-500/30',
+  coinbase:      'bg-sky-500/20 text-sky-300 border-sky-500/30',
+  htx:           'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
+  bitfinex:      'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+  gateio:        'bg-red-500/20 text-red-300 border-red-500/30',
+  gemini:        'bg-teal-500/20 text-teal-300 border-teal-500/30',
+  cryptocom:     'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
+  bitget:        'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
+  mexc:          'bg-blue-400/20 text-blue-200 border-blue-400/30',
+  phemex:        'bg-violet-500/20 text-violet-300 border-violet-500/30',
+  bitstamp:      'bg-rose-500/20 text-rose-300 border-rose-500/30',
+  poloniex:      'bg-teal-400/20 text-teal-200 border-teal-400/30',
+  upbit:         'bg-blue-600/20 text-blue-300 border-blue-600/30',
+  deribit:       'bg-orange-400/20 text-orange-200 border-orange-400/30',
+  // India
+  coindcx:       'bg-blue-700/20 text-blue-300 border-blue-700/30',
+  coinswitch:    'bg-purple-600/20 text-purple-300 border-purple-600/30',
+  wazirx:        'bg-cyan-600/20 text-cyan-300 border-cyan-600/30',
+  bitbns:        'bg-amber-500/20 text-amber-300 border-amber-500/30',
+  zebpay:        'bg-sky-600/20 text-sky-300 border-sky-600/30',
+  // Data
+  coingecko:     'bg-lime-500/20 text-lime-300 border-lime-500/30',
+  coinmarketcap: 'bg-green-400/20 text-green-200 border-green-400/30',
 }
 
 const EXCHANGE_ABBR: Record<string, string> = {
-  binance: 'BN', kraken: 'KR', coinbase: 'CB', bybit: 'BB',
-  kucoin: 'KC', htx: 'HT', bitfinex: 'BFX', okx: 'OKX',
+  // Global
+  binance: 'BN', okx: 'OKX', bybit: 'BB', kucoin: 'KC',
+  kraken: 'KR', coinbase: 'CB', htx: 'HT', bitfinex: 'BFX',
   gateio: 'GT', gemini: 'GM', cryptocom: 'CDC', bitget: 'BG',
-  coingecko: 'CG',
+  mexc: 'MX', phemex: 'PH', bitstamp: 'BS', poloniex: 'PX',
+  upbit: 'UP', deribit: 'DR',
+  // India
+  coindcx: 'DCX', coinswitch: 'CSW', wazirx: 'WRX', bitbns: 'BNS', zebpay: 'ZBP',
+  // Data
+  coingecko: 'CG', coinmarketcap: 'CMC',
 }
 
 // ── Shared small components ───────────────────────────────────────────────────
@@ -134,6 +155,8 @@ export default function AdminArbitragePanel() {
   const [deletingExchange, setDeletingExchange] = useState<string | null>(null)
   const [confirmDeleteExchange, setConfirmDeleteExchange] = useState<string | null>(null)
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({})
+  const [regionFilter, setRegionFilter] = useState<string>('All')
+  const [searchExchange, setSearchExchange] = useState('')
 
   // AI strategy
   const [aiStrategy, setAiStrategy] = useState<AiArbitrageStrategy | null>(null)
@@ -542,7 +565,7 @@ export default function AdminArbitragePanel() {
         ))}
       </div>
 
-      {/* ══ LIVE SCAN TAB ══════════════════════════════════════════════════ */}
+      {/* ══ LIVE SCAN TAB ════════════��═════════════════════════════════════ */}
       {subTab === 'live-scan' && (
         <div className="space-y-4">
 
@@ -1415,9 +1438,61 @@ export default function AdminArbitragePanel() {
                 })()}
               </div>
 
-              {/* Exchanges grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {apiKeys.map(ex => {
+              {/* Search + Region Filter bar */}
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="relative flex-1 min-w-[180px]">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
+                  <input
+                    value={searchExchange}
+                    onChange={e => setSearchExchange(e.target.value)}
+                    placeholder="Search exchange..."
+                    className="w-full pl-8 pr-3 py-2 bg-slate-800 border border-slate-700 text-white text-xs rounded-lg focus:outline-none focus:border-slate-500"
+                  />
+                </div>
+                {['All', 'Global', 'India', 'Korea', 'Data'].map(r => (
+                  <button key={r} onClick={() => setRegionFilter(r)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                      regionFilter === r
+                        ? 'bg-cyan-500/20 border-cyan-500/40 text-cyan-300'
+                        : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'
+                    }`}>
+                    {r}
+                  </button>
+                ))}
+                <span className="text-slate-600 text-xs ml-auto">
+                  {apiKeys.filter(k =>
+                    (regionFilter === 'All' || k.region === regionFilter) &&
+                    (searchExchange === '' || k.label.toLowerCase().includes(searchExchange.toLowerCase()) || k.exchange.includes(searchExchange.toLowerCase()))
+                  ).length} exchanges
+                </span>
+              </div>
+
+              {/* Exchanges grid — grouped by region */}
+              <div className="space-y-6">
+              {(() => {
+                const regions = regionFilter === 'All'
+                  ? ['Global', 'India', 'Korea', 'Data']
+                  : [regionFilter]
+                const filtered = apiKeys.filter(k =>
+                  (regionFilter === 'All' || k.region === regionFilter) &&
+                  (searchExchange === '' || k.label.toLowerCase().includes(searchExchange.toLowerCase()) || k.exchange.includes(searchExchange.toLowerCase()))
+                )
+                if (filtered.length === 0) return (
+                  <div className="text-center text-slate-500 py-10 text-sm">No exchanges match your filter.</div>
+                )
+                return regions.map(region => {
+                  const group = filtered.filter(k => k.region === region)
+                  if (group.length === 0) return null
+                  const REGION_LABELS: Record<string, string> = { Global: 'Global Exchanges', India: 'India Exchanges', Korea: 'Korea Exchanges', Data: 'Data & Reference APIs' }
+                  return (
+                    <div key={region} className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">{REGION_LABELS[region] ?? region}</span>
+                        <div className="flex-1 h-px bg-slate-800" />
+                        <span className="text-[10px] text-slate-600">{group.filter(k => k.apiKey).length}/{group.length} configured</span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {group.map(ex => {
                   const keyResult  = testResults[ex.exchange]
                   const liveStatus = keyResult ?? (ex.lastTestStatus ? { ok: ex.lastTestStatus === 'ok', latencyMs: ex.lastTestMs ?? 0, message: '' } : null)
                   const hasKeys    = !!ex.apiKey
@@ -1596,7 +1671,10 @@ export default function AdminArbitragePanel() {
                   )
                 })}
               </div>
-            </>
+            </div>
+          )
+        })}
+          </>
           )}
 
           {/* Configure modal */}
@@ -1978,7 +2056,7 @@ export default function AdminArbitragePanel() {
         </div>
       )}
 
-      {/* ══ AI AUTO SETUP TAB ══════════════════════════════════════════════ */}
+      {/* ══ AI AUTO SETUP TAB ════════════════════════════════════════��═════ */}
       {subTab === 'ai-strategy' && (
         <div className="space-y-4">
 

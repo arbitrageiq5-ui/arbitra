@@ -17,15 +17,29 @@ import {
 // ─── Exchange helpers ─────────────────────────────────────────────────────────
 
 const EX_ABBR: Record<string, string> = {
-  binance:'BN', kraken:'KR', coinbase:'CB', bybit:'BB', kucoin:'KC',
-  htx:'HT', bitfinex:'BFX', okx:'OKX', gateio:'GT', gemini:'GM',
-  cryptocom:'CDC', bitget:'BG',
+  // Global
+  binance:'BN', okx:'OKX', bybit:'BB', kucoin:'KC', kraken:'KR',
+  coinbase:'CB', htx:'HT', bitfinex:'BFX', gateio:'GT', gemini:'GM',
+  cryptocom:'CDC', bitget:'BG', mexc:'MX', phemex:'PH', bitstamp:'BS',
+  poloniex:'PX', upbit:'UP', deribit:'DR',
+  // India
+  coindcx:'DCX', coinswitch:'CSW', wazirx:'WRX', bitbns:'BNS', zebpay:'ZBP',
+  // Data
+  coingecko:'CG', coinmarketcap:'CMC',
 }
 const EX_COLOR: Record<string, string> = {
-  binance:'text-yellow-400', kraken:'text-purple-400', coinbase:'text-blue-400',
-  bybit:'text-orange-400', kucoin:'text-green-400', htx:'text-cyan-400',
-  bitfinex:'text-emerald-400', okx:'text-slate-300', gateio:'text-red-400',
-  gemini:'text-sky-400', cryptocom:'text-indigo-400', bitget:'text-teal-400',
+  // Global
+  binance:'text-yellow-400', okx:'text-blue-400', bybit:'text-orange-400',
+  kucoin:'text-green-400', kraken:'text-purple-400', coinbase:'text-sky-400',
+  htx:'text-cyan-400', bitfinex:'text-emerald-400', gateio:'text-red-400',
+  gemini:'text-teal-400', cryptocom:'text-indigo-400', bitget:'text-cyan-300',
+  mexc:'text-blue-300', phemex:'text-violet-400', bitstamp:'text-rose-400',
+  poloniex:'text-teal-300', upbit:'text-blue-400', deribit:'text-orange-300',
+  // India
+  coindcx:'text-blue-300', coinswitch:'text-purple-400', wazirx:'text-cyan-400',
+  bitbns:'text-amber-400', zebpay:'text-sky-400',
+  // Data
+  coingecko:'text-lime-400', coinmarketcap:'text-green-400',
 }
 
 function ExBadge({ exchange }: { exchange: string }) {
