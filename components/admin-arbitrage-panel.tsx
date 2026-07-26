@@ -699,17 +699,34 @@ export default function AdminArbitragePanel() {
                 <select value={filterBuyEx} onChange={e => setFilterBuyEx(e.target.value)}
                   className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-amber-500/50">
                   <option value="">All exchanges</option>
-                  <option value="binance">Binance</option>
-                  <option value="okx">OKX</option>
-                  <option value="bybit">Bybit</option>
-                  <option value="kucoin">KuCoin</option>
-                  <option value="kraken">Kraken</option>
-                  <option value="coinbase">Coinbase</option>
-                  <option value="gateio">Gate.io</option>
-                  <option value="bitfinex">Bitfinex</option>
-                  <option value="coinswitch">CoinSwitch</option>
-                  <option value="delta">Delta</option>
-                  <option value="wazirx">WazirX</option>
+                  <optgroup label="Global Exchanges">
+                    <option value="binance">Binance (BN)</option>
+                    <option value="okx">OKX (OKX)</option>
+                    <option value="bybit">Bybit (BB)</option>
+                    <option value="kucoin">KuCoin (KC)</option>
+                    <option value="kraken">Kraken (KR)</option>
+                    <option value="coinbase">Coinbase (CB)</option>
+                    <option value="htx">HTX (HT)</option>
+                    <option value="bitfinex">Bitfinex (BFX)</option>
+                    <option value="gateio">Gate.io (GT)</option>
+                    <option value="gemini">Gemini (GM)</option>
+                    <option value="cryptocom">Crypto.com (CDC)</option>
+                    <option value="bitget">Bitget (BG)</option>
+                    <option value="mexc">MEXC (MX)</option>
+                    <option value="phemex">Phemex (PH)</option>
+                    <option value="poloniex">Poloniex (PX)</option>
+                    <option value="bingx">BingX (BX)</option>
+                    <option value="lbank">LBank (LB)</option>
+                  </optgroup>
+                  <optgroup label="India Exchanges">
+                    <option value="coindcx">CoinDCX (DCX)</option>
+                    <option value="coinswitch">CoinSwitch (CSW)</option>
+                    <option value="wazirx">WazirX (WRX)</option>
+                    <option value="bitbns">BitBns (BNS)</option>
+                    <option value="zebpay">ZebPay (ZBP)</option>
+                    <option value="delta">Delta Exchange (DEL)</option>
+                    <option value="mudrex">Mudrex (MUX)</option>
+                  </optgroup>
                 </select>
               </div>
               <div>
@@ -717,17 +734,34 @@ export default function AdminArbitragePanel() {
                 <select value={filterSellEx} onChange={e => setFilterSellEx(e.target.value)}
                   className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-amber-500/50">
                   <option value="">All exchanges</option>
-                  <option value="binance">Binance</option>
-                  <option value="okx">OKX</option>
-                  <option value="bybit">Bybit</option>
-                  <option value="kucoin">KuCoin</option>
-                  <option value="kraken">Kraken</option>
-                  <option value="coinbase">Coinbase</option>
-                  <option value="gateio">Gate.io</option>
-                  <option value="bitfinex">Bitfinex</option>
-                  <option value="coinswitch">CoinSwitch</option>
-                  <option value="delta">Delta</option>
-                  <option value="wazirx">WazirX</option>
+                  <optgroup label="Global Exchanges">
+                    <option value="binance">Binance (BN)</option>
+                    <option value="okx">OKX (OKX)</option>
+                    <option value="bybit">Bybit (BB)</option>
+                    <option value="kucoin">KuCoin (KC)</option>
+                    <option value="kraken">Kraken (KR)</option>
+                    <option value="coinbase">Coinbase (CB)</option>
+                    <option value="htx">HTX (HT)</option>
+                    <option value="bitfinex">Bitfinex (BFX)</option>
+                    <option value="gateio">Gate.io (GT)</option>
+                    <option value="gemini">Gemini (GM)</option>
+                    <option value="cryptocom">Crypto.com (CDC)</option>
+                    <option value="bitget">Bitget (BG)</option>
+                    <option value="mexc">MEXC (MX)</option>
+                    <option value="phemex">Phemex (PH)</option>
+                    <option value="poloniex">Poloniex (PX)</option>
+                    <option value="bingx">BingX (BX)</option>
+                    <option value="lbank">LBank (LB)</option>
+                  </optgroup>
+                  <optgroup label="India Exchanges">
+                    <option value="coindcx">CoinDCX (DCX)</option>
+                    <option value="coinswitch">CoinSwitch (CSW)</option>
+                    <option value="wazirx">WazirX (WRX)</option>
+                    <option value="bitbns">BitBns (BNS)</option>
+                    <option value="zebpay">ZebPay (ZBP)</option>
+                    <option value="delta">Delta Exchange (DEL)</option>
+                    <option value="mudrex">Mudrex (MUX)</option>
+                  </optgroup>
                 </select>
               </div>
               <div>
