@@ -45,17 +45,14 @@ export async function creditIncomeCommission(
     const pct = INCOME_COMMISSION_RATES[level]
     const commissionAmount = (incomeAmount * pct) / 100
 
-    await db.insert(referralIncomeCommissions).values({
-      userId:        referrerId,
-      fromUserId:    earnerUserId,
-      level,
-      sourceType,
-      incomeAmount:  incomeAmount.toFixed(8),
-      commissionPct: pct.toFixed(4),
-      amount:        commissionAmount.toFixed(8),
-      refId:         refId ?? null,
-      status:        'paid',
-    })
+    await db.execute(
+      sql`INSERT INTO referral_income_commissions
+            ("userId", "fromUserId", level, source_type, income_amount, commission_pct, amount, ref_id, status)
+          VALUES
+            (${referrerId}, ${earnerUserId}, ${level}, ${sourceType},
+             ${incomeAmount.toFixed(8)}, ${pct.toFixed(4)}, ${commissionAmount.toFixed(8)},
+             ${refId ?? null}, 'paid')`
+    )
 
     currentUserId = referrerId
   }
@@ -158,37 +155,48 @@ export async function getMyReferralData() {
     .where(eq(user.referredBy, session.user.id))
     .orderBy(desc(user.createdAt))
 
-  // Income commissions (bot + auto-trade %)
-  const incomeCommissionsRaw = await db
-    .select({
-      id:            referralIncomeCommissions.id,
-      level:         referralIncomeCommissions.level,
-      sourceType:    referralIncomeCommissions.sourceType,
-      incomeAmount:  referralIncomeCommissions.incomeAmount,
-      commissionPct: referralIncomeCommissions.commissionPct,
-      amount:        referralIncomeCommissions.amount,
-      status:        referralIncomeCommissions.status,
-      createdAt:     referralIncomeCommissions.createdAt,
-      fromUserName:  user.name,
-      fromUserEmail: user.email,
+  // Income commissions (bot + auto-trade %) — raw SQL to avoid quoted column name issues
+  let incomeCommissions: {
+    id: number
+    level: number
+    sourceType: string
+    incomeAmount: string
+    commissionPct: string
+    amount: string
+    status: string
+    createdAt: Date
+    fromUser: { name: string | null; email: string | null }
+  }[] = []
+  try {
+    const icRows = await db.execute(
+      sql`SELECT ric.id, ric.level, ric.source_type AS "sourceType",
+             ric.income_amount AS "incomeAmount", ric.commission_pct AS "commissionPct",
+             ric.amount, ric.status, ric."createdAt",
+             u.name AS "fromUserName", u.email AS "fromUserEmail"
+          FROM referral_income_commissions ric
+          LEFT JOIN "user" u ON u.id = ric."fromUserId"
+          WHERE ric."userId" = ${session.user.id}
+          ORDER BY ric."createdAt" DESC`
+    )
+    const rows: unknown[] = (icRows as { rows?: unknown[] }).rows ?? ((icRows as unknown) as unknown[])
+    incomeCommissions = rows.map((ic) => {
+      const r = ic as Record<string, unknown>
+      return {
+        id: r.id as number,
+        level: r.level as number,
+        sourceType: r.sourceType as string,
+        incomeAmount: r.incomeAmount as string,
+        commissionPct: r.commissionPct as string,
+        amount: r.amount as string,
+        status: r.status as string,
+        createdAt: r.createdAt as Date,
+        fromUser: { name: r.fromUserName as string | null, email: r.fromUserEmail as string | null },
+      }
     })
-    .from(referralIncomeCommissions)
-    .leftJoin(user, eq(referralIncomeCommissions.fromUserId, user.id))
-    .where(eq(referralIncomeCommissions.userId, session.user.id))
-    .orderBy(desc(referralIncomeCommissions.createdAt))
-
-  // Reshape to match expected interface
-  const incomeCommissions = incomeCommissionsRaw.map(ic => ({
-    id: ic.id,
-    level: ic.level,
-    sourceType: ic.sourceType,
-    incomeAmount: ic.incomeAmount,
-    commissionPct: ic.commissionPct,
-    amount: ic.amount,
-    status: ic.status,
-    createdAt: ic.createdAt,
-    fromUser: { name: ic.fromUserName, email: ic.fromUserEmail },
-  }))
+  } catch {
+    // Table may not exist yet or columns differ — return empty array
+    incomeCommissions = []
+  }
 
   // Commission summary (activation flat fees)
   const totalEarned = commissions

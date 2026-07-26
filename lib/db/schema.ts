@@ -403,14 +403,14 @@ export const arbitrageConfig = pgTable('arbitrage_config', {
 
 export const referralIncomeCommissions = pgTable('referral_income_commissions', {
   id:            serial('id').primaryKey(),
-  userId:        text('"userId"').notNull().references(() => user.id, { onDelete: 'cascade' }),   // earner
-  fromUserId:    text('"fromUserId"').notNull().references(() => user.id, { onDelete: 'cascade' }), // whose profit triggered it
-  level:         integer('level').notNull(),                   // 1 | 2 | 3
-  sourceType:    text('source_type').notNull(),                // 'bot' | 'auto_trade'
-  incomeAmount:  decimal('income_amount', { precision: 18, scale: 8 }).notNull(),  // gross profit of the earner
-  commissionPct: decimal('commission_pct', { precision: 6, scale: 4 }).notNull(), // 0.50 | 0.25 | 0.20
-  amount:        decimal('amount', { precision: 18, scale: 8 }).notNull(),          // actual payout
-  refId:         text('ref_id'),                               // optional source record id
+  userId:        text('userId').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  fromUserId:    text('fromUserId').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  level:         integer('level').notNull(),
+  sourceType:    text('source_type').notNull(),
+  incomeAmount:  decimal('income_amount', { precision: 18, scale: 8 }).notNull(),
+  commissionPct: decimal('commission_pct', { precision: 6, scale: 4 }).notNull(),
+  amount:        decimal('amount', { precision: 18, scale: 8 }).notNull(),
+  refId:         text('ref_id'),
   status:        text('status').notNull().default('paid'),
   createdAt:     timestamp('createdAt').notNull().defaultNow(),
 })

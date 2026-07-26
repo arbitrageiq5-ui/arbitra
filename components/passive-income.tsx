@@ -67,6 +67,7 @@ const LEVEL_COLORS: Record<number, { bg: string; text: string; border: string; l
 export function PassiveIncome() {
   const [data, setData] = useState<ReferralData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [copiedLink, setCopiedLink] = useState(false)
   const [showTxInput, setShowTxInput] = useState(false)
@@ -89,11 +90,15 @@ export function PassiveIncome() {
 
   const load = useCallback(async () => {
     setLoading(true)
+    setLoadError(null)
     try {
       const d = await getMyReferralData()
       setData(d as ReferralData)
-    } catch { /* ignore */ }
-    finally { setLoading(false) }
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : 'Failed to load passive income data')
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
   useEffect(() => { load() }, [load])
@@ -134,6 +139,26 @@ export function PassiveIncome() {
         {[...Array(3)].map((_, i) => (
           <div key={i} className="h-32 rounded-xl bg-slate-800/50" />
         ))}
+      </div>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 gap-4">
+        <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+          <XCircle className="w-6 h-6 text-red-400" />
+        </div>
+        <div className="text-center">
+          <p className="text-white font-semibold text-sm mb-1">Could not load Passive Income</p>
+          <p className="text-slate-500 text-xs max-w-xs">{loadError}</p>
+        </div>
+        <button
+          onClick={load}
+          className="mt-1 px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-colors border border-slate-700"
+        >
+          Retry
+        </button>
       </div>
     )
   }
