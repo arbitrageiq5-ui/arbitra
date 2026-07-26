@@ -164,7 +164,7 @@ export function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
 
       // Redirect immediately using the role from the signIn response
       const role = (signInData?.user as unknown as { role?: string })?.role ?? 'viewer'
-      const dest = role === 'admin' ? '/admin' : role === 'trader' ? '/trader' : '/viewer'
+      const dest = role === 'admin' ? '/admin' : role === 'protrader' ? '/protrader' : role === 'trader' ? '/trader' : '/viewer'
       window.location.href = dest
       return
     }
@@ -174,7 +174,7 @@ export function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
     // Sign-up flow: get session then redirect
     const session = await authClient.getSession()
     const role = (session?.data?.user as unknown as { role?: string })?.role ?? 'viewer'
-    const dest = role === 'admin' ? '/admin' : role === 'trader' ? '/trader' : '/viewer'
+    const dest = role === 'admin' ? '/admin' : role === 'protrader' ? '/protrader' : role === 'trader' ? '/trader' : '/viewer'
     window.location.href = dest
   }
 

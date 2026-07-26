@@ -18,6 +18,7 @@ export default async function ViewerPage() {
 
   const role = (session.user as unknown as { role?: string }).role ?? 'viewer'
   if (role === 'admin') redirect('/admin')
+  if (role === 'protrader') redirect('/protrader')
   if (role === 'trader') redirect('/trader')
 
   const [dbUser] = await db

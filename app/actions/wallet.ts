@@ -260,7 +260,7 @@ export async function getAllTraderBalances() {
   const traders = await db
     .select({ id: user.id, name: user.name, email: user.email, isActivated: user.isActivated, createdAt: user.createdAt })
     .from(user)
-    .where(eq(user.role, 'trader'))
+    .where(sql`role IN ('trader', 'protrader')`)
 
   const results = await Promise.all(
     traders.map(async (t) => {

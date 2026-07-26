@@ -18,6 +18,7 @@ export default async function TraderPage() {
 
   const role = (session.user as unknown as { role?: string }).role ?? 'viewer'
   if (role === 'admin') redirect('/admin')
+  if (role === 'protrader') redirect('/protrader')
   if (role === 'viewer') redirect('/opportunities')
 
   // Fetch fresh isActivated directly from DB — the session object does not

@@ -61,9 +61,10 @@ const NETWORK_META: Record<Network, { color: string; bg: string; border: string;
 }
 
 const ROLE_BADGE: Record<string, string> = {
-  admin:  'bg-red-500/10 text-red-400 border border-red-500/20',
-  trader: 'bg-amber-500/10 text-amber-400 border border-amber-500/20',
-  viewer: 'bg-slate-700 text-slate-400 border border-slate-600',
+  admin:     'bg-red-500/10 text-red-400 border border-red-500/20',
+  protrader: 'bg-violet-500/10 text-violet-400 border border-violet-500/20',
+  trader:    'bg-amber-500/10 text-amber-400 border border-amber-500/20',
+  viewer:    'bg-slate-700 text-slate-400 border border-slate-600',
 }
 
 const STATUS_META = {
@@ -408,7 +409,7 @@ export default function AdminClient() {
   const activeAddressNetworks = addresses.filter(a => a.isActive).map(a => a.network)
 
   // Summary stats
-  const traderCount = users.filter(u => u.role === 'trader').length
+  const traderCount = users.filter(u => u.role === 'trader' || u.role === 'protrader').length
   const confirmedFunds = fundRequests.filter(r => r.status === 'confirmed').reduce((s, r) => s + parseFloat(r.amount), 0)
 
   return (
@@ -567,6 +568,7 @@ export default function AdminClient() {
                               >
                                 <option value="viewer">Viewer</option>
                                 <option value="trader">Trader</option>
+                                <option value="protrader">Pro Trader</option>
                                 <option value="admin">Admin</option>
                               </select>
                               <ChevronDown className="absolute right-1 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-500 pointer-events-none" />
@@ -844,7 +846,7 @@ export default function AdminClient() {
                 <div className="flex items-center gap-2">
                   <Button
                     size="sm"
-                    onClick={() => { setShowCreatePlan(true); setPlanTargetUserId(users.find(u => u.role === 'trader')?.id ?? '') }}
+                    onClick={() => { setShowCreatePlan(true); setPlanTargetUserId(users.find(u => u.role === 'trader' || u.role === 'protrader')?.id ?? '') }}
                     className="bg-amber-600 hover:bg-amber-700 text-black font-semibold gap-2 h-8 text-xs"
                   >
                     <Plus className="w-3.5 h-3.5" />
@@ -1566,7 +1568,7 @@ export default function AdminClient() {
                   className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-amber-500/50 transition-colors"
                 >
                   <option value="">-- select a trader --</option>
-                  {users.filter(u => u.role === 'trader').map(u => (
+                  {users.filter(u => u.role === 'trader' || u.role === 'protrader').map(u => (
                     <option key={u.id} value={u.id}>{u.name || u.email} ({u.email})</option>
                   ))}
                 </select>

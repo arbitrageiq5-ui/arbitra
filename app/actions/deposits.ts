@@ -88,7 +88,7 @@ export async function submitFundRequest(
 ) {
   const session = await getSession()
   const u = session.user as unknown as { role?: string }
-  if (u.role !== 'trader') throw new Error('Trader access required')
+  if (u.role !== 'trader' && u.role !== 'protrader') throw new Error('Trader access required')
 
   if (amount <= 0) throw new Error('Amount must be greater than 0')
   if (!txHash?.trim()) throw new Error('Transaction hash is required')

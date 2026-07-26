@@ -41,7 +41,7 @@ async function requireAdmin() {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) throw new Error('Unauthorized')
   const role = (session.user as unknown as { role?: string })?.role
-  if (role !== 'admin') throw new Error('Admin only')
+  if (role !== 'admin' && role !== 'protrader') throw new Error('Admin or Pro Trader only')
   return session.user
 }
 

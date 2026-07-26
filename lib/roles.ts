@@ -1,6 +1,6 @@
 // Role-based access control utilities
 
-export type UserRole = 'viewer' | 'trader' | 'admin'
+export type UserRole = 'viewer' | 'trader' | 'protrader' | 'admin'
 
 export interface RolePermissions {
   canViewDashboard: boolean
@@ -17,6 +17,18 @@ export interface RolePermissions {
 
 // Define permissions for each role
 export const rolePermissions: Record<UserRole, RolePermissions> = {
+  protrader: {
+    canViewDashboard: true,
+    canViewOpportunities: true,
+    canViewAnalytics: true,
+    canViewPortfolio: true,
+    canExecuteTrades: true,
+    canManageAccounts: true,
+    canViewAuditLogs: true,
+    canManageUsers: false,
+    canChangeRoles: false,
+    canAccessAdmin: true,
+  },
   viewer: {
     canViewDashboard: true,
     canViewOpportunities: true,
@@ -98,7 +110,8 @@ export function canAccess(role: UserRole, resource: string, action: string): boo
 export const roleHierarchy: Record<UserRole, number> = {
   viewer: 1,
   trader: 2,
-  admin: 3,
+  protrader: 3,
+  admin: 4,
 }
 
 // Check if one role is higher than another
@@ -107,13 +120,14 @@ export function roleIsHigherThan(role1: UserRole, role2: UserRole): boolean {
 }
 
 // Get role label for display
-export function getRoleLabel(role: UserRole): string {
-  const labels: Record<UserRole, string> = {
+export function getRoleLabel(role: string): string {
+  const labels: Record<string, string> = {
     viewer: 'Viewer',
     trader: 'Trader',
+    protrader: 'Pro Trader',
     admin: 'Administrator',
   }
-  return labels[role]
+  return labels[role] ?? role
 }
 
 // Get role description
@@ -121,6 +135,7 @@ export function getRoleDescription(role: UserRole): string {
   const descriptions: Record<UserRole, string> = {
     viewer: 'Can view opportunities, analytics, and portfolio. Read-only access.',
     trader: 'Can execute trades, manage exchange accounts, and view all analytics.',
+    protrader: 'Full arbitrage panel access (all Admin arbitrage features) plus all Trader bot & trading features. Cannot manage users or change roles.',
     admin: 'Full system access including user management, audit logs, and configuration.',
   }
   return descriptions[role]

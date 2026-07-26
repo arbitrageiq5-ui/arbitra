@@ -17,6 +17,7 @@ export default async function OpportunitiesPage() {
 
   // Traders and admins have their own dashboards
   if (role === 'admin') redirect('/admin')
+  if (role === 'protrader') redirect('/protrader')
   if (role === 'trader') redirect('/trader')
 
   return (

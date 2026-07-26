@@ -18,7 +18,7 @@ export default async function RolesPage() {
     redirect('/sign-in')
   }
 
-  const roles: UserRole[] = ['viewer', 'trader', 'admin']
+  const roles: UserRole[] = ['viewer', 'trader', 'protrader', 'admin']
   const permissions = [
     { key: 'canViewDashboard', label: 'View Dashboard' },
     { key: 'canViewOpportunities', label: 'View Opportunities' },
@@ -49,7 +49,7 @@ export default async function RolesPage() {
 
       <div className="max-w-6xl mx-auto">
         {/* Role Descriptions */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           {roles.map((role) => (
             <Card key={role} className="bg-slate-800 border-slate-700 p-6">
               <h3 className="text-xl font-bold text-white mb-2">{getRoleLabel(role)}</h3>
