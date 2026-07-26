@@ -9,7 +9,7 @@ export const user = pgTable('user', {
   email: text('email').notNull().unique(),
   emailVerified: boolean('emailVerified').notNull().default(false),
   image: text('image'),
-  role: text('role').default('viewer').notNull(), // 'viewer' | 'trader' | 'admin'
+  role: text('role').default('viewer').notNull(), // 'viewer' | 'trader' | 'protrader' | 'admin'
   // Referral & activation system
   referralCode: text('referral_code').unique(),
   referredBy: text('referred_by'), // userId of referrer (no FK to avoid circular)
