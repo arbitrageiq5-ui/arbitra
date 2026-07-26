@@ -65,6 +65,10 @@ const EXCHANGE_COLORS: Record<string, string> = {
   // Data
   coingecko:     'bg-lime-500/20 text-lime-300 border-lime-500/30',
   coinmarketcap: 'bg-green-400/20 text-green-200 border-green-400/30',
+  // From fetchers
+  mexc:          'bg-blue-400/20 text-blue-200 border-blue-400/30',
+  phemex:        'bg-violet-500/20 text-violet-300 border-violet-500/30',
+  upbit:         'bg-blue-600/20 text-blue-300 border-blue-600/30',
 }
 
 const EXCHANGE_ABBR: Record<string, string> = {
@@ -78,6 +82,8 @@ const EXCHANGE_ABBR: Record<string, string> = {
   coindcx: 'DCX', coinswitch: 'CSW', wazirx: 'WRX', bitbns: 'BNS', zebpay: 'ZBP',
   // Data
   coingecko: 'CG', coinmarketcap: 'CMC',
+  // From fetchers
+  mexc: 'MX', phemex: 'PH', upbit: 'UP',
 }
 
 // ── Shared small components ───────────────────────────────────────────────────
@@ -139,7 +145,7 @@ export default function AdminArbitragePanel() {
   const [filterBuyEx, setFilterBuyEx] = useState('')
   const [filterSellEx, setFilterSellEx] = useState('')
   const [sortByProfit, setSortByProfit] = useState<'asc' | 'desc'>('desc')
-  const [selectedSymbols, setSelectedSymbols] = useState<string[]>(SCAN_SYMBOLS.slice(0, 15))
+  const [selectedSymbols, setSelectedSymbols] = useState<string[]>(SCAN_SYMBOLS)
   const [minProfitThreshold, setMinProfitThreshold] = useState(0.3)
   const [autoScanInterval, setAutoScanInterval] = useState(30)
 
@@ -565,7 +571,7 @@ export default function AdminArbitragePanel() {
         ))}
       </div>
 
-      {/* ══ LIVE SCAN TAB ════════════��═���═══════════════════════════════════ */}
+      {/* ══ LIVE SCAN TAB ════════════��═�����═══════════════════════════════════ */}
       {subTab === 'live-scan' && (
         <div className="space-y-4">
 
@@ -576,7 +582,7 @@ export default function AdminArbitragePanel() {
               className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-400 disabled:opacity-60 text-black font-bold rounded-lg text-sm transition-colors"
             >
               <RefreshCw className={`w-4 h-4 ${scanning ? 'animate-spin' : ''}`} />
-              {scanning ? 'Scanning 12 exchanges...' : 'Run Live Scan'}
+              {scanning ? 'Scanning 16 exchanges...' : 'Run Full Market Scan'}
             </button>
             <button
               onClick={() => setAutoScan(p => !p)}
@@ -591,7 +597,7 @@ export default function AdminArbitragePanel() {
             </button>
             <div className="ml-auto flex items-center gap-4 text-xs">
               {lastScan && <span className="text-slate-500 flex items-center gap-1"><Clock className="w-3 h-3" /> {lastScan}</span>}
-              {onlineCount > 0 && <span className="text-green-400 flex items-center gap-1.5"><StatusDot ok />{onlineCount}/13 online</span>}
+              {onlineCount > 0 && <span className="text-green-400 flex items-center gap-1.5"><StatusDot ok />{onlineCount}/16 online</span>}
               {totalPrices > 0 && <span className="text-slate-500">{totalPrices} price pts</span>}
             </div>
           </div>
@@ -603,13 +609,14 @@ export default function AdminArbitragePanel() {
           )}
 
           {/* Live stats row */}
-          {opportunities.length > 0 && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {(opportunities.length > 0 || prices.length > 0) && (
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
               {[
-                { label: 'Opportunities',  value: filtered.length.toString(),                              color: 'text-amber-400' },
-                { label: 'Best Spread',    value: `+${(filtered[0]?.netProfitPct ?? 0).toFixed(3)}%`,     color: 'text-green-400' },
-                { label: 'Best $ / 1k',    value: `$${(filtered[0]?.profitPer1k ?? 0).toFixed(2)}`,       color: 'text-green-400' },
-                { label: 'Exchanges Live', value: `${onlineCount} / 13`,                                   color: 'text-cyan-400'  },
+                { label: 'Total Opps',     value: opportunities.length.toString(),                          color: 'text-amber-400' },
+                { label: 'Filtered',       value: filtered.length.toString(),                               color: 'text-white'     },
+                { label: 'Best Spread',    value: `+${(filtered[0]?.netProfitPct ?? 0).toFixed(3)}%`,       color: 'text-green-400' },
+                { label: 'Best $ / 1k',    value: `$${(filtered[0]?.profitPer1k ?? 0).toFixed(2)}`,         color: 'text-green-400' },
+                { label: 'Exchanges Live', value: `${onlineCount} / 16`,                                    color: 'text-cyan-400'  },
               ].map(stat => (
                 <Card key={stat.label} className="bg-slate-900 border-slate-800 p-3 text-center">
                   <p className="text-slate-500 text-xs mb-1">{stat.label}</p>
@@ -659,11 +666,13 @@ export default function AdminArbitragePanel() {
             <Card className="bg-slate-900 border-slate-800 p-12 text-center">
               <Activity className="w-10 h-10 text-slate-700 mx-auto mb-3" />
               <p className="text-slate-400 text-sm font-medium">
-                {opportunities.length === 0 ? 'Click "Run Live Scan" to fetch live prices from all 13 sources including CoinGecko' : 'No opportunities match your filters'}
+                {opportunities.length === 0
+                  ? 'Click "Run Full Market Scan" to scan live prices across all exchange pairs'
+                  : `${opportunities.length} total opportunities found — adjust filters to show more`}
               </p>
               {opportunities.length === 0 && (
                 <p className="text-slate-600 text-xs mt-2">
-                  Sources: Binance · Kraken · Coinbase · Bybit · KuCoin · HTX · Bitfinex · OKX · Gate.io · Gemini · Crypto.com · Bitget · CoinGecko
+                  Sources: Binance · Bybit · KuCoin · OKX · Gate.io · Kraken · Coinbase · Bitget · MEXC · HTX · Bitfinex · Gemini · Upbit · WazirX · CoinDCX · Phemex
                 </p>
               )}
             </Card>
@@ -2058,7 +2067,7 @@ export default function AdminArbitragePanel() {
         </div>
       )}
 
-      {/* ══ AI AUTO SETUP TAB ════════════════════════════════════════��═════ */}
+      {/* ══ AI AUTO SETUP TAB ═════════════════════════���══════════════��═════ */}
       {subTab === 'ai-strategy' && (
         <div className="space-y-4">
 

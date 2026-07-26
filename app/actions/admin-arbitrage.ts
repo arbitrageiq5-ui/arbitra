@@ -373,8 +373,8 @@ export async function adminFetchLivePrices(symbols: string[]): Promise<{
     botCfg = { minProfitPct: 0.5, safetyBufferPct: 0.1, tradingFeePct: null, withdrawalFeeOverride: null, networkFeeOverride: null, tradeAmountUsd: 1000, maxSlippagePct: 0.3, maxTransferTimeMin: 30 }
   }
 
-  // Detect opportunities
-  const rawOpps = detectArbitrageOpportunities(livePrices, 0.3)
+  // Detect opportunities across ALL exchange pairs
+  const rawOpps = detectArbitrageOpportunities(livePrices, 0.1)
   const opportunities: AdminArbitrageOpp[] = rawOpps.map((opp, idx) => {
     const bd = calcNetProfit(
       opp.symbol,
@@ -850,7 +850,7 @@ export async function executeExchangeTransfer(req: TransferRequest): Promise<Tra
       else errorMsg = data.retMsg ?? `HTTP ${res.status}`
     }
 
-    // ── OKX Withdrawal ────────────────────────────────────────────────────
+    // ── OKX Withdrawal ─────────────────────���──────────────────────────────
     else if (req.fromExchange === 'okx' && pass) {
       const crypto = await import('crypto')
       const ts = new Date().toISOString()
@@ -1402,7 +1402,7 @@ export async function grabLiveOpportunities(config: SniperBotConfig): Promise<Sc
   let livePrices: ExchangePrice[] = []
   try { livePrices = await getPricesAcrossExchanges(coins) } catch { livePrices = [] }
 
-  const rawOpps = detectArbitrageOpportunities(livePrices, 0.15)
+  const rawOpps = detectArbitrageOpportunities(livePrices, 0.1)
 
   return rawOpps
     .filter(o => !config.excludeExchanges.includes(o.buyExchange.toLowerCase()) && !config.excludeExchanges.includes(o.sellExchange.toLowerCase()))

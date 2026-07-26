@@ -164,7 +164,111 @@ async function fetchMexc(symbol: string): Promise<number | null> {
   } catch { return null }
 }
 
-// Exchange metadata
+/** HTX (Huobi): btcusdt format */
+async function fetchHtx(symbol: string): Promise<number | null> {
+  try {
+    const res = await fetch(
+      `https://api.huobi.pro/market/detail/merged?symbol=${symbol.toLowerCase()}usdt`,
+      { signal: AbortSignal.timeout(5000) }
+    )
+    if (!res.ok) return null
+    const data = await res.json()
+    const p = parseFloat(data?.tick?.close)
+    return isFinite(p) && p > 0 ? p : null
+  } catch { return null }
+}
+
+/** Bitfinex: tBTCUSD format */
+async function fetchBitfinex(symbol: string): Promise<number | null> {
+  try {
+    const res = await fetch(
+      `https://api-pub.bitfinex.com/v2/ticker/t${symbol}USD`,
+      { signal: AbortSignal.timeout(5000) }
+    )
+    if (!res.ok) return null
+    const data = await res.json()
+    // Response is array: [BID, BID_SIZE, ASK, ASK_SIZE, ..., LAST_PRICE, ...]
+    const p = parseFloat(data?.[6])
+    return isFinite(p) && p > 0 ? p : null
+  } catch { return null }
+}
+
+/** Gemini: btcusd format */
+async function fetchGemini(symbol: string): Promise<number | null> {
+  try {
+    const res = await fetch(
+      `https://api.gemini.com/v1/pubticker/${symbol.toLowerCase()}usd`,
+      { signal: AbortSignal.timeout(5000) }
+    )
+    if (!res.ok) return null
+    const data = await res.json()
+    const p = parseFloat(data?.last)
+    return isFinite(p) && p > 0 ? p : null
+  } catch { return null }
+}
+
+/** Upbit: KRW markets — convert to USD using ~1370 KRW/USD */
+async function fetchUpbit(symbol: string): Promise<number | null> {
+  try {
+    const res = await fetch(
+      `https://api.upbit.com/v1/ticker?markets=KRW-${symbol}`,
+      { signal: AbortSignal.timeout(5000) }
+    )
+    if (!res.ok) return null
+    const data = await res.json()
+    const krwPrice = parseFloat(data?.[0]?.trade_price)
+    if (!isFinite(krwPrice) || krwPrice <= 0) return null
+    const KRW_USD = 0.00073 // approximate KRW→USD rate
+    const p = krwPrice * KRW_USD
+    return isFinite(p) && p > 0 ? p : null
+  } catch { return null }
+}
+
+/** WazirX (India): uses BTC/USDT pairs */
+async function fetchWazirx(symbol: string): Promise<number | null> {
+  try {
+    const res = await fetch(
+      `https://api.wazirx.com/sapi/v1/ticker/24hr?symbol=${symbol.toLowerCase()}usdt`,
+      { signal: AbortSignal.timeout(5000) }
+    )
+    if (!res.ok) return null
+    const data = await res.json()
+    const p = parseFloat(data?.lastPrice)
+    return isFinite(p) && p > 0 ? p : null
+  } catch { return null }
+}
+
+/** CoinDCX: uses ticker API */
+async function fetchCoinDcx(symbol: string): Promise<number | null> {
+  try {
+    const res = await fetch(
+      `https://api.coindcx.com/exchange/ticker`,
+      { signal: AbortSignal.timeout(5000) }
+    )
+    if (!res.ok) return null
+    const data = await res.json() as Array<{ market: string; last_price: string }>
+    const ticker = data.find(t => t.market === `B-${symbol}_USDT` || t.market === `${symbol}USDT`)
+    if (!ticker) return null
+    const p = parseFloat(ticker.last_price)
+    return isFinite(p) && p > 0 ? p : null
+  } catch { return null }
+}
+
+/** Phemex: BTCUSDT format */
+async function fetchPhemex(symbol: string): Promise<number | null> {
+  try {
+    const res = await fetch(
+      `https://api.phemex.com/md/spot/ticker/24hr?symbol=s${symbol}USDT`,
+      { signal: AbortSignal.timeout(5000) }
+    )
+    if (!res.ok) return null
+    const data = await res.json()
+    const p = parseFloat(data?.result?.lastEp) / 1e8 // Phemex uses scaled integers
+    return isFinite(p) && p > 0 ? p : null
+  } catch { return null }
+}
+
+// Exchange metadata — ordered by volume/reliability
 const EXCHANGE_FETCHERS: { name: string; fetch: (s: string) => Promise<number | null> }[] = [
   { name: 'Binance',  fetch: fetchBinance  },
   { name: 'Bybit',    fetch: fetchBybit    },
@@ -175,6 +279,13 @@ const EXCHANGE_FETCHERS: { name: string; fetch: (s: string) => Promise<number | 
   { name: 'Coinbase', fetch: fetchCoinbase },
   { name: 'Bitget',   fetch: fetchBitget   },
   { name: 'MEXC',     fetch: fetchMexc     },
+  { name: 'HTX',      fetch: fetchHtx      },
+  { name: 'Bitfinex', fetch: fetchBitfinex },
+  { name: 'Gemini',   fetch: fetchGemini   },
+  { name: 'Upbit',    fetch: fetchUpbit    },
+  { name: 'WazirX',   fetch: fetchWazirx   },
+  { name: 'CoinDCX',  fetch: fetchCoinDcx  },
+  { name: 'Phemex',   fetch: fetchPhemex   },
 ]
 
 // ─── Seeded fallback simulation ───────────────────────────────────────────────
@@ -193,13 +304,14 @@ function seededRand(seed: number) {
 const EXCHANGE_NAMES = [
   'Binance', 'Bybit', 'KuCoin', 'OKX', 'Gate.io',
   'Kraken', 'Coinbase', 'Bitget', 'MEXC', 'Bitfinex',
-  'HTX', 'Gemini',
+  'HTX', 'Gemini', 'Upbit', 'WazirX', 'CoinDCX', 'Phemex',
 ]
 
 const EXCHANGE_FEES: Record<string, number> = {
   Binance: 0.10, Bybit: 0.10, KuCoin: 0.10, OKX: 0.08,
   'Gate.io': 0.20, Kraken: 0.16, Coinbase: 0.60, Bitget: 0.10,
   MEXC: 0.00, Bitfinex: 0.20, HTX: 0.20, Gemini: 0.35,
+  Upbit: 0.05, WazirX: 0.20, CoinDCX: 0.20, Phemex: 0.10,
 }
 
 function simulatePricesForSymbol(symbol: string, seed: number): ExchangePrice[] {
@@ -253,7 +365,7 @@ export async function getPricesAcrossExchanges(symbols: string[]): Promise<Excha
 
 export function detectArbitrageOpportunities(
   prices: ExchangePrice[],
-  minProfitPercentage = 0.5
+  minProfitPercentage = 0.1
 ): ArbitrageOpportunity[] {
   const opportunities: ArbitrageOpportunity[] = []
 
@@ -265,28 +377,47 @@ export function detectArbitrageOpportunities(
   }
 
   for (const [, symbolPrices] of bySymbol) {
-    // Sort by price to find best buy (lowest) and sell (highest)
-    const sorted = [...symbolPrices].sort((a, b) => a.price - b.price)
-    const best = sorted[sorted.length - 1]
-    const worst = sorted[0]
+    if (symbolPrices.length < 2) continue
 
-    if (!best || !worst || best.exchange === worst.exchange) continue
+    // Compare EVERY unique exchange pair (n*(n-1)/2 combinations)
+    for (let i = 0; i < symbolPrices.length; i++) {
+      for (let j = i + 1; j < symbolPrices.length; j++) {
+        const a = symbolPrices[i]
+        const b = symbolPrices[j]
+        if (a.exchange === b.exchange) continue
 
-    const profitPercentage = ((best.price - worst.price) / worst.price) * 100
-    if (profitPercentage < minProfitPercentage) continue
+        // Determine buy (lower price) and sell (higher price)
+        const buy  = a.price <= b.price ? a : b
+        const sell = a.price <= b.price ? b : a
 
-    opportunities.push({
-      symbol: worst.symbol,
-      buyExchange: worst.exchange,
-      buyPrice: worst.price,
-      sellExchange: best.exchange,
-      sellPrice: best.price,
-      profitPercentage,
-      profitAmount: best.price - worst.price,
-    })
+        const profitPercentage = ((sell.price - buy.price) / buy.price) * 100
+        if (profitPercentage < minProfitPercentage) continue
+
+        opportunities.push({
+          symbol: buy.symbol,
+          buyExchange: buy.exchange,
+          buyPrice: buy.price,
+          sellExchange: sell.exchange,
+          sellPrice: sell.price,
+          profitPercentage,
+          profitAmount: sell.price - buy.price,
+        })
+      }
+    }
   }
 
-  return opportunities.sort((a, b) => b.profitPercentage - a.profitPercentage)
+  // Sort by profit descending, deduplicate same buy/sell pair keeping highest
+  const seen = new Set<string>()
+  const deduped: ArbitrageOpportunity[] = []
+  for (const opp of opportunities.sort((a, b) => b.profitPercentage - a.profitPercentage)) {
+    const key = `${opp.symbol}-${opp.buyExchange}-${opp.sellExchange}`
+    if (!seen.has(key)) {
+      seen.add(key)
+      deduped.push(opp)
+    }
+  }
+
+  return deduped
 }
 
 // ─── Encrypt/decrypt API keys (no longer uses CryptoJS) ──────────────────────
