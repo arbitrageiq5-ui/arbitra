@@ -10,9 +10,9 @@ import {
   getBotConfig, saveBotConfig, getBotAnalytics, executeBotTrade, evaluateRiskFilters,
   AdminLivePrice, AdminArbitrageOpp, ExchangeStatus, ExchangeApiKey,
   AiArbitrageStrategy, TransferRoute, ExchangeBalance, TransferLog,
-  BotConfig, BotAnalytics, RiskFilterResult, NetProfitBreakdown,
-  calcNetProfit,
+  BotConfig, BotAnalytics, RiskFilterResult,
 } from '@/app/actions/admin-arbitrage'
+import { calcNetProfit, type NetProfitBreakdown } from '@/lib/utils/arbitrage-calc'
 import {
   Activity, RefreshCw, CheckCircle2, XCircle, Wifi, WifiOff,
   ArrowRightLeft, TrendingUp, Zap, Filter, Clock, AlertTriangle,
@@ -379,7 +379,7 @@ export default function AdminArbitragePanel() {
     }
   }
 
-  // ── Live scan ────────────────────────────────────────────────────���────────
+  // ── Live scan ───────────────────────────────────��────────────────���────────
   const runScan = useCallback(async () => {
     setScanError(null)
     setScanning(true)
