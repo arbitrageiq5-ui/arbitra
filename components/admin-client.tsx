@@ -19,10 +19,12 @@ import {
   CheckCircle2, XCircle, Clock, AlertCircle, Pencil,
   Zap, Shield, BarChart3, RefreshCw, UserPlus, X, Eye, EyeOff, KeyRound,
   TrendingUp, Activity, PauseCircle, StopCircle, DollarSign, Gift, ArrowUpCircle,
+  Sparkles,
 } from 'lucide-react'
 import AdminArbitragePanel from '@/components/admin-arbitrage-panel'
+import AdminAiPanel from '@/components/admin-ai-panel'
 
-type Tab = 'users' | 'deposit-addresses' | 'fund-requests' | 'auto-trade' | 'activation-fees' | 'withdrawals' | 'wallets' | 'arbitrage'
+type Tab = 'users' | 'deposit-addresses' | 'fund-requests' | 'auto-trade' | 'activation-fees' | 'withdrawals' | 'wallets' | 'arbitrage' | 'ai-support'
 type Network = 'TRC20' | 'BEP20' | 'ERC20'
 
 interface User { id: string; name: string | null; email: string; role: string; createdAt: Date }
@@ -169,6 +171,13 @@ export default function AdminClient() {
     if (activeTab === 'activation-fees') loadActivationFeeReqs()
     if (activeTab === 'withdrawals') loadWithdrawalReqs()
     if (activeTab === 'wallets') loadTraderBalances()
+    if (activeTab === 'ai-support') {
+      // Pre-load all context data so the AI has accurate numbers
+      loadFundRequests()
+      loadWithdrawalReqs()
+      loadAutoTradePlans()
+      loadActivationFeeReqs()
+    }
   }, [activeTab])
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
@@ -506,6 +515,7 @@ export default function AdminClient() {
             { key: 'activation-fees' as Tab,      label: 'Activations',       icon: Gift,        badge: activationFeeReqs.filter(f => f.status === 'pending').length },
             { key: 'withdrawals' as Tab,          label: 'Withdrawals',        icon: ArrowUpCircle, badge: withdrawalReqs.filter(w => w.status === 'pending').length },
             { key: 'wallets' as Tab,              label: 'Wallets',             icon: Wallet,        badge: traderBalances.length },
+            { key: 'ai-support' as Tab,           label: 'AI Assistant',        icon: Sparkles,      badge: 0 },
           ]).map(tab => (
             <button
               key={tab.key}
@@ -1451,6 +1461,25 @@ export default function AdminClient() {
             </div>
             <AdminArbitragePanel />
           </div>
+        )}
+
+        {/* ── AI SUPPORT TAB ── */}
+        {activeTab === 'ai-support' && (
+          <Card className="bg-slate-900 border-slate-800 p-6">
+            <AdminAiPanel
+              context={{
+                userCount: users.length,
+                traderCount: users.filter(u => u.role === 'trader' || u.role === 'protrader').length,
+                pendingDeposits: fundRequests.filter(r => r.status === 'pending').length,
+                pendingWithdrawals: withdrawalReqs.filter(w => w.status === 'pending').length,
+                pendingActivations: activationFeeReqs.filter(f => f.status === 'pending').length,
+                activePlans: autoTradePlans.filter(p => p.status === 'active').length,
+                confirmedFunds: fundRequests
+                  .filter(r => r.status === 'confirmed')
+                  .reduce((s, r) => s + parseFloat(r.amount), 0),
+              }}
+            />
+          </Card>
         )}
 
       </main>
