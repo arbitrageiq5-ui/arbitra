@@ -1266,3 +1266,256 @@ export async function getTransferHistory(limit = 50): Promise<TransferLog[]> {
     createdAt:    r.createdAt.toISOString(),
   }))
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// BOT 2 — LIVE OPPORTUNITY SNIPER + ALT-COIN TRANSFER ENGINE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export interface SniperBotConfig {
+  enabled:            boolean
+  tradeAmountUsd:     number
+  minNetProfitPct:    number
+  minNetProfitUsd:    number
+  maxTransferMin:     number
+  preferredNetworks:  string[]
+  preferredCoins:     string[]
+  excludeExchanges:   string[]
+  autoExecute:        boolean
+  cooldownSeconds:    number
+  maxConcurrentGrabs: number
+  scoringWeights: {
+    netProfit:     number  // 0–10
+    transferSpeed: number  // 0–10
+    feeEfficiency: number  // 0–10
+  }
+}
+
+export interface ScoredOpportunity {
+  id:                   string
+  symbol:               string
+  buyExchange:          string
+  sellExchange:         string
+  buyPrice:             number
+  sellPrice:            number
+  grossSpreadPct:       number
+  netProfitPct:         number
+  netProfitUsd:         number
+  totalCostsUsd:        number
+  tradingFeeBuyUsd:     number
+  tradingFeeSellUsd:    number
+  withdrawalFeeUsd:     number
+  networkFeeUsd:        number
+  slippageUsd:          number
+  safetyBufferUsd:      number
+  suggestedNetwork:     string
+  suggestedAmount:      number
+  estimatedTransferMin: number
+  score:                number
+  scoreBreakdown: {
+    profitScore: number
+    speedScore:  number
+    feeScore:    number
+  }
+  readyToGrab:  boolean
+  blockers:     string[]
+  detectedAt:   string
+}
+
+const _DEFAULT_SNIPER: SniperBotConfig = {
+  enabled: false, tradeAmountUsd: 500, minNetProfitPct: 0.35, minNetProfitUsd: 1.5,
+  maxTransferMin: 20, preferredNetworks: ['TRC20','BEP20','SOL'],
+  preferredCoins: ['USDT','SOL','BNB','XRP','TRX'], excludeExchanges: [],
+  autoExecute: false, cooldownSeconds: 30, maxConcurrentGrabs: 2,
+  scoringWeights: { netProfit: 7, transferSpeed: 5, feeEfficiency: 4 },
+}
+
+export async function getSniperBotConfig(): Promise<SniperBotConfig> {
+  await requireAdmin()
+  try {
+    const row = await db.select().from(arbitrageConfig)
+      .where(eq(arbitrageConfig.configKey, 'sniper_bot_config')).limit(1)
+    if (row[0]) return { ..._DEFAULT_SNIPER, ...(row[0].configValue as Partial<SniperBotConfig>) }
+  } catch { /* fall through */ }
+  return { ..._DEFAULT_SNIPER }
+}
+
+export async function saveSniperBotConfig(cfg: Partial<SniperBotConfig>): Promise<void> {
+  await requireAdmin()
+  const existing = await db.select().from(arbitrageConfig)
+    .where(eq(arbitrageConfig.configKey, 'sniper_bot_config')).limit(1)
+  if (existing.length > 0) {
+    const merged = { ...(existing[0].configValue as object), ...cfg }
+    await db.update(arbitrageConfig)
+      .set({ configValue: merged as Record<string,unknown>, updatedAt: new Date() })
+      .where(eq(arbitrageConfig.configKey, 'sniper_bot_config'))
+  } else {
+    await db.insert(arbitrageConfig).values({
+      configKey: 'sniper_bot_config',
+      configValue: { ..._DEFAULT_SNIPER, ...cfg } as Record<string,unknown>,
+    })
+  }
+}
+
+function _scoreSniperOpp(
+  netProfitPct: number, transferMin: number, totalCostsUsd: number, tradeAmt: number,
+  w: SniperBotConfig['scoringWeights'],
+) {
+  const profitScore = Math.min(100, Math.max(0, (netProfitPct / 3)  * 100))
+  const speedScore  = Math.min(100, Math.max(0, (1 - transferMin / 30) * 100))
+  const feeScore    = Math.min(100, Math.max(0, (1 - (totalCostsUsd / tradeAmt) * 10) * 100))
+  const wSum = (w.netProfit + w.transferSpeed + w.feeEfficiency) || 1
+  const score = (profitScore * w.netProfit + speedScore * w.transferSpeed + feeScore * w.feeEfficiency) / wSum
+  return { score: Math.round(score), profitScore: Math.round(profitScore), speedScore: Math.round(speedScore), feeScore: Math.round(feeScore) }
+}
+
+export async function grabLiveOpportunities(config: SniperBotConfig): Promise<ScoredOpportunity[]> {
+  await requireAdmin()
+
+  const keyRows = await db.select().from(exchangeApiKeys)
+  const keyMap  = Object.fromEntries(keyRows.map(r => [r.exchange.toLowerCase(), r]))
+
+  const coins = config.preferredCoins.length > 0 ? config.preferredCoins : _DEFAULT_SNIPER.preferredCoins
+  let livePrices: ExchangePrice[] = []
+  try { livePrices = await getPricesAcrossExchanges(coins) } catch { livePrices = [] }
+
+  const rawOpps = detectArbitrageOpportunities(livePrices, 0.15)
+
+  return rawOpps
+    .filter(o => !config.excludeExchanges.includes(o.buyExchange.toLowerCase()) && !config.excludeExchanges.includes(o.sellExchange.toLowerCase()))
+    .map((opp, idx) => {
+      const sym     = opp.symbol.toUpperCase()
+      const net0    = _BESTNET[sym] ?? _BESTNET['default']
+      const network = config.preferredNetworks.includes(net0) ? net0 : (config.preferredNetworks[0] ?? net0)
+
+      const bd = calcNetProfit(
+        opp.symbol, opp.buyExchange, opp.sellExchange, opp.buyPrice, opp.sellPrice,
+        config.tradeAmountUsd,
+        { safetyBufferPct: 0.1, tradingFeePct: null, withdrawalFeeOverride: null, networkFeeOverride: _NETFEE[network] ?? null, minProfitPct: config.minNetProfitPct, maxSlippagePct: 0.5, maxTransferTimeMin: config.maxTransferMin },
+      )
+
+      const { score, profitScore, speedScore, feeScore } = _scoreSniperOpp(bd.netProfitPct, bd.estimatedTransferMin, bd.totalCosts, config.tradeAmountUsd, config.scoringWeights)
+
+      const blockers: string[] = []
+      const bKey = keyMap[opp.buyExchange.toLowerCase()]
+      const sKey = keyMap[opp.sellExchange.toLowerCase()]
+      if (!bKey?.apiKey)         blockers.push(`No API key: ${opp.buyExchange}`)
+      else if (bKey.isPublicOnly) blockers.push(`${opp.buyExchange}: Public Only — enable trading`)
+      if (!sKey?.apiKey)         blockers.push(`No API key: ${opp.sellExchange}`)
+      else if (sKey.isPublicOnly) blockers.push(`${opp.sellExchange}: Public Only — enable trading`)
+      if (bd.netProfitPct < config.minNetProfitPct) blockers.push(`Profit ${bd.netProfitPct.toFixed(3)}% < min ${config.minNetProfitPct}%`)
+      if (bd.netProfit    < config.minNetProfitUsd) blockers.push(`Profit $${bd.netProfit.toFixed(2)} < min $${config.minNetProfitUsd}`)
+      if (bd.estimatedTransferMin > config.maxTransferMin) blockers.push(`Transfer ${bd.estimatedTransferMin}m > max ${config.maxTransferMin}m`)
+
+      return {
+        id: `sniper-${opp.symbol}-${opp.buyExchange}-${opp.sellExchange}-${Date.now()}-${idx}`,
+        symbol: opp.symbol, buyExchange: opp.buyExchange, sellExchange: opp.sellExchange,
+        buyPrice: opp.buyPrice, sellPrice: opp.sellPrice,
+        grossSpreadPct: bd.grossProfitPct, netProfitPct: bd.netProfitPct, netProfitUsd: bd.netProfit,
+        totalCostsUsd: bd.totalCosts, tradingFeeBuyUsd: bd.tradingFeeBuy, tradingFeeSellUsd: bd.tradingFeeSell,
+        withdrawalFeeUsd: bd.withdrawalFee, networkFeeUsd: bd.networkFee,
+        slippageUsd: bd.estimatedSlippage, safetyBufferUsd: bd.safetyBuffer,
+        suggestedNetwork: network, suggestedAmount: config.tradeAmountUsd,
+        estimatedTransferMin: bd.estimatedTransferMin,
+        score, scoreBreakdown: { profitScore, speedScore, feeScore },
+        readyToGrab: blockers.length === 0, blockers,
+        detectedAt: new Date().toISOString(),
+      } satisfies ScoredOpportunity
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 20)
+}
+
+export async function getDepositAddress(
+  exchange: string, symbol: string, network: string,
+): Promise<{ address: string | null; memo: string | null; error?: string }> {
+  await requireAdmin()
+
+  const keyRow = await db.select().from(exchangeApiKeys)
+    .where(eq(exchangeApiKeys.exchange, exchange.toLowerCase())).limit(1)
+  const key    = keyRow[0]?.apiKey    ?? null
+  const secret = keyRow[0]?.apiSecret ?? null
+  const pass   = keyRow[0]?.passphrase ?? null
+
+  if (!key || !secret) return { address: null, memo: null, error: `No API credentials for ${exchange}` }
+
+  try {
+    const crypto = await import('crypto')
+    const ex = exchange.toLowerCase()
+
+    if (ex === 'binance') {
+      const ts = Date.now().toString()
+      const params = new URLSearchParams({ coin: symbol, network, timestamp: ts })
+      const sig = crypto.createHmac('sha256', secret).update(params.toString()).digest('hex')
+      params.append('signature', sig)
+      const res  = await fetch(`https://api.binance.com/sapi/v1/capital/deposit/address?${params}`, { headers: { 'X-MBX-APIKEY': key }, signal: AbortSignal.timeout(8000) })
+      const data = await res.json() as { address?: string; tag?: string; msg?: string }
+      if (res.ok && data.address) return { address: data.address, memo: data.tag ?? null }
+      return { address: null, memo: null, error: data.msg ?? `HTTP ${res.status}` }
+    }
+
+    if (ex === 'kucoin' && pass) {
+      const ts  = Date.now().toString()
+      const path = `/api/v1/deposit-addresses?currency=${symbol}&chain=${network}`
+      const sig     = crypto.createHmac('sha256', secret).update(ts + 'GET' + path).digest('base64')
+      const passSig = crypto.createHmac('sha256', secret).update(pass).digest('base64')
+      const res  = await fetch(`https://api.kucoin.com${path}`, { headers: { 'KC-API-KEY': key, 'KC-API-SIGN': sig, 'KC-API-TIMESTAMP': ts, 'KC-API-PASSPHRASE': passSig, 'KC-API-KEY-VERSION': '2' }, signal: AbortSignal.timeout(8000) })
+      const data = await res.json() as { data?: { address?: string; memo?: string }; msg?: string }
+      if (res.ok && data.data?.address) return { address: data.data.address, memo: data.data.memo ?? null }
+      return { address: null, memo: null, error: data.msg ?? `HTTP ${res.status}` }
+    }
+
+    if (ex === 'bybit') {
+      const ts = Date.now().toString(); const recv = '5000'
+      const qs  = `coin=${symbol}&chainType=${network}`
+      const sig = crypto.createHmac('sha256', secret).update(ts + key + recv + qs).digest('hex')
+      const res  = await fetch(`https://api.bybit.com/v5/asset/deposit/query-address?${qs}`, { headers: { 'X-BAPI-API-KEY': key, 'X-BAPI-SIGN': sig, 'X-BAPI-SIGN-ALGORITHM': 'HMAC_SHA256', 'X-BAPI-TIMESTAMP': ts, 'X-BAPI-RECV-WINDOW': recv }, signal: AbortSignal.timeout(8000) })
+      const data = await res.json() as { result?: { chains?: Array<{ depositAddress?: string; tagDeposit?: string }> }; retMsg?: string }
+      const chain = data.result?.chains?.[0]
+      if (res.ok && chain?.depositAddress) return { address: chain.depositAddress, memo: chain.tagDeposit ?? null }
+      return { address: null, memo: null, error: data.retMsg ?? `HTTP ${res.status}` }
+    }
+
+    if (ex === 'okx' && pass) {
+      const ts  = new Date().toISOString()
+      const path = `/api/v5/asset/deposit-address?ccy=${symbol}`
+      const sig  = crypto.createHmac('sha256', secret).update(ts + 'GET' + path).digest('base64')
+      const res  = await fetch(`https://www.okx.com${path}`, { headers: { 'OK-ACCESS-KEY': key, 'OK-ACCESS-SIGN': sig, 'OK-ACCESS-TIMESTAMP': ts, 'OK-ACCESS-PASSPHRASE': pass }, signal: AbortSignal.timeout(8000) })
+      const data = await res.json() as { data?: Array<{ addr?: string; memo?: string; chain?: string }>; msg?: string }
+      const entry = data.data?.find(d => d.chain?.toUpperCase().includes(network.toUpperCase())) ?? data.data?.[0]
+      if (res.ok && entry?.addr) return { address: entry.addr, memo: entry.memo ?? null }
+      return { address: null, memo: null, error: data.msg ?? `HTTP ${res.status}` }
+    }
+
+    if (ex === 'gateio') {
+      const ts  = Math.floor(Date.now() / 1000).toString()
+      const path = `/api/v4/wallet/deposit_address?currency=${symbol}`
+      const sig  = crypto.createHmac('sha512', secret).update(`GET\n${path}\n\n${ts}`).digest('hex')
+      const res  = await fetch(`https://api.gateio.ws${path}`, { headers: { 'KEY': key, 'Timestamp': ts, 'SIGN': sig }, signal: AbortSignal.timeout(8000) })
+      const data = await res.json() as { address?: string; multichain_addresses?: Array<{ chain?: string; address?: string; payment_id?: string }>; message?: string }
+      const mc   = data.multichain_addresses?.find(c => c.chain?.toUpperCase().includes(network.toUpperCase()))
+      const addr = mc?.address ?? data.address
+      if (res.ok && addr) return { address: addr, memo: mc?.payment_id ?? null }
+      return { address: null, memo: null, error: data.message ?? `HTTP ${res.status}` }
+    }
+
+    if (ex === 'kraken') {
+      const nonce  = Date.now().toString()
+      const body   = `nonce=${nonce}&asset=${symbol}&method=${network}`
+      const path   = '/0/private/DepositAddresses'
+      const keyBuf = Buffer.from(secret, 'base64')
+      const hmac   = crypto.createHmac('sha512', keyBuf)
+      hmac.update(path)
+      hmac.update(crypto.createHash('sha256').update(nonce + body).digest())
+      const sig = hmac.digest('base64')
+      const res  = await fetch(`https://api.kraken.com${path}`, { method: 'POST', headers: { 'API-Key': key, 'API-Sign': sig, 'Content-Type': 'application/x-www-form-urlencoded' }, body, signal: AbortSignal.timeout(8000) })
+      const data = await res.json() as { result?: Array<{ address?: string; tag?: string }>; error?: string[] }
+      const entry = data.result?.[0]
+      if (res.ok && entry?.address) return { address: entry.address, memo: entry.tag ?? null }
+      return { address: null, memo: null, error: data.error?.[0] ?? `HTTP ${res.status}` }
+    }
+
+    return { address: null, memo: null, error: `Deposit address lookup not implemented for ${exchange}` }
+  } catch (err) {
+    return { address: null, memo: null, error: err instanceof Error ? err.message : 'Unknown error' }
+  }
+}

@@ -13,6 +13,7 @@ import {
   BotConfig, BotAnalytics, RiskFilterResult,
 } from '@/app/actions/admin-arbitrage'
 import { calcNetProfit, type NetProfitBreakdown } from '@/lib/utils/arbitrage-calc'
+import { SniperBotTab } from '@/components/sniper-bot-tab'
 import {
   Activity, RefreshCw, CheckCircle2, XCircle, Wifi, WifiOff,
   ArrowRightLeft, TrendingUp, Zap, Filter, Clock, AlertTriangle,
@@ -27,7 +28,7 @@ import {
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-type SubTab = 'live-scan' | 'exchange-connections' | 'balances' | 'ai-strategy' | 'transfer' | 'transfer-routes' | 'bot-engine' | 'analytics' | 'settings'
+type SubTab = 'live-scan' | 'sniper-bot' | 'exchange-connections' | 'balances' | 'ai-strategy' | 'transfer' | 'transfer-routes' | 'bot-engine' | 'analytics' | 'settings'
 
 const SCAN_SYMBOLS = [
   'BTC', 'ETH', 'BNB', 'SOL', 'XRP', 'DOGE', 'ADA', 'AVAX',
@@ -509,7 +510,8 @@ export default function AdminArbitragePanel() {
 
   const SUB_TABS: { key: SubTab; label: string; icon: React.ElementType }[] = [
     { key: 'live-scan',            label: 'Live Scan',       icon: Activity          },
-    { key: 'bot-engine',           label: 'Bot Engine',      icon: Cpu               },
+    { key: 'sniper-bot',           label: 'Bot 2 — Sniper',  icon: Target            },
+    { key: 'bot-engine',           label: 'Bot 1 — Engine',  icon: Cpu               },
     { key: 'analytics',            label: 'Analytics',       icon: LineChart         },
     { key: 'exchange-connections', label: 'API Keys',        icon: Key               },
     { key: 'balances',             label: 'Balances',        icon: Wallet            },
@@ -745,6 +747,9 @@ export default function AdminArbitragePanel() {
           )}
         </div>
       )}
+
+      {/* ══ BOT 2 — SNIPER TAB ════════════════════════════════════════════ */}
+      {subTab === 'sniper-bot' && <SniperBotTab />}
 
       {/* ══ BOT ENGINE TAB ════════════════════════════════════════════════ */}
       {subTab === 'bot-engine' && (
