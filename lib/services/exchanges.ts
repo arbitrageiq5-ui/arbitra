@@ -238,6 +238,86 @@ async function fetchWazirx(symbol: string): Promise<number | null> {
   } catch { return null }
 }
 
+/** Delta Exchange (India): BTCUSD perpetual/spot */
+async function fetchDelta(symbol: string): Promise<number | null> {
+  try {
+    // Delta uses product symbols like BTCUSD
+    const res = await fetch(
+      `https://api.delta.exchange/v2/tickers?contract_types=spot`,
+      { signal: AbortSignal.timeout(5000) }
+    )
+    if (!res.ok) return null
+    const data = await res.json()
+    const tickers = data?.result as Array<{ symbol: string; close: string }> | undefined
+    if (!Array.isArray(tickers)) return null
+    const match = tickers.find(t =>
+      t.symbol === `${symbol}USDT` || t.symbol === `${symbol}USD`
+    )
+    if (!match) return null
+    const p = parseFloat(match.close)
+    return isFinite(p) && p > 0 ? p : null
+  } catch { return null }
+}
+
+/** CoinSwitch Pro (India): uses public ticker */
+async function fetchCoinSwitch(symbol: string): Promise<number | null> {
+  try {
+    const res = await fetch(
+      `https://coinswitch.co/api/v2/coins/${symbol.toLowerCase()}/`,
+      { signal: AbortSignal.timeout(5000) }
+    )
+    if (!res.ok) return null
+    const data = await res.json()
+    const p = parseFloat(data?.current_price ?? data?.price ?? data?.data?.price)
+    return isFinite(p) && p > 0 ? p : null
+  } catch { return null }
+}
+
+/** BitBns (India): INR market → convert to USD */
+async function fetchBitbns(symbol: string): Promise<number | null> {
+  try {
+    const res = await fetch(
+      `https://bitbns.com/order/getTickerWithVolume/?symbol=${symbol}`,
+      { signal: AbortSignal.timeout(5000) }
+    )
+    if (!res.ok) return null
+    const data = await res.json()
+    const inrPrice = parseFloat(data?.last ?? data?.currentPrice ?? data?.data?.last)
+    if (!isFinite(inrPrice) || inrPrice <= 0) return null
+    const INR_USD = 0.012 // approximate INR→USD
+    const p = inrPrice * INR_USD
+    return isFinite(p) && p > 0 ? p : null
+  } catch { return null }
+}
+
+/** ZebPay (India): USDT pairs */
+async function fetchZebpay(symbol: string): Promise<number | null> {
+  try {
+    const res = await fetch(
+      `https://api.zebpay.com/api/v1/market/orderbook?currencyCode=${symbol}USD`,
+      { signal: AbortSignal.timeout(5000) }
+    )
+    if (!res.ok) return null
+    const data = await res.json()
+    const p = parseFloat(data?.market?.last ?? data?.buy ?? data?.sell)
+    return isFinite(p) && p > 0 ? p : null
+  } catch { return null }
+}
+
+/** Mudrex (India): public market data */
+async function fetchMudrex(symbol: string): Promise<number | null> {
+  try {
+    const res = await fetch(
+      `https://api.mudrex.com/v1/market/ticker?symbol=${symbol}USDT`,
+      { signal: AbortSignal.timeout(5000) }
+    )
+    if (!res.ok) return null
+    const data = await res.json()
+    const p = parseFloat(data?.data?.last ?? data?.last)
+    return isFinite(p) && p > 0 ? p : null
+  } catch { return null }
+}
+
 /** CoinDCX: uses ticker API */
 async function fetchCoinDcx(symbol: string): Promise<number | null> {
   try {
@@ -283,9 +363,14 @@ const EXCHANGE_FETCHERS: { name: string; fetch: (s: string) => Promise<number | 
   { name: 'Bitfinex', fetch: fetchBitfinex },
   { name: 'Gemini',   fetch: fetchGemini   },
   { name: 'Upbit',    fetch: fetchUpbit    },
-  { name: 'WazirX',   fetch: fetchWazirx   },
-  { name: 'CoinDCX',  fetch: fetchCoinDcx  },
-  { name: 'Phemex',   fetch: fetchPhemex   },
+  { name: 'WazirX',          fetch: fetchWazirx    },
+  { name: 'CoinDCX',         fetch: fetchCoinDcx   },
+  { name: 'Phemex',          fetch: fetchPhemex    },
+  { name: 'Delta Exchange',  fetch: fetchDelta     },
+  { name: 'CoinSwitch',      fetch: fetchCoinSwitch },
+  { name: 'BitBns',          fetch: fetchBitbns    },
+  { name: 'ZebPay',          fetch: fetchZebpay    },
+  { name: 'Mudrex',          fetch: fetchMudrex    },
 ]
 
 // ─── Seeded fallback simulation ───────────────────────────────────────────────
@@ -305,6 +390,7 @@ const EXCHANGE_NAMES = [
   'Binance', 'Bybit', 'KuCoin', 'OKX', 'Gate.io',
   'Kraken', 'Coinbase', 'Bitget', 'MEXC', 'Bitfinex',
   'HTX', 'Gemini', 'Upbit', 'WazirX', 'CoinDCX', 'Phemex',
+  'Delta Exchange', 'CoinSwitch', 'BitBns', 'ZebPay', 'Mudrex',
 ]
 
 const EXCHANGE_FEES: Record<string, number> = {
@@ -312,6 +398,7 @@ const EXCHANGE_FEES: Record<string, number> = {
   'Gate.io': 0.20, Kraken: 0.16, Coinbase: 0.60, Bitget: 0.10,
   MEXC: 0.00, Bitfinex: 0.20, HTX: 0.20, Gemini: 0.35,
   Upbit: 0.05, WazirX: 0.20, CoinDCX: 0.20, Phemex: 0.10,
+  'Delta Exchange': 0.05, CoinSwitch: 0.25, BitBns: 0.25, ZebPay: 0.15, Mudrex: 0.10,
 }
 
 function simulatePricesForSymbol(symbol: string, seed: number): ExchangePrice[] {

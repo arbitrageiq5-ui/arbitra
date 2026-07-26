@@ -12,6 +12,14 @@ export const SUPPORTED_EXCHANGES: Record<string, { name: string; hasPassphrase: 
   poloniex:   { name: 'Poloniex',   hasPassphrase: false, docsUrl: 'https://poloniex.com/apiKeys' },
   cryptocom:  { name: 'Crypto.com', hasPassphrase: false, docsUrl: 'https://crypto.com/exchange/personal/api-management' },
   phemex:     { name: 'Phemex',     hasPassphrase: false, docsUrl: 'https://phemex.com/user-center/api-management' },
-  bingx:      { name: 'BingX',      hasPassphrase: false, docsUrl: 'https://bingx.com/en-us/account/api' },
-  lbank:      { name: 'LBank',      hasPassphrase: false, docsUrl: 'https://www.lbank.com/en-US/user/api' },
+  bingx:      { name: 'BingX',        hasPassphrase: false, docsUrl: 'https://bingx.com/en-us/account/api' },
+  lbank:      { name: 'LBank',        hasPassphrase: false, docsUrl: 'https://www.lbank.com/en-US/user/api' },
+  // ── India ──────────────────────────────────────────────────────────────────
+  coindcx:    { name: 'CoinDCX',      hasPassphrase: false, docsUrl: 'https://coindcx.com/trade/api' },
+  coinswitch: { name: 'CoinSwitch',   hasPassphrase: false, docsUrl: 'https://coinswitch.co/pro/api' },
+  wazirx:     { name: 'WazirX',       hasPassphrase: false, docsUrl: 'https://wazirx.com/settings/keys' },
+  bitbns:     { name: 'BitBns',       hasPassphrase: false, docsUrl: 'https://bitbns.com/api-trade/' },
+  zebpay:     { name: 'ZebPay',       hasPassphrase: false, docsUrl: 'https://zebpay.com/api' },
+  delta:      { name: 'Delta Exchange', hasPassphrase: false, docsUrl: 'https://www.delta.exchange/app/account/manage-api-keys' },
+  mudrex:     { name: 'Mudrex',       hasPassphrase: false, docsUrl: 'https://mudrex.com/settings/api-keys' },
 }

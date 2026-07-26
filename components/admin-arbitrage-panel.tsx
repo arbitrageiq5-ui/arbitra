@@ -66,9 +66,18 @@ const EXCHANGE_COLORS: Record<string, string> = {
   coingecko:     'bg-lime-500/20 text-lime-300 border-lime-500/30',
   coinmarketcap: 'bg-green-400/20 text-green-200 border-green-400/30',
   // From fetchers
-  mexc:          'bg-blue-400/20 text-blue-200 border-blue-400/30',
-  phemex:        'bg-violet-500/20 text-violet-300 border-violet-500/30',
-  upbit:         'bg-blue-600/20 text-blue-300 border-blue-600/30',
+  mexc:             'bg-blue-400/20 text-blue-200 border-blue-400/30',
+  phemex:           'bg-violet-500/20 text-violet-300 border-violet-500/30',
+  upbit:            'bg-blue-600/20 text-blue-300 border-blue-600/30',
+  // India
+  coindcx:          'bg-blue-700/20 text-blue-300 border-blue-700/30',
+  coinswitch:       'bg-purple-600/20 text-purple-300 border-purple-600/30',
+  wazirx:           'bg-teal-500/20 text-teal-300 border-teal-500/30',
+  'delta exchange': 'bg-orange-500/20 text-orange-300 border-orange-500/30',
+  delta:            'bg-orange-500/20 text-orange-300 border-orange-500/30',
+  bitbns:           'bg-amber-600/20 text-amber-300 border-amber-600/30',
+  zebpay:           'bg-sky-600/20 text-sky-300 border-sky-600/30',
+  mudrex:           'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
 }
 
 const EXCHANGE_ABBR: Record<string, string> = {
@@ -80,6 +89,7 @@ const EXCHANGE_ABBR: Record<string, string> = {
   upbit: 'UP', deribit: 'DR',
   // India
   coindcx: 'DCX', coinswitch: 'CSW', wazirx: 'WRX', bitbns: 'BNS', zebpay: 'ZBP',
+  delta: 'DEL', 'delta exchange': 'DEL', mudrex: 'MUX',
   // Data
   coingecko: 'CG', coinmarketcap: 'CMC',
   // From fetchers
@@ -210,18 +220,30 @@ export default function AdminArbitragePanel() {
     TRX:  ['TRC20'],
   }
   const EXCHANGE_LIST = [
-    { value: 'binance',  label: 'Binance'    },
-    { value: 'kucoin',   label: 'KuCoin'     },
-    { value: 'bybit',    label: 'Bybit'      },
-    { value: 'okx',      label: 'OKX'        },
-    { value: 'kraken',   label: 'Kraken'     },
-    { value: 'bitget',   label: 'Bitget'     },
-    { value: 'coinbase', label: 'Coinbase'   },
-    { value: 'gateio',   label: 'Gate.io'    },
-    { value: 'bitfinex', label: 'Bitfinex'   },
-    { value: 'gemini',   label: 'Gemini'     },
-    { value: 'htx',      label: 'HTX'        },
-    { value: 'cryptocom',label: 'Crypto.com' },
+    // Global
+    { value: 'binance',   label: 'Binance'         },
+    { value: 'bybit',     label: 'Bybit'           },
+    { value: 'kucoin',    label: 'KuCoin'          },
+    { value: 'okx',       label: 'OKX'             },
+    { value: 'kraken',    label: 'Kraken'          },
+    { value: 'coinbase',  label: 'Coinbase'        },
+    { value: 'bitget',    label: 'Bitget'          },
+    { value: 'gateio',    label: 'Gate.io'         },
+    { value: 'mexc',      label: 'MEXC'            },
+    { value: 'htx',       label: 'HTX'             },
+    { value: 'bitfinex',  label: 'Bitfinex'        },
+    { value: 'gemini',    label: 'Gemini'          },
+    { value: 'cryptocom', label: 'Crypto.com'      },
+    { value: 'phemex',    label: 'Phemex'          },
+    { value: 'upbit',     label: 'Upbit'           },
+    // India
+    { value: 'coindcx',   label: 'CoinDCX'         },
+    { value: 'coinswitch',label: 'CoinSwitch'      },
+    { value: 'wazirx',    label: 'WazirX'          },
+    { value: 'delta',     label: 'Delta Exchange'  },
+    { value: 'bitbns',    label: 'BitBns'          },
+    { value: 'zebpay',    label: 'ZebPay'          },
+    { value: 'mudrex',    label: 'Mudrex'          },
   ]
   const ALL_COINS = ['USDT','BTC','ETH','BNB','SOL','XRP','DOGE','ADA','AVAX','MATIC','LINK','LTC','TRX','DOT','ATOM','UNI']
 
@@ -582,7 +604,7 @@ export default function AdminArbitragePanel() {
               className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-400 disabled:opacity-60 text-black font-bold rounded-lg text-sm transition-colors"
             >
               <RefreshCw className={`w-4 h-4 ${scanning ? 'animate-spin' : ''}`} />
-              {scanning ? 'Scanning 16 exchanges...' : 'Run Full Market Scan'}
+              {scanning ? 'Scanning 21 exchanges...' : 'Run Full Market Scan'}
             </button>
             <button
               onClick={() => setAutoScan(p => !p)}
@@ -597,7 +619,7 @@ export default function AdminArbitragePanel() {
             </button>
             <div className="ml-auto flex items-center gap-4 text-xs">
               {lastScan && <span className="text-slate-500 flex items-center gap-1"><Clock className="w-3 h-3" /> {lastScan}</span>}
-              {onlineCount > 0 && <span className="text-green-400 flex items-center gap-1.5"><StatusDot ok />{onlineCount}/16 online</span>}
+              {onlineCount > 0 && <span className="text-green-400 flex items-center gap-1.5"><StatusDot ok />{onlineCount}/21 online</span>}
               {totalPrices > 0 && <span className="text-slate-500">{totalPrices} price pts</span>}
             </div>
           </div>
@@ -616,7 +638,7 @@ export default function AdminArbitragePanel() {
                 { label: 'Filtered',       value: filtered.length.toString(),                               color: 'text-white'     },
                 { label: 'Best Spread',    value: `+${(filtered[0]?.netProfitPct ?? 0).toFixed(3)}%`,       color: 'text-green-400' },
                 { label: 'Best $ / 1k',    value: `$${(filtered[0]?.profitPer1k ?? 0).toFixed(2)}`,         color: 'text-green-400' },
-                { label: 'Exchanges Live', value: `${onlineCount} / 16`,                                    color: 'text-cyan-400'  },
+                { label: 'Exchanges Live', value: `${onlineCount} / 21`,                                    color: 'text-cyan-400'  },
               ].map(stat => (
                 <Card key={stat.label} className="bg-slate-900 border-slate-800 p-3 text-center">
                   <p className="text-slate-500 text-xs mb-1">{stat.label}</p>
@@ -672,7 +694,7 @@ export default function AdminArbitragePanel() {
               </p>
               {opportunities.length === 0 && (
                 <p className="text-slate-600 text-xs mt-2">
-                  Sources: Binance · Bybit · KuCoin · OKX · Gate.io · Kraken · Coinbase · Bitget · MEXC · HTX · Bitfinex · Gemini · Upbit · WazirX · CoinDCX · Phemex
+                  Global: Binance · Bybit · KuCoin · OKX · Gate.io · Kraken · Coinbase · Bitget · MEXC · HTX · Bitfinex · Gemini · Upbit · Phemex &nbsp;|&nbsp; India: CoinDCX · CoinSwitch · WazirX · Delta Exchange · BitBns · ZebPay · Mudrex
                 </p>
               )}
             </Card>
