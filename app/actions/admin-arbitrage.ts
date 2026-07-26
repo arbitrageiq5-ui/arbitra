@@ -6,7 +6,28 @@ import { db } from '@/lib/db'
 import { exchangeApiKeys, arbitrageConfig, exchangeTransferLogs, arbitrageOpportunities } from '@/lib/db/schema'
 import { eq, desc } from 'drizzle-orm'
 import { getPricesAcrossExchanges, detectArbitrageOpportunities, ExchangePrice } from '@/lib/services/exchanges'
-import { calcNetProfit } from '@/lib/utils/arbitrage-calc'
+// ─── Inline profit calculator (private — not exported, avoids 'use server' object export error) ───
+const _EXFEE: Record<string, number> = { binance:0.1,kraken:0.16,coinbase:0.6,bybit:0.1,kucoin:0.1,htx:0.2,bitfinex:0.2,okx:0.08,gateio:0.2,gemini:0.35,cryptocom:0.075,bitget:0.1,poloniex:0.14,mexc:0.0 }
+const _WDFEE: Record<string,Record<string,number>> = { USDT:{binance:1.0,kucoin:1.0,bybit:1.0,okx:1.0,kraken:2.0,default:1.5},BTC:{binance:4.0,kucoin:3.5,bybit:4.0,okx:3.5,kraken:4.0,default:4.0},ETH:{binance:2.0,kucoin:1.8,bybit:2.0,okx:1.8,kraken:2.5,default:2.0},SOL:{binance:0.01,kucoin:0.02,bybit:0.01,okx:0.01,default:0.02},default:{default:2.0} }
+const _NETFEE: Record<string,number> = { TRC20:1.0,BEP20:0.5,ERC20:5.0,SOL:0.01,BTC:3.0,AVAX:0.5,XRP:0.01,default:2.0 }
+const _BESTNET: Record<string,string> = { USDT:'TRC20',BTC:'BTC',ETH:'ERC20',BNB:'BEP20',SOL:'SOL',XRP:'XRP',ADA:'BEP20',AVAX:'AVAX',default:'BEP20' }
+const _XFERTIME: Record<string,number> = { TRC20:2,BEP20:3,ERC20:8,SOL:1,BTC:30,AVAX:2,XRP:1,default:5 }
+function calcNetProfit(symbol:string,buyExchange:string,sellExchange:string,buyPrice:number,sellPrice:number,tradeAmountUsd:number,config:{safetyBufferPct:number,tradingFeePct:number|null,withdrawalFeeOverride:number|null,networkFeeOverride:number|null,minProfitPct:number,maxSlippagePct:number,maxTransferTimeMin:number}) {
+  const bEx=buyExchange.toLowerCase(),sEx=sellExchange.toLowerCase(),sym=symbol.toUpperCase()
+  const qty=tradeAmountUsd/buyPrice,sv=qty*sellPrice,bv=tradeAmountUsd
+  const tfBuy=bv*((config.tradingFeePct??_EXFEE[bEx]??0.1)/100),tfSell=sv*((config.tradingFeePct??_EXFEE[sEx]??0.1)/100)
+  const wdm=_WDFEE[sym]??_WDFEE['default'],wd=config.withdrawalFeeOverride??(wdm[bEx]??wdm['default']??2.0)
+  const net0=_BESTNET[sym]??_BESTNET['default'],nf=config.networkFeeOverride??(_NETFEE[net0]??2.0)
+  const slip=(bv+sv)*(0.05/100),safe=tradeAmountUsd*((config.safetyBufferPct??0.1)/100)
+  const gross=sv-bv,costs=tfBuy+tfSell+wd+nf+slip+safe,net=gross-costs
+  const gPct=((sellPrice-buyPrice)/buyPrice)*100,nPct=(net/tradeAmountUsd)*100
+  const xfer=_XFERTIME[net0]??_XFERTIME['default']
+  let reject:string|null=null
+  if(nPct<config.minProfitPct) reject=`Net profit ${nPct.toFixed(3)}% below threshold ${config.minProfitPct}%`
+  else if((slip/tradeAmountUsd*100)>config.maxSlippagePct) reject=`Slippage exceeds max ${config.maxSlippagePct}%`
+  else if(xfer>config.maxTransferTimeMin) reject=`Transfer time ${xfer}m exceeds max ${config.maxTransferTimeMin}m`
+  return { symbol,buyExchange,sellExchange,tradeAmountUsd,buyPrice,sellPrice,tradingFeeBuy:tfBuy,tradingFeeSell:tfSell,withdrawalFee:wd,networkFee:nf,estimatedSlippage:slip,safetyBuffer:safe,grossProfit:gross,totalCosts:costs,netProfit:net,grossProfitPct:gPct,netProfitPct:nPct,roi:nPct,viable:!reject,rejectReason:reject,estimatedTransferMin:xfer }
+}
 import OpenAI from 'openai'
 
 async function requireAdmin() {
