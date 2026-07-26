@@ -955,11 +955,6 @@ export async function saveBotConfig(config: Partial<BotConfig>): Promise<void> {
   }
 }
 
-// ─── NET PROFIT CALCULATOR ───────────────────────────────────────────────────
-// Re-export from the shared utility so callers can import from one place.
-export type { NetProfitBreakdown } from '@/lib/utils/arbitrage-calc'
-export { calcNetProfit } from '@/lib/utils/arbitrage-calc'
-
 // ─── RISK FILTER STATUS ─────────────────────────────────────────────────────
 
 export interface RiskFilterResult {
