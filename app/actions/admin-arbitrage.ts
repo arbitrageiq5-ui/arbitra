@@ -81,24 +81,32 @@ export interface ExchangeApiKey {
   lastTestStatus: string | null
   lastTestMs: number | null
   note: string | null
+  // enriched metadata from ALL_EXCHANGES
+  docsUrl: string
+  docsLabel: string
+  tradingFee: string
+  requiresIpWhitelist: boolean
+  hasPassphrase: boolean
+  permissions: string[]
+  color: string
 }
 
 // ─── EXCHANGE API KEY MANAGEMENT ───────────────────────────────────────────
 
-const ALL_EXCHANGES = [
-  { exchange: 'binance',    label: 'Binance',    url: 'https://api.binance.com',        hasPassphrase: false },
-  { exchange: 'kraken',     label: 'Kraken',     url: 'https://api.kraken.com',         hasPassphrase: false },
-  { exchange: 'coinbase',   label: 'Coinbase',   url: 'https://api.coinbase.com',       hasPassphrase: false },
-  { exchange: 'bybit',      label: 'Bybit',      url: 'https://api.bybit.com',          hasPassphrase: false },
-  { exchange: 'kucoin',     label: 'KuCoin',     url: 'https://api.kucoin.com',         hasPassphrase: true  },
-  { exchange: 'htx',        label: 'HTX (Huobi)',url: 'https://api.huobi.pro',          hasPassphrase: false },
-  { exchange: 'bitfinex',   label: 'Bitfinex',   url: 'https://api.bitfinex.com',       hasPassphrase: false },
-  { exchange: 'okx',        label: 'OKX',        url: 'https://www.okx.com/api/v5',     hasPassphrase: true  },
-  { exchange: 'gateio',     label: 'Gate.io',    url: 'https://api.gateio.ws/api/v4',   hasPassphrase: false },
-  { exchange: 'gemini',     label: 'Gemini',     url: 'https://api.gemini.com',         hasPassphrase: false },
-  { exchange: 'cryptocom',  label: 'Crypto.com', url: 'https://api.crypto.com/v2',      hasPassphrase: false },
-  { exchange: 'bitget',     label: 'Bitget',     url: 'https://api.bitget.com/v2',      hasPassphrase: true  },
-  { exchange: 'coingecko',  label: 'CoinGecko',  url: 'https://api.coingecko.com/api/v3', hasPassphrase: false },
+export const ALL_EXCHANGES = [
+  { exchange: 'binance',   label: 'Binance',     url: 'https://api.binance.com',           hasPassphrase: false, docsUrl: 'https://www.binance.com/en/my/settings/api-management',   docsLabel: 'Binance API Mgmt',    tradingFee: '0.10%', requiresIpWhitelist: true,  permissions: ['Read Info', 'Spot Trading', 'Withdrawals'], color: '#F0B90B' },
+  { exchange: 'kraken',    label: 'Kraken',      url: 'https://api.kraken.com',            hasPassphrase: false, docsUrl: 'https://www.kraken.com/u/security/api',                    docsLabel: 'Kraken API Settings', tradingFee: '0.16%', requiresIpWhitelist: false, permissions: ['Query Funds', 'Query Orders', 'Create Orders', 'Withdraw Funds'], color: '#5741D9' },
+  { exchange: 'coinbase',  label: 'Coinbase',    url: 'https://api.coinbase.com',          hasPassphrase: false, docsUrl: 'https://www.coinbase.com/settings/api',                    docsLabel: 'Coinbase API Keys',   tradingFee: '0.60%', requiresIpWhitelist: false, permissions: ['View', 'Trade', 'Transfer'], color: '#0052FF' },
+  { exchange: 'bybit',     label: 'Bybit',       url: 'https://api.bybit.com',             hasPassphrase: false, docsUrl: 'https://www.bybit.com/app/user/api-management',            docsLabel: 'Bybit API Mgmt',      tradingFee: '0.10%', requiresIpWhitelist: true,  permissions: ['Read-Write', 'Spot Trading', 'Wallet Transfer'], color: '#F7A600' },
+  { exchange: 'kucoin',    label: 'KuCoin',      url: 'https://api.kucoin.com',            hasPassphrase: true,  docsUrl: 'https://www.kucoin.com/account/api',                       docsLabel: 'KuCoin API Keys',     tradingFee: '0.10%', requiresIpWhitelist: false, permissions: ['General', 'Spot Trading', 'Margin Trading', 'Transfer'], color: '#23AF91' },
+  { exchange: 'htx',       label: 'HTX (Huobi)', url: 'https://api.huobi.pro',             hasPassphrase: false, docsUrl: 'https://www.htx.com/en-us/apikey/createKey/',              docsLabel: 'HTX API Center',      tradingFee: '0.20%', requiresIpWhitelist: true,  permissions: ['Read Only', 'Trade', 'Withdraw'], color: '#2F80ED' },
+  { exchange: 'bitfinex',  label: 'Bitfinex',    url: 'https://api.bitfinex.com',          hasPassphrase: false, docsUrl: 'https://setting.bitfinex.com/api',                         docsLabel: 'Bitfinex API Keys',   tradingFee: '0.20%', requiresIpWhitelist: false, permissions: ['Account Read', 'Orders', 'Wallets'], color: '#16B157' },
+  { exchange: 'okx',       label: 'OKX',         url: 'https://www.okx.com/api/v5',        hasPassphrase: true,  docsUrl: 'https://www.okx.com/account/my-api',                       docsLabel: 'OKX API Mgmt',        tradingFee: '0.08%', requiresIpWhitelist: true,  permissions: ['Read', 'Trade', 'Withdraw'], color: '#1677FF' },
+  { exchange: 'gateio',    label: 'Gate.io',     url: 'https://api.gateio.ws/api/v4',      hasPassphrase: false, docsUrl: 'https://www.gate.io/myaccount/apiv4keys',                  docsLabel: 'Gate.io API Keys',    tradingFee: '0.20%', requiresIpWhitelist: false, permissions: ['Spot Read', 'Spot Trade', 'Wallet'], color: '#FF6B00' },
+  { exchange: 'gemini',    label: 'Gemini',      url: 'https://api.gemini.com',            hasPassphrase: false, docsUrl: 'https://exchange.gemini.com/settings/api',                 docsLabel: 'Gemini API Settings', tradingFee: '0.35%', requiresIpWhitelist: false, permissions: ['Auditor', 'Trader', 'Fund Manager'], color: '#00DCFA' },
+  { exchange: 'cryptocom', label: 'Crypto.com',  url: 'https://api.crypto.com/v2',         hasPassphrase: false, docsUrl: 'https://crypto.com/exchange/personal/api-management',      docsLabel: 'Crypto.com API Mgmt', tradingFee: '0.075%',requiresIpWhitelist: false, permissions: ['Read', 'Trading', 'Wallet'], color: '#1199FA' },
+  { exchange: 'bitget',    label: 'Bitget',      url: 'https://api.bitget.com/v2',         hasPassphrase: true,  docsUrl: 'https://www.bitget.com/account/newapi',                    docsLabel: 'Bitget API Keys',     tradingFee: '0.10%', requiresIpWhitelist: false, permissions: ['Read Only', 'Spot Trade', 'Withdraw'], color: '#00CDD5' },
+  { exchange: 'coingecko', label: 'CoinGecko',   url: 'https://api.coingecko.com/api/v3',  hasPassphrase: false, docsUrl: 'https://www.coingecko.com/en/developers/dashboard',        docsLabel: 'CoinGecko API',       tradingFee: 'N/A',   requiresIpWhitelist: false, permissions: ['Public Data', 'Pro: Market Data', 'Pro: NFT Data'], color: '#8DC63F' },
 ]
 
 export async function getExchangeApiKeys(): Promise<ExchangeApiKey[]> {
@@ -121,6 +129,13 @@ export async function getExchangeApiKeys(): Promise<ExchangeApiKey[]> {
       lastTestStatus: row?.lastTestStatus ?? null,
       lastTestMs: row?.lastTestMs ?? null,
       note: row?.note ?? null,
+      docsUrl: ex.docsUrl,
+      docsLabel: ex.docsLabel,
+      tradingFee: ex.tradingFee,
+      requiresIpWhitelist: ex.requiresIpWhitelist,
+      hasPassphrase: ex.hasPassphrase,
+      permissions: ex.permissions,
+      color: ex.color,
     }
   })
 }
@@ -168,6 +183,11 @@ export async function saveExchangeApiKey(data: {
       note: data.note ?? null,
     })
   }
+}
+
+export async function deleteExchangeApiKey(exchange: string): Promise<void> {
+  await requireAdmin()
+  await db.delete(exchangeApiKeys).where(eq(exchangeApiKeys.exchange, exchange))
 }
 
 export async function toggleExchangeEnabled(exchange: string, enabled: boolean): Promise<void> {

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Card } from '@/components/ui/card'
 import {
   adminFetchLivePrices, testExchangeConnection, testAllExchanges,
-  getExchangeApiKeys, saveExchangeApiKey, toggleExchangeEnabled,
+  getExchangeApiKeys, saveExchangeApiKey, toggleExchangeEnabled, deleteExchangeApiKey,
   generateAiArbitrageStrategy, getSavedAiStrategy, getTransferRoutes,
   getExchangeBalances, executeExchangeTransfer, getTransferHistory,
   getBotConfig, saveBotConfig, getBotAnalytics, executeBotTrade, evaluateRiskFilters,
@@ -130,6 +130,9 @@ export default function AdminArbitragePanel() {
   const [testingAll, setTestingAll] = useState(false)
   const [testResults, setTestResults] = useState<Record<string, { ok: boolean; latencyMs: number; message: string }>>({})
   const [savingExchange, setSavingExchange] = useState(false)
+  const [deletingExchange, setDeletingExchange] = useState<string | null>(null)
+  const [confirmDeleteExchange, setConfirmDeleteExchange] = useState<string | null>(null)
+  const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({})
 
   // AI strategy
   const [aiStrategy, setAiStrategy] = useState<AiArbitrageStrategy | null>(null)
@@ -447,6 +450,17 @@ export default function AdminArbitragePanel() {
       setEditingExchange(null)
     } finally {
       setSavingExchange(false)
+    }
+  }
+
+  async function handleDeleteApiKey(exchange: string) {
+    setDeletingExchange(exchange)
+    try {
+      await deleteExchangeApiKey(exchange)
+      await loadApiKeys()
+      setConfirmDeleteExchange(null)
+    } finally {
+      setDeletingExchange(null)
     }
   }
 
@@ -1337,20 +1351,25 @@ export default function AdminArbitragePanel() {
       {/* ══ EXCHANGE API CONNECTIONS TAB ═══════════════════════════════════ */}
       {subTab === 'exchange-connections' && (
         <div className="space-y-4">
-          {/* Header section */}
-          <div className="flex items-start justify-between flex-wrap gap-4">
+
+          {/* Header */}
+          <div className="flex items-start justify-between flex-wrap gap-3">
             <div>
               <h3 className="text-white font-bold text-base flex items-center gap-2">
                 <Key className="w-5 h-5 text-amber-400" />
                 Exchange API Connections
               </h3>
-              <p className="text-slate-500 text-xs mt-2">Connect and manage your exchange API keys for automated trading and data fetching. Test connections regularly.</p>
+              <p className="text-slate-500 text-xs mt-1">Connect API keys for automated trading. Enable Public API for price data only. Add full credentials for trade execution and withdrawals.</p>
             </div>
             <div className="flex gap-2">
+              <button onClick={() => loadApiKeys()} disabled={loadingKeys}
+                className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs rounded-lg transition-colors">
+                <RefreshCw className={`w-3.5 h-3.5 ${loadingKeys ? 'animate-spin' : ''}`} /> Reload
+              </button>
               <button onClick={handleTestAll} disabled={testingAll}
-                className="flex items-center gap-2 px-4 py-2.5 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-60 text-white font-bold rounded-lg text-xs transition-colors">
-                <TestTube2 className={`w-4 h-4 ${testingAll ? 'animate-spin' : ''}`} />
-                {testingAll ? 'Testing...' : 'Test All'}
+                className="flex items-center gap-1.5 px-4 py-2 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-60 text-white font-bold rounded-lg text-xs transition-colors">
+                <TestTube2 className={`w-3.5 h-3.5 ${testingAll ? 'animate-spin' : ''}`} />
+                {testingAll ? 'Testing All...' : 'Test All'}
               </button>
             </div>
           </div>
@@ -1358,187 +1377,215 @@ export default function AdminArbitragePanel() {
           {loadingKeys ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {Array.from({ length: 6 }).map((_, i) => (
-                <Card key={i} className="bg-slate-900 border-slate-800 p-5 animate-pulse h-40" />
+                <Card key={i} className="bg-slate-900 border-slate-800 p-5 animate-pulse h-44" />
               ))}
             </div>
           ) : (
             <>
               {/* Summary stats */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {(() => {
-                  const connected = apiKeys.filter(k => k.apiKey && k.isEnabled).length
-                  const total = apiKeys.length
-                  const online = Object.values(testResults).filter(r => r?.ok).length
-                  return (
-                    <>
-                      <Card className="bg-slate-900 border-slate-800 p-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center">
-                            <Key className="w-5 h-5 text-amber-400" />
-                          </div>
-                          <div>
-                            <p className="text-slate-500 text-xs">Configured</p>
-                            <p className="text-white font-bold text-lg">{connected}/{total}</p>
-                          </div>
+                  const withKeys = apiKeys.filter(k => k.apiKey).length
+                  const online   = Object.values(testResults).filter(r => r?.ok).length
+                  const failing  = Object.values(testResults).filter(r => r?.ok === false).length
+                  const enabled  = apiKeys.filter(k => k.isEnabled).length
+                  return [
+                    { label: 'With API Keys',  value: `${withKeys}/${apiKeys.length}`, icon: Key,      color: 'text-amber-400', bg: 'bg-amber-500/10' },
+                    { label: 'Online',         value: online.toString(),               icon: Wifi,     color: 'text-green-400', bg: 'bg-green-500/10' },
+                    { label: 'Failed',         value: failing.toString(),              icon: WifiOff,  color: failing > 0 ? 'text-red-400' : 'text-slate-500', bg: failing > 0 ? 'bg-red-500/10' : 'bg-slate-800' },
+                    { label: 'Enabled',        value: enabled.toString(),              icon: Activity, color: 'text-cyan-400',  bg: 'bg-cyan-500/10'  },
+                  ].map(s => (
+                    <Card key={s.label} className="bg-slate-900 border-slate-800 p-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-9 h-9 rounded-lg ${s.bg} flex items-center justify-center`}>
+                          <s.icon className={`w-4 h-4 ${s.color}`} />
                         </div>
-                      </Card>
-                      <Card className="bg-slate-900 border-slate-800 p-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center">
-                            <Wifi className="w-5 h-5 text-green-400" />
-                          </div>
-                          <div>
-                            <p className="text-slate-500 text-xs">Online</p>
-                            <p className="text-white font-bold text-lg">{online}</p>
-                          </div>
+                        <div>
+                          <p className="text-slate-500 text-[10px]">{s.label}</p>
+                          <p className={`font-bold text-base leading-none mt-0.5 ${s.color}`}>{s.value}</p>
                         </div>
-                      </Card>
-                      <Card className="bg-slate-900 border-slate-800 p-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center">
-                            <Activity className="w-5 h-5 text-blue-400" />
-                          </div>
-                          <div>
-                            <p className="text-slate-500 text-xs">Enabled</p>
-                            <p className="text-white font-bold text-lg">{apiKeys.filter(k => k.isEnabled).length}</p>
-                          </div>
-                        </div>
-                      </Card>
-                    </>
-                  )
+                      </div>
+                    </Card>
+                  ))
                 })()}
               </div>
 
               {/* Exchanges grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {apiKeys.map(ex => {
-                  const keyResult = testResults[ex.exchange]
+                  const keyResult  = testResults[ex.exchange]
                   const liveStatus = keyResult ?? (ex.lastTestStatus ? { ok: ex.lastTestStatus === 'ok', latencyMs: ex.lastTestMs ?? 0, message: '' } : null)
-                  const hasKeys = !!ex.apiKey
-                  const isOnline = liveStatus?.ok === true
-                  const isFailing = liveStatus?.ok === false
+                  const hasKeys    = !!ex.apiKey
+                  const isOnline   = liveStatus?.ok === true
+                  const isFailing  = liveStatus?.ok === false
+                  const isTesting  = testingExchange === ex.exchange
 
                   return (
-                    <Card key={ex.exchange}
-                      className={`border transition-all ${
-                        isOnline  ? 'bg-slate-900 border-green-500/30' :
-                        isFailing ? 'bg-slate-900 border-red-500/30'   :
-                        'bg-slate-900 border-slate-800'
-                      }`}
-                    >
+                    <Card key={ex.exchange} className={`border transition-all duration-200 overflow-hidden ${
+                      isOnline  ? 'bg-slate-900 border-green-500/30'  :
+                      isFailing ? 'bg-slate-900 border-red-500/30'    :
+                      hasKeys   ? 'bg-slate-900 border-amber-500/20'  :
+                      'bg-slate-900 border-slate-800'
+                    }`}>
+
+                      {/* Top accent bar */}
+                      <div className="h-0.5 w-full" style={{ background: ex.color + '40' }} />
+
                       {/* Card header */}
-                      <div className="flex items-center justify-between p-5 border-b border-slate-800">
-                        <div className="flex items-center gap-3.5">
-                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-xs font-black border ${
-                            EXCHANGE_COLORS[ex.exchange] ?? 'bg-slate-800 text-slate-300 border-slate-700'
-                          }`}>
-                            {EXCHANGE_ABBR[ex.exchange] ?? ex.label.slice(0, 2)}
+                      <div className="flex items-center justify-between px-4 pt-4 pb-3">
+                        <div className="flex items-center gap-3">
+                          {/* Exchange logo square */}
+                          <div className="w-9 h-9 rounded-lg flex items-center justify-center text-[11px] font-black border border-slate-700 bg-slate-800 shrink-0"
+                            style={{ color: ex.color }}>
+                            {EXCHANGE_ABBR[ex.exchange] ?? ex.label.slice(0, 2).toUpperCase()}
                           </div>
                           <div>
-                            <p className="text-white font-bold text-sm">{ex.label}</p>
-                            <div className="flex items-center gap-2 mt-1">
-                              <span className={`text-[10px] px-2 py-0.5 rounded-full border ${
+                            <div className="flex items-center gap-2">
+                              <span className="text-white font-bold text-sm">{ex.label}</span>
+                              {isOnline && <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse inline-block" />}
+                              {isFailing && <span className="w-1.5 h-1.5 rounded-full bg-red-400 inline-block" />}
+                            </div>
+                            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                              <span className={`text-[9px] px-1.5 py-0.5 rounded border font-semibold ${
                                 ex.isPublicOnly
                                   ? 'bg-blue-500/10 border-blue-500/30 text-blue-300'
                                   : 'bg-amber-500/10 border-amber-500/30 text-amber-300'
                               }`}>
-                                {ex.isPublicOnly ? 'Public API' : 'Authenticated'}
+                                {ex.isPublicOnly ? 'Public Only' : 'Authenticated'}
                               </span>
-                              {ex.note && <span className="text-slate-600 text-[10px]">{ex.note}</span>}
+                              <span className="text-[9px] text-slate-600 font-mono">Fee: {ex.tradingFee}</span>
+                              {ex.requiresIpWhitelist && (
+                                <span className="text-[9px] px-1.5 py-0.5 rounded border bg-orange-500/10 border-orange-500/30 text-orange-300 font-semibold">IP Whitelist</span>
+                              )}
                             </div>
                           </div>
                         </div>
-                        {/* Enable/disable toggle */}
+                        {/* Enable toggle */}
                         <button onClick={() => handleToggleEnabled(ex.exchange, ex.isEnabled)}
-                          className="text-slate-400 hover:text-white transition-colors p-1.5">
+                          title={ex.isEnabled ? 'Disable exchange' : 'Enable exchange'}
+                          className="shrink-0 transition-colors">
                           {ex.isEnabled
                             ? <ToggleRight className="w-6 h-6 text-green-400" />
-                            : <ToggleLeft className="w-6 h-6 text-slate-600" />
+                            : <ToggleLeft  className="w-6 h-6 text-slate-600" />
                           }
                         </button>
                       </div>
 
-                      {/* Card body */}
-                      <div className="p-5 space-y-3">
-                        {/* Status indicator */}
+                      {/* Body */}
+                      <div className="px-4 pb-3 space-y-2.5">
+
+                        {/* Connection test status */}
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1.5">
                             {isOnline ? (
-                              <>
-                                <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                                <span className="text-green-400 font-semibold text-xs">Online & Ready</span>
-                              </>
+                              <><CheckCircle className="w-3.5 h-3.5 text-green-400" /><span className="text-green-400 text-xs font-semibold">Online</span></>
                             ) : isFailing ? (
-                              <>
-                                <div className="w-2 h-2 rounded-full bg-red-400" />
-                                <span className="text-red-400 font-semibold text-xs">Connection Failed</span>
-                              </>
+                              <><XCircleIcon className="w-3.5 h-3.5 text-red-400" /><span className="text-red-400 text-xs font-semibold">Failed</span></>
                             ) : (
-                              <>
-                                <div className="w-2 h-2 rounded-full bg-slate-600" />
-                                <span className="text-slate-400 font-semibold text-xs">Not Tested</span>
-                              </>
+                              <><Minus className="w-3.5 h-3.5 text-slate-600" /><span className="text-slate-500 text-xs">Not tested</span></>
                             )}
                           </div>
-                          {liveStatus?.latencyMs ? (
-                            <span className="text-[10px] text-slate-500 font-mono">{liveStatus.latencyMs}ms</span>
-                          ) : null}
-                        </div>
-
-                        {/* API key status */}
-                        <div className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg">
                           <div className="flex items-center gap-2">
-                            <Key className="w-4 h-4 text-slate-600" />
-                            <div>
-                              <p className="text-slate-400 text-xs">API Key</p>
-                              {hasKeys && ex.apiKey ? (
-                                <p className="text-amber-400 font-mono text-[10px]">{ex.apiKey.slice(0, 8)}...{ex.apiKey.slice(-4)}</p>
-                              ) : (
-                                <p className="text-slate-600 text-xs italic">Not configured</p>
-                              )}
-                            </div>
+                            {liveStatus?.latencyMs ? (
+                              <span className="text-[10px] text-slate-500 font-mono bg-slate-800 px-1.5 py-0.5 rounded">{liveStatus.latencyMs}ms</span>
+                            ) : null}
+                            {ex.lastTestedAt && (
+                              <span className="text-[10px] text-slate-600 flex items-center gap-1">
+                                <Clock className="w-3 h-3" />{new Date(ex.lastTestedAt).toLocaleTimeString()}
+                              </span>
+                            )}
                           </div>
-                          {hasKeys && (
-                            <div className="w-2 h-2 rounded-full bg-green-400" />
-                          )}
                         </div>
 
-                        {/* Last tested */}
-                        {ex.lastTestedAt && (
-                          <div className="text-[10px] text-slate-600 flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            Last tested: {new Date(ex.lastTestedAt).toLocaleTimeString()}
-                          </div>
-                        )}
-
-                        {/* Error message if any */}
-                        {liveStatus?.message && (
-                          <div className="p-2 bg-red-500/10 border border-red-500/30 rounded text-red-300 text-xs">
+                        {/* Error message */}
+                        {isFailing && liveStatus?.message && (
+                          <div className="px-2.5 py-1.5 bg-red-500/10 border border-red-500/20 rounded text-red-300 text-[10px] font-mono">
                             {liveStatus.message}
                           </div>
                         )}
+
+                        {/* API credentials status row */}
+                        <div className="grid grid-cols-3 gap-1.5">
+                          <div className={`px-2 py-1.5 rounded text-center border ${ex.apiKey ? 'bg-green-500/5 border-green-500/20' : 'bg-slate-800/60 border-slate-700'}`}>
+                            <p className="text-[9px] text-slate-500">API Key</p>
+                            {ex.apiKey
+                              ? <p className="text-[10px] text-green-400 font-mono font-bold">••••{ex.apiKey.slice(-4)}</p>
+                              : <p className="text-[10px] text-slate-600 italic">none</p>
+                            }
+                          </div>
+                          <div className={`px-2 py-1.5 rounded text-center border ${ex.apiSecret ? 'bg-green-500/5 border-green-500/20' : 'bg-slate-800/60 border-slate-700'}`}>
+                            <p className="text-[9px] text-slate-500">Secret</p>
+                            <p className={`text-[10px] font-bold ${ex.apiSecret ? 'text-green-400' : 'text-slate-600 italic'}`}>{ex.apiSecret ? 'Set' : 'none'}</p>
+                          </div>
+                          <div className={`px-2 py-1.5 rounded text-center border ${ex.passphrase ? 'bg-green-500/5 border-green-500/20' : ex.hasPassphrase ? 'bg-orange-500/5 border-orange-500/20' : 'bg-slate-800/60 border-slate-700'}`}>
+                            <p className="text-[9px] text-slate-500">Phrase</p>
+                            <p className={`text-[10px] font-bold ${ex.passphrase ? 'text-green-400' : ex.hasPassphrase ? 'text-orange-400 italic' : 'text-slate-600 italic'}`}>
+                              {ex.passphrase ? 'Set' : ex.hasPassphrase ? 'Required' : 'N/A'}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Required permissions */}
+                        <div>
+                          <p className="text-[9px] text-slate-600 uppercase tracking-wider mb-1">Required Permissions</p>
+                          <div className="flex flex-wrap gap-1">
+                            {ex.permissions.map(p => (
+                              <span key={p} className="text-[9px] px-1.5 py-0.5 bg-slate-800 border border-slate-700 text-slate-400 rounded">{p}</span>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Note if any */}
+                        {ex.note && (
+                          <p className="text-[10px] text-slate-500 italic">{ex.note}</p>
+                        )}
                       </div>
 
-                      {/* Card footer - Actions */}
-                      <div className="flex gap-2 p-5 border-t border-slate-800">
+                      {/* Footer actions */}
+                      <div className="flex gap-1.5 px-4 pb-4">
                         <button
                           onClick={() => handleTestOne(ex.exchange)}
-                          disabled={testingExchange === ex.exchange}
-                          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
+                          disabled={isTesting}
+                          title="Test public API connectivity"
+                          className="flex items-center justify-center gap-1 py-2 px-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-medium rounded-lg transition-colors disabled:opacity-50 whitespace-nowrap"
                         >
-                          <TestTube2 className={`w-3.5 h-3.5 ${testingExchange === ex.exchange ? 'animate-spin' : ''}`} />
-                          {testingExchange === ex.exchange ? 'Testing' : 'Test'}
+                          <TestTube2 className={`w-3.5 h-3.5 ${isTesting ? 'animate-spin' : ''}`} />
+                          {isTesting ? 'Testing' : 'Test'}
                         </button>
+
+                        <a
+                          href={ex.docsUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title={`Open ${ex.docsLabel}`}
+                          className="flex items-center justify-center gap-1 py-2 px-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-medium rounded-lg transition-colors whitespace-nowrap"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          Get Keys
+                        </a>
+
                         <button
                           onClick={() => {
                             setEditingExchange(ex.exchange)
                             setEditForm({ apiKey: '', apiSecret: '', passphrase: '', note: ex.note ?? '', isEnabled: ex.isEnabled, isPublicOnly: ex.isPublicOnly })
                           }}
-                          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-400 text-xs font-medium rounded-lg transition-colors"
+                          title="Configure API credentials"
+                          className="flex-1 flex items-center justify-center gap-1 py-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-400 text-xs font-medium rounded-lg transition-colors"
                         >
                           <Settings className="w-3.5 h-3.5" />
                           Configure
                         </button>
+
+                        {/* Delete — only show if key exists in DB */}
+                        {ex.id > 0 && (
+                          <button
+                            onClick={() => setConfirmDeleteExchange(ex.exchange)}
+                            title="Delete API key from database"
+                            className="flex items-center justify-center p-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 rounded-lg transition-colors"
+                          >
+                            <XCircleIcon className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                       </div>
                     </Card>
                   )
@@ -1547,69 +1594,191 @@ export default function AdminArbitragePanel() {
             </>
           )}
 
-          {/* Edit modal */}
-          {editingExchange && (
-            <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-              <Card className="bg-[#0E1324] border-slate-700 p-6 w-full max-w-md space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-white font-bold text-base flex items-center gap-2">
-                    <Key className="w-4 h-4 text-amber-400" />
-                    Configure {apiKeys.find(k => k.exchange === editingExchange)?.label}
-                  </h3>
-                  <button onClick={() => setEditingExchange(null)} className="text-slate-400 hover:text-white text-lg leading-none">&times;</button>
-                </div>
+          {/* Configure modal */}
+          {editingExchange && (() => {
+            const ex = apiKeys.find(k => k.exchange === editingExchange)
+            if (!ex) return null
+            return (
+              <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+                <Card className="bg-[#0D1117] border-slate-700 w-full max-w-lg overflow-hidden">
 
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-xs text-slate-400 mb-1 block">API Key <span className="text-slate-600">(optional — leave blank to keep existing)</span></label>
-                    <input type="password" value={editForm.apiKey} onChange={e => setEditForm(p => ({ ...p, apiKey: e.target.value }))}
-                      placeholder="Enter API key..."
-                      className="w-full px-3 py-2 bg-slate-900 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-amber-500/50 font-mono" />
+                  {/* Modal header with accent */}
+                  <div className="h-1 w-full" style={{ background: ex.color }} />
+                  <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-black" style={{ color: ex.color }}>
+                        {EXCHANGE_ABBR[ex.exchange] ?? ex.label.slice(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <h3 className="text-white font-bold text-sm">{ex.label} — API Configuration</h3>
+                        <a href={ex.docsUrl} target="_blank" rel="noopener noreferrer"
+                          className="text-[10px] text-cyan-400 hover:text-cyan-300 flex items-center gap-1 mt-0.5">
+                          <ExternalLink className="w-3 h-3" /> {ex.docsLabel}
+                        </a>
+                      </div>
+                    </div>
+                    <button onClick={() => setEditingExchange(null)} className="text-slate-400 hover:text-white p-1">
+                      <XCircleIcon className="w-5 h-5" />
+                    </button>
                   </div>
-                  <div>
-                    <label className="text-xs text-slate-400 mb-1 block">API Secret</label>
-                    <input type="password" value={editForm.apiSecret} onChange={e => setEditForm(p => ({ ...p, apiSecret: e.target.value }))}
-                      placeholder="Enter API secret..."
-                      className="w-full px-3 py-2 bg-slate-900 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-amber-500/50 font-mono" />
+
+                  <div className="px-6 py-5 space-y-4">
+                    {/* Info banner */}
+                    <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                      <p className="text-blue-300 text-[10px] font-medium mb-1.5">Required permissions when creating your API key:</p>
+                      <div className="flex flex-wrap gap-1">
+                        {ex.permissions.map(p => (
+                          <span key={p} className="text-[9px] px-1.5 py-0.5 bg-blue-500/20 border border-blue-500/30 text-blue-200 rounded">{p}</span>
+                        ))}
+                      </div>
+                      {ex.requiresIpWhitelist && (
+                        <p className="text-orange-300 text-[10px] mt-2 flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3" />
+                          This exchange requires IP whitelisting. Add your server IP to the allowlist.
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Fields */}
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-xs text-slate-400 mb-1 block flex items-center gap-1.5">
+                          API Key
+                          {ex.apiKey && <span className="text-[10px] text-green-400 font-mono">(current: ••••{ex.apiKey.slice(-4)})</span>}
+                        </label>
+                        <div className="relative">
+                          <input
+                            type={showSecrets[ex.exchange + '_key'] ? 'text' : 'password'}
+                            value={editForm.apiKey}
+                            onChange={e => setEditForm(p => ({ ...p, apiKey: e.target.value }))}
+                            placeholder="Leave blank to keep existing..."
+                            className="w-full px-3 py-2.5 pr-10 bg-slate-900 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-amber-500/50 font-mono" />
+                          <button type="button" onClick={() => setShowSecrets(p => ({ ...p, [ex.exchange + '_key']: !p[ex.exchange + '_key'] }))}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300">
+                            {showSecrets[ex.exchange + '_key'] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-xs text-slate-400 mb-1 block flex items-center gap-1.5">
+                          API Secret
+                          {ex.apiSecret && <span className="text-[10px] text-green-400">(currently set)</span>}
+                        </label>
+                        <div className="relative">
+                          <input
+                            type={showSecrets[ex.exchange + '_secret'] ? 'text' : 'password'}
+                            value={editForm.apiSecret}
+                            onChange={e => setEditForm(p => ({ ...p, apiSecret: e.target.value }))}
+                            placeholder="Leave blank to keep existing..."
+                            className="w-full px-3 py-2.5 pr-10 bg-slate-900 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-amber-500/50 font-mono" />
+                          <button type="button" onClick={() => setShowSecrets(p => ({ ...p, [ex.exchange + '_secret']: !p[ex.exchange + '_secret'] }))}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300">
+                            {showSecrets[ex.exchange + '_secret'] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      </div>
+
+                      {ex.hasPassphrase && (
+                        <div>
+                          <label className="text-xs text-slate-400 mb-1 block flex items-center gap-1.5">
+                            Passphrase
+                            <span className="text-orange-400 text-[10px]">(required for {ex.label})</span>
+                            {ex.passphrase && <span className="text-[10px] text-green-400">(currently set)</span>}
+                          </label>
+                          <div className="relative">
+                            <input
+                              type={showSecrets[ex.exchange + '_phrase'] ? 'text' : 'password'}
+                              value={editForm.passphrase}
+                              onChange={e => setEditForm(p => ({ ...p, passphrase: e.target.value }))}
+                              placeholder="Enter passphrase..."
+                              className="w-full px-3 py-2.5 pr-10 bg-slate-900 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-amber-500/50 font-mono" />
+                            <button type="button" onClick={() => setShowSecrets(p => ({ ...p, [ex.exchange + '_phrase']: !p[ex.exchange + '_phrase'] }))}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300">
+                              {showSecrets[ex.exchange + '_phrase'] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between p-3 bg-slate-800/60 rounded-lg">
+                        <div>
+                          <p className="text-white text-xs font-semibold">Public API Only</p>
+                          <p className="text-slate-500 text-[10px] mt-0.5">When ON: price data only. When OFF: enables live trading and withdrawals.</p>
+                        </div>
+                        <button onClick={() => setEditForm(p => ({ ...p, isPublicOnly: !p.isPublicOnly }))}>
+                          {editForm.isPublicOnly
+                            ? <ToggleRight className="w-7 h-7 text-blue-400" />
+                            : <ToggleLeft  className="w-7 h-7 text-slate-600" />
+                          }
+                        </button>
+                      </div>
+
+                      <div>
+                        <label className="text-xs text-slate-400 mb-1 block">Note (optional)</label>
+                        <input value={editForm.note} onChange={e => setEditForm(p => ({ ...p, note: e.target.value }))}
+                          placeholder="e.g. Read-only key, main account..."
+                          className="w-full px-3 py-2.5 bg-slate-900 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-amber-500/50" />
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <button onClick={() => setEditingExchange(null)}
+                        className="flex-1 py-2.5 border border-slate-700 text-slate-400 rounded-lg text-sm hover:text-white hover:border-slate-500 transition-colors">
+                        Cancel
+                      </button>
+                      <button onClick={handleSaveApiKey} disabled={savingExchange}
+                        className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-lg text-sm transition-colors disabled:opacity-60">
+                        <Save className="w-3.5 h-3.5" />
+                        {savingExchange ? 'Saving...' : 'Save Credentials'}
+                      </button>
+                    </div>
                   </div>
-                  <div>
-                    <label className="text-xs text-slate-400 mb-1 block">Passphrase <span className="text-slate-600">(KuCoin, OKX, Bitget)</span></label>
-                    <input type="password" value={editForm.passphrase} onChange={e => setEditForm(p => ({ ...p, passphrase: e.target.value }))}
-                      placeholder="Enter passphrase..."
-                      className="w-full px-3 py-2 bg-slate-900 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-amber-500/50 font-mono" />
+                </Card>
+              </div>
+            )
+          })()}
+
+          {/* Delete confirmation modal */}
+          {confirmDeleteExchange && (() => {
+            const ex = apiKeys.find(k => k.exchange === confirmDeleteExchange)
+            if (!ex) return null
+            return (
+              <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+                <Card className="bg-[#0D1117] border-red-500/40 w-full max-w-sm p-6 space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-red-500/10 border border-red-500/30 flex items-center justify-center">
+                      <XCircleIcon className="w-5 h-5 text-red-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-white font-bold text-sm">Delete API Keys</h3>
+                      <p className="text-slate-400 text-xs mt-0.5">{ex.label}</p>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs text-slate-400">Public API Only (no trading)</label>
-                    <button onClick={() => setEditForm(p => ({ ...p, isPublicOnly: !p.isPublicOnly }))}
-                      className="text-slate-400 hover:text-white">
-                      {editForm.isPublicOnly
-                        ? <ToggleRight className="w-6 h-6 text-green-400" />
-                        : <ToggleLeft className="w-6 h-6 text-slate-600" />
+                  <p className="text-slate-400 text-sm">
+                    This will permanently delete all saved API credentials for <span className="text-white font-semibold">{ex.label}</span> from the database. The exchange will revert to Public API mode.
+                  </p>
+                  <div className="flex gap-3">
+                    <button onClick={() => setConfirmDeleteExchange(null)}
+                      className="flex-1 py-2.5 border border-slate-700 text-slate-400 rounded-lg text-sm hover:text-white transition-colors">
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => handleDeleteApiKey(confirmDeleteExchange)}
+                      disabled={deletingExchange === confirmDeleteExchange}
+                      className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-red-500 hover:bg-red-400 text-white font-bold rounded-lg text-sm transition-colors disabled:opacity-60"
+                    >
+                      {deletingExchange === confirmDeleteExchange
+                        ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Deleting...</>
+                        : <><XCircleIcon className="w-3.5 h-3.5" /> Delete Keys</>
                       }
                     </button>
                   </div>
-                  <div>
-                    <label className="text-xs text-slate-400 mb-1 block">Note</label>
-                    <input value={editForm.note} onChange={e => setEditForm(p => ({ ...p, note: e.target.value }))}
-                      placeholder="Optional note..."
-                      className="w-full px-3 py-2 bg-slate-900 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-amber-500/50" />
-                  </div>
-                </div>
+                </Card>
+              </div>
+            )
+          })()}
 
-                <div className="flex gap-3">
-                  <button onClick={() => setEditingExchange(null)}
-                    className="flex-1 py-2 border border-slate-700 text-slate-400 rounded-lg text-sm hover:text-white hover:border-slate-500 transition-colors">
-                    Cancel
-                  </button>
-                  <button onClick={handleSaveApiKey} disabled={savingExchange}
-                    className="flex-1 flex items-center justify-center gap-2 py-2 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-lg text-sm transition-colors disabled:opacity-60">
-                    <Save className="w-3.5 h-3.5" />
-                    {savingExchange ? 'Saving...' : 'Save'}
-                  </button>
-                </div>
-              </Card>
-            </div>
-          )}
         </div>
       )}
 
