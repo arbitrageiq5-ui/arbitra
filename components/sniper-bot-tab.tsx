@@ -412,7 +412,7 @@ function ConfigPanel({ config, onChange, onSave, saving }: ConfigPanelProps) {
           <div key={f.key}>
             <label className="text-[10px] text-slate-500 mb-1 block">{f.label}</label>
             <input type="number" min={f.min} step={f.step}
-              value={(config as Record<string,unknown>)[f.key] as number}
+              value={(config as unknown as Record<string,number>)[f.key]}
               onChange={e => onChange({ [f.key]: parseFloat(e.target.value) } as Partial<SniperBotConfig>)}
               className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-xs font-mono focus:outline-none focus:border-cyan-500/50" />
           </div>
