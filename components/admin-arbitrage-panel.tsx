@@ -52,48 +52,38 @@ const EXCHANGE_COLORS: Record<string, string> = {
   bitget:        'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
   mexc:          'bg-blue-400/20 text-blue-200 border-blue-400/30',
   phemex:        'bg-violet-500/20 text-violet-300 border-violet-500/30',
-  bitstamp:      'bg-rose-500/20 text-rose-300 border-rose-500/30',
-  poloniex:      'bg-teal-400/20 text-teal-200 border-teal-400/30',
-  upbit:         'bg-blue-600/20 text-blue-300 border-blue-600/30',
-  deribit:       'bg-orange-400/20 text-orange-200 border-orange-400/30',
-  // India
-  coindcx:       'bg-blue-700/20 text-blue-300 border-blue-700/30',
-  coinswitch:    'bg-purple-600/20 text-purple-300 border-purple-600/30',
-  wazirx:        'bg-cyan-600/20 text-cyan-300 border-cyan-600/30',
-  bitbns:        'bg-amber-500/20 text-amber-300 border-amber-500/30',
-  zebpay:        'bg-sky-600/20 text-sky-300 border-sky-600/30',
-  // Data
-  coingecko:     'bg-lime-500/20 text-lime-300 border-lime-500/30',
-  coinmarketcap: 'bg-green-400/20 text-green-200 border-green-400/30',
-  // From fetchers
-  mexc:             'bg-blue-400/20 text-blue-200 border-blue-400/30',
-  phemex:           'bg-violet-500/20 text-violet-300 border-violet-500/30',
+  bitstamp:         'bg-rose-500/20 text-rose-300 border-rose-500/30',
+  poloniex:         'bg-teal-400/20 text-teal-200 border-teal-400/30',
   upbit:            'bg-blue-600/20 text-blue-300 border-blue-600/30',
+  deribit:          'bg-orange-400/20 text-orange-200 border-orange-400/30',
+  bingx:            'bg-pink-500/20 text-pink-300 border-pink-500/30',
+  lbank:            'bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-500/30',
   // India
   coindcx:          'bg-blue-700/20 text-blue-300 border-blue-700/30',
   coinswitch:       'bg-purple-600/20 text-purple-300 border-purple-600/30',
-  wazirx:           'bg-teal-500/20 text-teal-300 border-teal-500/30',
+  wazirx:           'bg-cyan-600/20 text-cyan-300 border-cyan-600/30',
+  bitbns:           'bg-amber-500/20 text-amber-300 border-amber-500/30',
+  zebpay:           'bg-sky-600/20 text-sky-300 border-sky-600/30',
   'delta exchange': 'bg-orange-500/20 text-orange-300 border-orange-500/30',
   delta:            'bg-orange-500/20 text-orange-300 border-orange-500/30',
-  bitbns:           'bg-amber-600/20 text-amber-300 border-amber-600/30',
-  zebpay:           'bg-sky-600/20 text-sky-300 border-sky-600/30',
   mudrex:           'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+  // Data sources
+  coingecko:        'bg-lime-500/20 text-lime-300 border-lime-500/30',
+  coinmarketcap:    'bg-green-400/20 text-green-200 border-green-400/30',
 }
 
 const EXCHANGE_ABBR: Record<string, string> = {
   // Global
-  binance: 'BN', okx: 'OKX', bybit: 'BB', kucoin: 'KC',
-  kraken: 'KR', coinbase: 'CB', htx: 'HT', bitfinex: 'BFX',
-  gateio: 'GT', gemini: 'GM', cryptocom: 'CDC', bitget: 'BG',
-  mexc: 'MX', phemex: 'PH', bitstamp: 'BS', poloniex: 'PX',
-  upbit: 'UP', deribit: 'DR',
+  binance: 'BN',   okx: 'OKX',   bybit: 'BB',      kucoin: 'KC',
+  kraken: 'KR',    coinbase: 'CB', htx: 'HT',        bitfinex: 'BFX',
+  gateio: 'GT',    gemini: 'GM',  cryptocom: 'CDC',  bitget: 'BG',
+  mexc: 'MX',      phemex: 'PH',  bitstamp: 'BS',    poloniex: 'PX',
+  upbit: 'UP',     deribit: 'DR', bingx: 'BX',       lbank: 'LB',
   // India
-  coindcx: 'DCX', coinswitch: 'CSW', wazirx: 'WRX', bitbns: 'BNS', zebpay: 'ZBP',
-  delta: 'DEL', 'delta exchange': 'DEL', mudrex: 'MUX',
-  // Data
+  coindcx: 'DCX',  coinswitch: 'CSW', wazirx: 'WRX', bitbns: 'BNS',
+  zebpay: 'ZBP',   delta: 'DEL',      'delta exchange': 'DEL', mudrex: 'MUX',
+  // Data sources
   coingecko: 'CG', coinmarketcap: 'CMC',
-  // From fetchers
-  mexc: 'MX', phemex: 'PH', upbit: 'UP',
 }
 
 // ── Shared small components ───────────────────────────────────────────────────
@@ -2682,7 +2672,7 @@ export default function AdminArbitragePanel() {
         </div>
       )}
 
-      {/* ══ TRANSFER ROUTES TAB ════════════════════════════════════════════ */}
+      {/* ══ TRANSFER ROUTES TAB ════���═══════════════════════════════════════ */}
       {subTab === 'transfer-routes' && (
         <div className="space-y-4">
           <Card className="bg-slate-900 border-slate-800 p-5">
