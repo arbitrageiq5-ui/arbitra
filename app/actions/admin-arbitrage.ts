@@ -76,6 +76,8 @@ export interface AdminArbitrageOpp {
   estimatedTransferMin: number
   viable: boolean
   rejectReason: string | null
+  riskScore: number           // 0–100 (lower = safer)
+  riskLevel: 'Low' | 'Medium' | 'High' | 'Critical'
 }
 
 export interface ExchangeStatus {
@@ -322,6 +324,47 @@ export async function testAllExchanges(): Promise<Record<string, { ok: boolean; 
   return Object.fromEntries(results.map(r => [r.exchange, r.result]))
 }
 
+// ─── RISK SCORING ────────────────────────────────────────────────────────────
+// Computes a 0–100 risk score (0 = lowest risk, 100 = critical) from:
+//   - Net profit spread (very high % = likely data error / front-run risk)
+//   - Transfer time  (longer = more price-move exposure)
+//   - Total cost ratio (fees eating into profit = execution risk)
+//   - Whether the opp was rejected (reject reason = high risk)
+
+function calcRiskScore(params: {
+  netProfitPct: number
+  grossProfitPct: number
+  estimatedTransferMin: number
+  totalCostsUsd: number
+  grossProfitUsd: number
+  viable: boolean
+}): { riskScore: number; riskLevel: 'Low' | 'Medium' | 'High' | 'Critical' } {
+  const { netProfitPct, grossProfitPct, estimatedTransferMin, totalCostsUsd, grossProfitUsd, viable } = params
+
+  // Factor 1: spread anomaly — unrealistically high spread means suspect data (0–30 pts)
+  const spreadRisk = grossProfitPct > 10 ? 30 : grossProfitPct > 5 ? 20 : grossProfitPct > 2 ? 10 : 0
+
+  // Factor 2: transfer time — longer window = higher price movement risk (0–30 pts)
+  const transferRisk = estimatedTransferMin > 60 ? 30 : estimatedTransferMin > 30 ? 20 : estimatedTransferMin > 15 ? 12 : estimatedTransferMin > 5 ? 6 : 0
+
+  // Factor 3: cost-to-profit ratio — if costs > 70% of gross, margin of safety is thin (0–25 pts)
+  const costRatio = grossProfitUsd > 0 ? (totalCostsUsd / grossProfitUsd) : 1
+  const costRisk = costRatio > 0.9 ? 25 : costRatio > 0.7 ? 18 : costRatio > 0.5 ? 10 : costRatio > 0.3 ? 5 : 0
+
+  // Factor 4: negative / near-zero net profit (0–15 pts)
+  const profitRisk = netProfitPct < 0 ? 15 : netProfitPct < 0.1 ? 10 : netProfitPct < 0.3 ? 5 : 0
+
+  // Factor 5: rejected by viability check (flat +10 pts)
+  const viableRisk = viable ? 0 : 10
+
+  const score = Math.min(100, spreadRisk + transferRisk + costRisk + profitRisk + viableRisk)
+
+  const riskLevel: 'Low' | 'Medium' | 'High' | 'Critical' =
+    score < 20 ? 'Low' : score < 45 ? 'Medium' : score < 70 ? 'High' : 'Critical'
+
+  return { riskScore: score, riskLevel }
+}
+
 // ─── LIVE PRICE SCAN ────────────────────────────────────────────────────────
 
 // Complete display name map — covers all exchanges in our API list
@@ -453,6 +496,14 @@ export async function adminFetchLivePrices(symbols: string[]): Promise<{
       estimatedTransferMin: bd.estimatedTransferMin,
       viable:            bd.viable,
       rejectReason:      bd.rejectReason,
+      ...calcRiskScore({
+        netProfitPct:         bd.netProfitPct,
+        grossProfitPct:       bd.grossProfitPct,
+        estimatedTransferMin: bd.estimatedTransferMin,
+        totalCostsUsd:        bd.totalCosts,
+        grossProfitUsd:       bd.grossProfit,
+        viable:               bd.viable,
+      }),
     }
   })
 

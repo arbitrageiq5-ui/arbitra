@@ -145,6 +145,7 @@ export default function AdminArbitragePanel() {
   const [filterBuyEx, setFilterBuyEx] = useState('')
   const [filterSellEx, setFilterSellEx] = useState('')
   const [filterBlockchain, setFilterBlockchain] = useState('')
+  const [filterRisk, setFilterRisk] = useState('')
   const [sortByProfit, setSortByProfit] = useState<'asc' | 'desc'>('desc')
   const [selectedSymbols, setSelectedSymbols] = useState<string[]>(SCAN_SYMBOLS)
   const [minProfitThreshold, setMinProfitThreshold] = useState(0.3)
@@ -540,6 +541,7 @@ export default function AdminArbitragePanel() {
       if (filterBuyEx  && !o.buyExchange.toLowerCase().includes(filterBuyEx.toLowerCase()))  return false
       if (filterSellEx && !o.sellExchange.toLowerCase().includes(filterSellEx.toLowerCase())) return false
       // Blockchain filter: check if the symbol/coin exists on that blockchain
+      if (filterRisk && o.riskLevel !== filterRisk) return false
       if (filterBlockchain) {
         const coinBlockchains: Record<string, string[]> = {
           'BTC':   ['BTC', 'Polygon', 'Avalanche'],
@@ -661,14 +663,14 @@ export default function AdminArbitragePanel() {
             <div className="flex items-center gap-2 mb-2">
               <Filter className="w-4 h-4 text-amber-400" />
               <p className="text-xs text-slate-400 font-semibold">Market Filters</p>
-              {(filterSymbol || filterMinProfit > 0 || filterBuyEx || filterSellEx || filterBlockchain) && (
-                <button onClick={() => { setFilterSymbol(''); setFilterMinProfit(0); setFilterBuyEx(''); setFilterSellEx(''); setFilterBlockchain('') }}
+              {(filterSymbol || filterMinProfit > 0 || filterBuyEx || filterSellEx || filterBlockchain || filterRisk) && (
+                <button onClick={() => { setFilterSymbol(''); setFilterMinProfit(0); setFilterBuyEx(''); setFilterSellEx(''); setFilterBlockchain(''); setFilterRisk('') }}
                   className="ml-auto text-xs text-slate-500 hover:text-amber-400 transition-colors">
                   Clear all filters
                 </button>
               )}
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
               <div>
                 <label className="text-xs text-slate-400 mb-1.5 block font-medium">Coin</label>
                 <div className="relative">
@@ -768,6 +770,17 @@ export default function AdminArbitragePanel() {
                   <option value="BTC">Bitcoin</option>
                   <option value="XRP">XRP Ledger</option>
                   <option value="ADA">Cardano</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-slate-400 mb-1.5 block font-medium">Risk Level</label>
+                <select value={filterRisk} onChange={e => setFilterRisk(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 text-white rounded-lg text-sm focus:outline-none focus:border-amber-500/50">
+                  <option value="">All risks</option>
+                  <option value="Low">Low risk</option>
+                  <option value="Medium">Medium risk</option>
+                  <option value="High">High risk</option>
+                  <option value="Critical">Critical risk</option>
                 </select>
               </div>
               <div>
