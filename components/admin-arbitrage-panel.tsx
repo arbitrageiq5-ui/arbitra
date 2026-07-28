@@ -106,13 +106,21 @@ function ProfitBadge({ pct }: { pct: number }) {
   return <span className={`px-2 py-0.5 rounded border text-[11px] font-bold ${color}`}>+{pct.toFixed(3)}%</span>
 }
 
-function RiskBadge({ risk }: { risk: string }) {
-  const colors: Record<string, string> = {
-    Low:    'text-green-400 bg-green-500/10 border-green-500/20',
-    Medium: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
-    High:   'text-red-400 bg-red-500/10 border-red-500/20',
+function RiskBadge({ risk, score }: { risk: string; score?: number }) {
+  const cfg: Record<string, { cls: string; dot: string; icon: string }> = {
+    Low:      { cls: 'text-green-400 bg-green-500/10 border-green-500/25',   dot: 'bg-green-400',  icon: '▼' },
+    Medium:   { cls: 'text-amber-400 bg-amber-500/10 border-amber-500/25',   dot: 'bg-amber-400',  icon: '◆' },
+    High:     { cls: 'text-red-400 bg-red-500/10 border-red-500/25',         dot: 'bg-red-400',    icon: '▲' },
+    Critical: { cls: 'text-rose-300 bg-rose-600/15 border-rose-500/40',      dot: 'bg-rose-400 animate-pulse', icon: '!!' },
   }
-  return <span className={`text-[11px] px-2 py-0.5 rounded border font-medium ${colors[risk] ?? colors.Medium}`}>{risk}</span>
+  const c = cfg[risk] ?? cfg.Medium
+  return (
+    <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded border font-bold ${c.cls}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
+      {risk}
+      {score !== undefined && <span className="opacity-60 font-normal ml-0.5">{score}</span>}
+    </span>
+  )
 }
 
 function StatusDot({ ok, idle }: { ok?: boolean; idle?: boolean }) {
@@ -794,23 +802,52 @@ export default function AdminArbitragePanel() {
             </div>
           </Card>
 
-          {/* Opportunities table */}
-          {filtered.length === 0 ? (
-            <Card className="bg-slate-900 border-slate-800 p-12 text-center">
-              <Activity className="w-10 h-10 text-slate-700 mx-auto mb-3" />
-              <p className="text-slate-400 text-sm font-medium">
-                {opportunities.length === 0
-                  ? 'Click "Run Full Market Scan" to scan live prices across all exchange pairs'
-                  : `${opportunities.length} total opportunities found — adjust filters to show more`}
-              </p>
-              {opportunities.length === 0 && (
-                <p className="text-slate-600 text-xs mt-2">
-                  Global: Binance · Bybit · KuCoin · OKX · Gate.io · Kraken · Coinbase · Bitget · MEXC · HTX · Bitfinex · Gemini · Upbit · Phemex &nbsp;|&nbsp; India: CoinDCX · CoinSwitch · WazirX · Delta Exchange · BitBns · ZebPay · Mudrex
-                </p>
-              )}
-            </Card>
-          ) : (
-            <Card className="bg-slate-900 border-slate-800 overflow-hidden">
+            {/* Risk Summary Bar */}
+            {filtered.length > 0 && (() => {
+              const counts = { Low: 0, Medium: 0, High: 0, Critical: 0 }
+              filtered.forEach(o => { if (o.riskLevel in counts) counts[o.riskLevel as keyof typeof counts]++ })
+              const avg = filtered.length ? Math.round(filtered.reduce((s, o) => s + (o.riskScore ?? 0), 0) / filtered.length) : 0
+              return (
+                <div className="flex flex-wrap items-center gap-2 px-1">
+                  <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Risk Summary:</span>
+                  {counts.Low > 0 && (
+                    <button onClick={() => setFilterRisk(filterRisk === 'Low' ? '' : 'Low')}
+                      className={`flex items-center gap-1 px-2 py-0.5 rounded border text-[10px] font-bold transition-colors ${filterRisk === 'Low' ? 'bg-green-500/25 border-green-400 text-green-300' : 'bg-green-500/10 border-green-500/25 text-green-400 hover:bg-green-500/20'}`}>
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
+                      Low <span className="opacity-70">&times;{counts.Low}</span>
+                    </button>
+                  )}
+                  {counts.Medium > 0 && (
+                    <button onClick={() => setFilterRisk(filterRisk === 'Medium' ? '' : 'Medium')}
+                      className={`flex items-center gap-1 px-2 py-0.5 rounded border text-[10px] font-bold transition-colors ${filterRisk === 'Medium' ? 'bg-amber-500/25 border-amber-400 text-amber-300' : 'bg-amber-500/10 border-amber-500/25 text-amber-400 hover:bg-amber-500/20'}`}>
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                      Medium <span className="opacity-70">&times;{counts.Medium}</span>
+                    </button>
+                  )}
+                  {counts.High > 0 && (
+                    <button onClick={() => setFilterRisk(filterRisk === 'High' ? '' : 'High')}
+                      className={`flex items-center gap-1 px-2 py-0.5 rounded border text-[10px] font-bold transition-colors ${filterRisk === 'High' ? 'bg-red-500/25 border-red-400 text-red-300' : 'bg-red-500/10 border-red-500/25 text-red-400 hover:bg-red-500/20'}`}>
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+                      High <span className="opacity-70">&times;{counts.High}</span>
+                    </button>
+                  )}
+                  {counts.Critical > 0 && (
+                    <button onClick={() => setFilterRisk(filterRisk === 'Critical' ? '' : 'Critical')}
+                      className={`flex items-center gap-1 px-2 py-0.5 rounded border text-[10px] font-bold transition-colors ${filterRisk === 'Critical' ? 'bg-rose-600/30 border-rose-400 text-rose-300' : 'bg-rose-600/15 border-rose-500/40 text-rose-400 hover:bg-rose-600/25'}`}>
+                      <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse" />
+                      Critical <span className="opacity-70">&times;{counts.Critical}</span>
+                    </button>
+                  )}
+                  <span className="ml-auto text-[10px] text-slate-500">
+                    Avg risk score: <span className={`font-bold ${avg < 20 ? 'text-green-400' : avg < 45 ? 'text-amber-400' : avg < 70 ? 'text-red-400' : 'text-rose-400'}`}>{avg}/100</span>
+                  </span>
+                </div>
+              )
+            })()}
+
+            {/* Opportunities table */}
+            {filtered.length > 0 && (
+              <Card className="bg-slate-900 border-slate-800 overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
@@ -825,6 +862,7 @@ export default function AdminArbitragePanel() {
                       <th className="px-3 py-3 font-medium text-right">Slippage</th>
                       <th className="px-3 py-3 font-medium text-right">Net Profit</th>
                       <th className="px-3 py-3 font-medium text-right">Transfer</th>
+                      <th className="px-3 py-3 font-medium text-center">Risk</th>
                       <th className="px-3 py-3 font-medium text-right">Action</th>
                     </tr>
                   </thead>
@@ -874,6 +912,14 @@ export default function AdminArbitragePanel() {
                           <span className="text-slate-400 text-[10px] flex items-center justify-end gap-1">
                             <Timer className="w-3 h-3" />{opp.estimatedTransferMin}m
                           </span>
+                        </td>
+                        <td className="px-3 py-3 text-center">
+                          <RiskBadge risk={opp.riskLevel ?? 'Medium'} score={opp.riskScore} />
+                          {opp.rejectReason && (
+                            <p className="text-[9px] text-slate-500 mt-0.5 max-w-[90px] truncate" title={opp.rejectReason}>
+                              {opp.rejectReason}
+                            </p>
+                          )}
                         </td>
                         <td className="px-3 py-3 text-right">
                           <button
