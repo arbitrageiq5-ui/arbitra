@@ -415,6 +415,44 @@ export const referralIncomeCommissions = pgTable('referral_income_commissions', 
   createdAt:     timestamp('createdAt').notNull().defaultNow(),
 })
 
+// --- Trader Arbitrage Bot Trades ---
+// Each row = one full arbitrage cycle: buy on exchange A → withdraw → deposit on B → sell
+
+export const arbitrageBotTrades = pgTable('arbitrage_bot_trades', {
+  id:              serial('id').primaryKey(),
+  userId:          text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  symbol:          text('symbol').notNull(),           // e.g. USDT, BTC, ETH
+  network:         text('network').notNull(),           // e.g. TRC20, BEP20, ERC20
+  buyExchange:     text('buy_exchange').notNull(),
+  sellExchange:    text('sell_exchange').notNull(),
+  buyPrice:        decimal('buy_price', { precision: 18, scale: 8 }).notNull(),
+  sellPrice:       decimal('sell_price', { precision: 18, scale: 8 }).notNull(),
+  amount:          decimal('amount', { precision: 18, scale: 8 }).notNull(),       // qty of coin
+  amountUsd:       decimal('amount_usd', { precision: 18, scale: 2 }).notNull(),   // capital in USD
+  grossProfitUsd:  decimal('gross_profit_usd', { precision: 18, scale: 4 }),
+  feeBuyUsd:       decimal('fee_buy_usd', { precision: 18, scale: 4 }),
+  feeSellUsd:      decimal('fee_sell_usd', { precision: 18, scale: 4 }),
+  feeNetworkUsd:   decimal('fee_network_usd', { precision: 18, scale: 4 }),
+  netProfitUsd:    decimal('net_profit_usd', { precision: 18, scale: 4 }),
+  netProfitPct:    decimal('net_profit_pct', { precision: 8, scale: 4 }),
+  withdrawTxId:    text('withdraw_tx_id'),
+  depositTxId:     text('deposit_tx_id'),
+  sellOrderId:     text('sell_order_id'),
+  buyOrderId:      text('buy_order_id'),
+  destinationAddr: text('destination_addr'),           // address on sell exchange
+  riskLevel:       text('risk_level').default('Medium'), // Low | Medium | High | Critical
+  riskScore:       integer('risk_score').default(50),
+  // Status pipeline
+  status:          text('status').notNull().default('pending'),
+  // pending → buying → withdrawing → depositing → selling → completed | failed
+  statusDetail:    text('status_detail'),
+  errorMessage:    text('error_message'),
+  startedAt:       timestamp('started_at'),
+  completedAt:     timestamp('completed_at'),
+  createdAt:       timestamp('createdAt').notNull().defaultNow(),
+  updatedAt:       timestamp('updatedAt').notNull().defaultNow(),
+})
+
 // --- Exchange Transfer Logs (admin cross-exchange transfers) ---
 
 export const exchangeTransferLogs = pgTable('exchange_transfer_logs', {

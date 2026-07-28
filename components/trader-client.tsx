@@ -25,13 +25,14 @@ import { ActivationFeeModal } from '@/components/activation-fee-modal'
 import { TradingBot } from '@/components/trading-bot'
 import { TraderAiArbitrageModal } from '@/components/trader-ai-modal'
 import { Lending } from '@/components/lending'
+import { ArbitrageBotPanel } from '@/components/arbitrage-bot-panel'
 
 type Opportunity = Awaited<ReturnType<typeof getMarketOpportunities>>[number]
 type DepositAddress = Awaited<ReturnType<typeof getDepositAddresses>>[number]
 type FundRequest = Awaited<ReturnType<typeof getMyFundRequests>>[number]
 
 type Network = 'TRC20' | 'BEP20' | 'ERC20'
-type Tab = 'wallet' | 'opportunities' | 'funds' | 'exchanges' | 'trade' | 'auto-trade' | 'passive-income' | 'lending' | 'trading-bot'
+type Tab = 'wallet' | 'opportunities' | 'funds' | 'exchanges' | 'trade' | 'auto-trade' | 'passive-income' | 'lending' | 'trading-bot' | 'arb-bot'
 type SortKey = 'netProfit' | 'spread' | 'volume24h' | 'symbol'
 type SortDir = 'asc' | 'desc'
 
@@ -338,6 +339,7 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
               { key: 'wallet' as Tab, label: 'Wallet', icon: Wallet, count: null },
               { key: 'auto-trade' as Tab, label: 'Auto Trade', icon: Zap, count: null },
               { key: 'trading-bot' as Tab, label: 'Bots', icon: Bot, count: null },
+              { key: 'arb-bot' as Tab, label: 'Arb Bot', icon: ArrowRightLeft, count: null },
               { key: 'lending' as Tab, label: 'Lending', icon: TrendingUp, count: null },
               { key: 'passive-income' as Tab, label: 'Passive', icon: Gift, count: null },
               { key: 'opportunities' as Tab, label: 'Markets', icon: TrendingUp, count: null },
@@ -388,12 +390,17 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
     <TradingBot />
   )}
 
+        {/* ── TAB: ARB BOT ── */}
+        {activeTab === 'arb-bot' && (
+          <ArbitrageBotPanel />
+        )}
+
         {/* ── TAB: PASSIVE INCOME ── */}
         {activeTab === 'passive-income' && (
           <PassiveIncome />
         )}
 
-        {/* ── TAB: TRADE OPPORTUNITIES ── */}
+        {/* ��─ TAB: TRADE OPPORTUNITIES ── */}
         {activeTab === 'opportunities' && (
           <div className="space-y-4">
             {/* Stats — 3-col on sm+, compact row on mobile */}
