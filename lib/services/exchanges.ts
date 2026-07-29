@@ -5,6 +5,7 @@
  */
 
 import { BASE_PRICES, COIN_VOLUME_24H, DEFAULT_VOLUME } from '@/lib/constants/prices'
+import { getPriceCached, setPriceCached } from '@/lib/cache/price-cache'
 
 export interface ExchangePrice {
   symbol: string
@@ -426,6 +427,25 @@ export async function getPricesAcrossExchanges(
 ): Promise<ExchangePrice[]> {
   const seed = Math.floor(Date.now() / 15000) // 15-second window for sim
 
+  // ── Cache check: return cached prices if all symbols hit within 15s window ─
+  const cachedResults: ExchangePrice[] = []
+  const uncachedSymbols = new Set(symbols)
+  
+  for (const symbol of symbols) {
+    for (const exName of ['binance', 'okx', 'bybit', 'kucoin', 'kraken', 'coinbase', 'bitfinex']) {
+      const cached = getPriceCached(exName, symbol)
+      if (cached) {
+        cachedResults.push({ symbol, exchange: exName, price: cached, timestamp: Date.now() })
+        uncachedSymbols.delete(symbol)
+      }
+    }
+  }
+
+  // If everything is cached, return immediately (avoid all API calls)
+  if (uncachedSymbols.size === 0 && cachedResults.length > 0) {
+    return cachedResults
+  }
+
   // ── Layer 1: CCXT live prices ─────────────────────────────────────────────
   let ccxtPrices: ExchangePrice[] = []
   try {
@@ -501,6 +521,11 @@ export async function getPricesAcrossExchanges(
     if (!symbolsWithAnyPrice.has(symbol)) {
       livePrices.push(...simulatePricesForSymbol(symbol, seed + symbol.charCodeAt(0) * 997))
     }
+  }
+
+  // ── Cache all fetched prices for next 15 seconds ──────────────────────────
+  for (const p of livePrices) {
+    setPriceCached(p.exchange, p.symbol, p.price)
   }
 
   return livePrices
