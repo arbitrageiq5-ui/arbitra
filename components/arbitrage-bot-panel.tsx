@@ -11,9 +11,10 @@ import {
 } from 'lucide-react'
 import {
   executeBotTrade, getBotTradeHistory, cancelBotTrade,
-  getEnabledExchangeKeys, computeProfitBreakdown,
-  type BotTradeRow, type BotTradeInput,
+  getEnabledExchangeKeys,
+  type BotTradeRow,
 } from '@/app/actions/arbitrage-bot'
+import { computeProfitBreakdown, type BotTradeInput } from '@/lib/arb-bot-utils'
 import { getMarketOpportunities } from '@/app/actions/arbitrage'
 
 type Opportunity = Awaited<ReturnType<typeof getMarketOpportunities>>[number]
