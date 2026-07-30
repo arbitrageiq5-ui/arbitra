@@ -15,7 +15,7 @@ async function getUserId() {
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-export type BotTradeRow = typeof arbitrageBotTrades.$inferSelect
+type BotTradeRow = typeof arbitrageBotTrades.$inferSelect
 
 // Map display names to CCXT exchange IDs
 const DISPLAY_TO_CCXT: Record<string, string> = {

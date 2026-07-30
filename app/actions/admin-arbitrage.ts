@@ -36,6 +36,18 @@ function calcNetProfit(symbol:string,buyExchange:string,sellExchange:string,buyP
   return { symbol,buyExchange,sellExchange,tradeAmountUsd,buyPrice,sellPrice,tradingFeeBuy:tfBuy,tradingFeeSell:tfSell,withdrawalFee:wd,networkFee:nf,estimatedSlippage:slip,safetyBuffer:safe,grossProfit:gross,totalCosts:costs,netProfit:net,grossProfitPct:gPct,netProfitPct:nPct,roi:nPct,viable:!reject,rejectReason:reject,estimatedTransferMin:xfer }
 }
 import OpenAI from 'openai'
+import type {
+  AdminLivePrice, AdminArbitrageOpp, ExchangeStatus, TransferRoute,
+  ExchangeApiKey, AiArbitrageStrategy, ExchangeBalance,
+  TransferRequest, TransferResult, BotConfig, RiskFilterResult,
+  BotAnalytics, BotTradeResult, TransferLog, SniperBotConfig, ScoredOpportunity,
+} from '@/lib/types/arbitrage-types'
+export type {
+  AdminLivePrice, AdminArbitrageOpp, ExchangeStatus, TransferRoute,
+  ExchangeApiKey, AiArbitrageStrategy, ExchangeBalance,
+  TransferRequest, TransferResult, BotConfig, RiskFilterResult,
+  BotAnalytics, BotTradeResult, TransferLog, SniperBotConfig, ScoredOpportunity,
+} from '@/lib/types/arbitrage-types'
 
 async function requireAdmin() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -45,60 +57,10 @@ async function requireAdmin() {
   return session.user
 }
 
-// ─── Types ─────────────────────────────────────────────────────────────────
+// ─── Types (imported from @/lib/types/arbitrage-types — NOT declared here) ──
 
-export interface AdminLivePrice {
-  symbol: string
-  exchange: string
-  price: number
-  timestamp: number
-}
-
-export interface AdminArbitrageOpp {
-  id: string
-  symbol: string
-  buyExchange: string
-  buyPrice: number
-  sellExchange: string
-  sellPrice: number
-  profitPct: number
-  netProfitPct: number
-  profitPer1k: number
-  detectedAt: string
-  // Enhanced net profit fields
-  tradingFeeUsd: number
-  withdrawalFeeUsd: number
-  networkFeeUsd: number
-  slippageUsd: number
-  safetyBufferUsd: number
-  grossProfitUsd: number
-  netProfitUsd: number
-  estimatedTransferMin: number
-  viable: boolean
-  rejectReason: string | null
-  riskScore: number           // 0–100 (lower = safer)
-  riskLevel: 'Low' | 'Medium' | 'High' | 'Critical'
-}
-
-export interface ExchangeStatus {
-  name: string
-  label: string
-  online: boolean
-  latencyMs: number
-  pricesFetched: number
-  lastChecked: string
-}
-
-export interface TransferRoute {
-  fromExchange: string
-  toExchange: string
-  symbol: string
-  network: 'TRC20' | 'BEP20' | 'ERC20' | 'SOL' | 'BTC' | 'BNB' | 'AVAX'
-  estimatedFee: number
-  estimatedTimeMin: number
-}
-
-export interface ExchangeApiKey {
+// ExchangeApiKey local shape used below
+interface ExchangeApiKey {
   id: number
   exchange: string
   label: string
@@ -512,7 +474,7 @@ export async function adminFetchLivePrices(symbols: string[]): Promise<{
 
 // ─── AI AUTO SETUP ──────────────────────────────────────────────────────────
 
-export interface AiArbitrageStrategy {
+interface AiArbitrageStrategy {
   summary: string
   recommendedPairs: Array<{
     symbol: string
@@ -681,7 +643,7 @@ export async function getTransferRoutes(
 
 // ─── EXCHANGE BALANCES ───────────────────────────────────────────────────────
 
-export interface ExchangeBalance {
+interface ExchangeBalance {
   exchange: string
   label: string
   symbol: string
@@ -711,7 +673,7 @@ export async function getExchangeBalances(exchange: string): Promise<ExchangeBal
     return [{ exchange, label, symbol: 'N/A', free: 0, locked: 0, total: 0, usdValue: 0 }]
   }
 
-  // ── Binance ──────────────────────────────────────────────────────────────
+  // ── Binance ────────────────────────��─────────────────────────────────────
   if (exchange === 'binance') {
     try {
       const crypto = await import('crypto')
@@ -844,7 +806,7 @@ export async function getExchangeBalances(exchange: string): Promise<ExchangeBal
 
 // ─── EXECUTE TRANSFER ────────────────────────────────────────────────────────
 
-export interface TransferRequest {
+interface TransferRequest {
   fromExchange: string
   toExchange:   string
   symbol:       string
@@ -854,7 +816,7 @@ export interface TransferRequest {
   memo?:        string
 }
 
-export interface TransferResult {
+interface TransferResult {
   success: boolean
   txId?:   string
   message: string
@@ -1022,7 +984,7 @@ export async function executeExchangeTransfer(req: TransferRequest): Promise<Tra
 
 // ─── BOT CONFIG ─────────────────────────────────────────────────────────────
 
-export interface BotConfig {
+interface BotConfig {
   // Execution
   isRunning: boolean
   executionMode: 'monitor' | 'semi-auto' | 'full-auto'
@@ -1123,7 +1085,7 @@ export async function saveBotConfig(config: Partial<BotConfig>): Promise<void> {
 
 // ─── RISK FILTER STATUS ─────────────────────────────────────────────────────
 
-export interface RiskFilterResult {
+interface RiskFilterResult {
   filter: string
   passed: boolean
   value: string
@@ -1158,7 +1120,7 @@ export async function evaluateRiskFilters(
 
 // ─── ANALYTICS ──────────────────────────────────────────────────────────────
 
-export interface BotAnalytics {
+interface BotAnalytics {
   totalOpportunities: number
   executedTrades: number
   successfulTrades: number
@@ -1304,7 +1266,7 @@ export async function getBotAnalytics(): Promise<BotAnalytics> {
 
 // ─── EXECUTE BOT TRADE ──────────────────────────────────────────────────────
 
-export interface BotTradeResult {
+interface BotTradeResult {
   success: boolean
   opportunityId: string
   message: string
@@ -1356,7 +1318,7 @@ export async function executeBotTrade(opp: AdminArbitrageOpp, config: BotConfig)
 
 // ─── TRANSFER HISTORY ────────────────────────────────────────────────────────
 
-export interface TransferLog {
+interface TransferLog {
   id: number
   fromExchange: string
   toExchange:   string
@@ -1396,7 +1358,7 @@ export async function getTransferHistory(limit = 50): Promise<TransferLog[]> {
 // BOT 2 — LIVE OPPORTUNITY SNIPER + ALT-COIN TRANSFER ENGINE
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export interface SniperBotConfig {
+interface SniperBotConfig {
   enabled:            boolean
   tradeAmountUsd:     number
   minNetProfitPct:    number
@@ -1415,7 +1377,7 @@ export interface SniperBotConfig {
   }
 }
 
-export interface ScoredOpportunity {
+interface ScoredOpportunity {
   id:                   string
   symbol:               string
   buyExchange:          string

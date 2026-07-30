@@ -14,8 +14,9 @@ import {
 import {
   executeBotTrade, getBotTradeHistory, cancelBotTrade,
   getEnabledExchangeKeys, fetchLivePricesForPair,
-  type BotTradeRow,
 } from '@/app/actions/arbitrage-bot'
+import type { arbitrageBotTrades } from '@/lib/db/schema'
+type BotTradeRow = typeof arbitrageBotTrades.$inferSelect
 import {
   computeProfitBreakdown, runSafetyChecks,
   type BotTradeInput, type SafetyCheck,
