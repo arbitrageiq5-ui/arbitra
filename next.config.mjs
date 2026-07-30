@@ -33,13 +33,6 @@ const nextConfig = {
           { key: 'Content-Type', value: 'application/manifest+json' },
         ],
       },
-      // Static assets — cache for 1 year (versioned by Next.js)
-      {
-        source: '/_next/static/:path*',
-        headers: [
-          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
-        ],
-      },
       // Images — cache for 30 days
       {
         source: '/images/:path*',
@@ -57,17 +50,6 @@ const nextConfig = {
     ]
   },
 
-  // Response headers for security and performance
-  async rewrites() {
-    return {
-      beforeFiles: [
-        {
-          source: '/api/health',
-          destination: '/api/health',
-        },
-      ],
-    }
-  },
 }
 
 export default nextConfig
