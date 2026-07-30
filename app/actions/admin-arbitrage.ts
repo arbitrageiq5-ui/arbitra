@@ -5,7 +5,8 @@ import { headers } from 'next/headers'
 import { db } from '@/lib/db'
 import { exchangeApiKeys, arbitrageConfig, exchangeTransferLogs, arbitrageOpportunities } from '@/lib/db/schema'
 import { eq, desc } from 'drizzle-orm'
-import { getPricesAcrossExchanges, detectArbitrageOpportunities, ExchangePrice } from '@/lib/services/exchanges'
+import { getPricesAcrossExchanges, detectArbitrageOpportunities } from '@/lib/services/exchanges'
+import type { ExchangePrice } from '@/lib/services/exchanges'
 // ─── Inline profit calculator (private — not exported, avoids 'use server' object export error) ───
 const _EXFEE: Record<string, number> = {
   // Global
@@ -51,32 +52,7 @@ async function requireAdmin() {
   return session.user
 }
 
-// ─── Types (imported from @/lib/types/arbitrage-types — NOT declared here) ──
-
-// ExchangeApiKey local shape used below
-interface ExchangeApiKey {
-  id: number
-  exchange: string
-  label: string
-  apiKey: string | null
-  apiSecret: string | null
-  passphrase: string | null
-  isEnabled: boolean
-  isPublicOnly: boolean
-  lastTestedAt: string | null
-  lastTestStatus: string | null
-  lastTestMs: number | null
-  note: string | null
-  // enriched metadata from ALL_EXCHANGES
-  docsUrl: string
-  docsLabel: string
-  tradingFee: string
-  requiresIpWhitelist: boolean
-  hasPassphrase: boolean
-  permissions: string[]
-  color: string
-  region: string
-}
+// ─── Types imported from @/lib/types/arbitrage-types (not declared here) ─────
 
 // ─── EXCHANGE API KEY MANAGEMENT ───────────────────────────────────────────
 
@@ -1350,7 +1326,7 @@ export async function getTransferHistory(limit = 50): Promise<TransferLog[]> {
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // BOT 2 — LIVE OPPORTUNITY SNIPER + ALT-COIN TRANSFER ENGINE
-// ═══════════════════════════════════════════════════════════════════════════════
+// ══════════════════════════��════════════════════════════════════════════════════
 
 interface SniperBotConfig {
   enabled:            boolean
