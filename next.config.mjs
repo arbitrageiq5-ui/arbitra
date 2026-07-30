@@ -19,11 +19,12 @@ const nextConfig = {
   // PWA: service worker must never be cached so updates are picked up immediately
   async headers() {
     return [
-      // Service worker — no cache
+      // Service worker — never cache so stale chunks can never be served
       {
         source: '/sw.js',
         headers: [
-          { key: 'Cache-Control', value: 'public, max-age=0, must-revalidate' },
+          { key: 'Cache-Control', value: 'no-store, no-cache, must-revalidate' },
+          { key: 'Pragma', value: 'no-cache' },
         ],
       },
       // Manifest
