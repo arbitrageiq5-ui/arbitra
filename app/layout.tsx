@@ -73,34 +73,9 @@ export default function RootLayout({
       <body className="antialiased font-sans" style={{ backgroundColor: '#050816', color: '#FFFFFF' }}>
         {children}
         {process.env.NODE_ENV === 'production' && <Analytics />}
-        <SwCleanup />
       </body>
     </html>
   )
 }
 
-// Unregisters ALL service workers and clears ALL caches so stale JS chunks
-// never block page loads. Runs once on every page load — no re-registration.
-function SwCleanup() {
-  return (
-    <script
-      dangerouslySetInnerHTML={{
-        __html: `
-(function() {
-  if (!('serviceWorker' in navigator)) return;
-  // Unregister every SW registration
-  navigator.serviceWorker.getRegistrations().then(function(regs) {
-    regs.forEach(function(reg) { reg.unregister(); });
-  });
-  // Delete every Cache Storage entry
-  if (window.caches) {
-    caches.keys().then(function(names) {
-      names.forEach(function(name) { caches.delete(name); });
-    });
-  }
-})();
-        `,
-      }}
-    />
-  )
-}
+
