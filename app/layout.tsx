@@ -57,6 +57,24 @@ export const viewport: Viewport = {
   viewportFit: 'cover',
 }
 
+// Registers sw-v3.js (new URL) so the browser fetches it fresh, bypassing any
+// cached copy of the old sw.js. The old SW expires on next browser check cycle.
+function SwInit() {
+  return (
+    <script
+      dangerouslySetInnerHTML={{
+        __html: `
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('/sw-v3.js').catch(function() {});
+  });
+}
+        `,
+      }}
+    />
+  )
+}
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -73,6 +91,7 @@ export default function RootLayout({
       <body className="antialiased font-sans" style={{ backgroundColor: '#050816', color: '#FFFFFF' }}>
         {children}
         {process.env.NODE_ENV === 'production' && <Analytics />}
+        <SwInit />
       </body>
     </html>
   )

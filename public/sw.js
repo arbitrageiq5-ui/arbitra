@@ -1,28 +1,24 @@
-// ArbitrageIQ Service Worker — self-destruct build
-// This SW wipes all caches and unregisters itself on every install so that
-// stale JS chunk caches (which cause "module factory not available" errors)
-// can never survive a rebuild. A new SW with real caching can be introduced
-// once the app is stable.
+// sw.js — network-only service worker (no caching)
+// All requests pass directly to the network. This SW never caches anything,
+// preventing stale JS chunk errors after rebuilds.
 
-self.addEventListener('install', event => {
-  // Skip waiting immediately so this SW activates before the old one can
-  // serve any more stale responses.
+const VERSION = 'v3'
+
+self.addEventListener('install', () => {
   self.skipWaiting()
-  event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.map(key => caches.delete(key)))
-    )
-  )
 })
 
 self.addEventListener('activate', event => {
+  // Delete every old cache from previous SW versions
   event.waitUntil(
-    // Delete every cache that might exist.
     caches.keys()
       .then(keys => Promise.all(keys.map(key => caches.delete(key))))
       .then(() => self.clients.claim())
-      .then(() => self.registration.unregister())
   )
 })
 
-// No fetch handler — every request goes straight to the network.
+// Network-only for ALL requests — especially /_next/ chunks
+self.addEventListener('fetch', event => {
+  // Always fetch from network, never touch the cache
+  event.respondWith(fetch(event.request))
+})
