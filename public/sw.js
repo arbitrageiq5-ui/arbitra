@@ -1,149 +1,120 @@
 // ArbitrageIQ Service Worker for offline support and caching
-const CACHE_NAME = 'arbitrage-iq-v1'
-const RUNTIME_CACHE = 'arbitrage-iq-runtime'
-const API_CACHE = 'arbitrage-iq-api'
+// v2 — never cache /_next/static/ chunks; they are content-hashed by the build
+const CACHE_NAME = 'arbitrage-iq-v2'
+const RUNTIME_CACHE = 'arbitrage-iq-runtime-v2'
+const API_CACHE = 'arbitrage-iq-api-v2'
 
-// Assets to cache on install
+// Assets to precache on install (app shell only — no JS chunks)
 const PRECACHE_ASSETS = [
-  '/',
   '/manifest.json',
   '/icon-192x192.png',
   '/icon-512x512.png',
 ]
 
-// Install event — cache essential assets
+// Install event — cache essential static assets, skip waiting so the new SW
+// activates immediately instead of waiting for old tabs to close.
 self.addEventListener('install', event => {
+  self.skipWaiting()
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll(PRECACHE_ASSETS)
-    })
+    caches.open(CACHE_NAME).then(cache => cache.addAll(PRECACHE_ASSETS))
   )
 })
 
-// Activate event — clean up old caches
+// Activate event — delete ALL old caches so stale chunks can never be served,
+// then claim all open clients immediately.
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then(cacheNames => {
-      return Promise.all(
+    caches.keys().then(cacheNames =>
+      Promise.all(
         cacheNames.map(cacheName => {
-          if (cacheName !== CACHE_NAME && cacheName !== RUNTIME_CACHE && cacheName !== API_CACHE) {
+          const isCurrentCache = [CACHE_NAME, RUNTIME_CACHE, API_CACHE].includes(cacheName)
+          if (!isCurrentCache) {
             return caches.delete(cacheName)
           }
         })
       )
-    })
+    ).then(() => self.clients.claim())
   )
 })
 
-// Fetch event — network-first for JS, cache-first for static assets
 self.addEventListener('fetch', event => {
   const { request } = event
   const url = new URL(request.url)
 
-  // Skip non-GET requests and external URLs
-  if (request.method !== 'GET' || !url.origin.includes(self.location.origin)) {
+  // Skip non-GET, cross-origin, or chrome-extension requests
+  if (
+    request.method !== 'GET' ||
+    url.origin !== self.location.origin ||
+    url.protocol === 'chrome-extension:'
+  ) {
     return
   }
 
-  // Next.js JS chunks — always fetch fresh to avoid stale code
-  if (url.pathname.includes('/_next/static/')) {
-    event.respondWith(
-      fetch(request)
-        .then(response => {
-          if (!response || response.status !== 200 || response.type !== 'basic') {
-            return response
-          }
-          const responseClone = response.clone()
-          caches.open(RUNTIME_CACHE).then(cache => {
-            cache.put(request, responseClone)
-          })
-          return response
-        })
-        .catch(() => caches.match(request))
-    )
+  // ── Next.js JS/CSS chunks — NETWORK ONLY, never cache ──────────────────────
+  // These are content-hashed by the build tool. Serving a stale chunk causes
+  // "module factory not available" errors. Let the browser handle caching.
+  if (url.pathname.startsWith('/_next/')) {
+    event.respondWith(fetch(request))
     return
   }
 
-  // API calls — network-first, cache fallback
+  // ── API calls — network-first, short-lived cache fallback ──────────────────
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(
       fetch(request)
         .then(response => {
-          // Cache successful responses
           if (response.ok) {
-            const responseToCache = response.clone()
-            caches.open(API_CACHE).then(cache => {
-              cache.put(request, responseToCache)
-            })
+            const clone = response.clone()
+            caches.open(API_CACHE).then(cache => cache.put(request, clone))
           }
           return response
         })
-        .catch(() => {
-          // Return cached API response if network fails
-          return caches.match(request).then(cachedResponse => {
-            return cachedResponse || new Response('API unavailable offline', { status: 503 })
-          })
-        })
+        .catch(() =>
+          caches.match(request).then(cached =>
+            cached || new Response('{"error":"offline"}', {
+              status: 503,
+              headers: { 'Content-Type': 'application/json' },
+            })
+          )
+        )
     )
     return
   }
 
-  // Static assets (JS, CSS, images) — cache-first, network fallback
-  if (
-    request.destination === 'style' ||
-    request.destination === 'script' ||
-    request.destination === 'image' ||
-    request.destination === 'font'
-  ) {
+  // ── Images and fonts — cache-first, network fallback ──────────────────────
+  if (request.destination === 'image' || request.destination === 'font') {
     event.respondWith(
-      caches.match(request).then(cachedResponse => {
-        return (
-          cachedResponse ||
-          fetch(request)
-            .then(response => {
-              if (response.ok) {
-                const responseToCache = response.clone()
-                caches.open(RUNTIME_CACHE).then(cache => {
-                  cache.put(request, responseToCache)
-                })
-              }
-              return response
-            })
-            .catch(() => {
-              // Fallback for failed requests
-              if (request.destination === 'image') {
-                return new Response(
-                  '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect fill="#333" width="100" height="100"/></svg>',
-                  { headers: { 'Content-Type': 'image/svg+xml' } }
-                )
-              }
-              return new Response('Offline', { status: 503 })
-            })
-        )
+      caches.match(request).then(cached => {
+        if (cached) return cached
+        return fetch(request).then(response => {
+          if (response.ok) {
+            const clone = response.clone()
+            caches.open(RUNTIME_CACHE).then(cache => cache.put(request, clone))
+          }
+          return response
+        })
       })
     )
     return
   }
 
-  // Navigation requests — network-first
+  // ── Navigation — network-first, cache fallback ────────────────────────────
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
         .then(response => {
           if (response.ok) {
-            const responseToCache = response.clone()
-            caches.open(RUNTIME_CACHE).then(cache => {
-              cache.put(request, responseToCache)
-            })
+            const clone = response.clone()
+            caches.open(RUNTIME_CACHE).then(cache => cache.put(request, clone))
           }
           return response
         })
-        .catch(() => {
-          // Try to serve from cache on network failure
-          return caches.match(request).then(cachedResponse => {
-            return cachedResponse || caches.match('/') || new Response('Offline', { status: 503 })
-          })
-        })
+        .catch(() =>
+          caches.match(request).then(cached =>
+            cached || caches.match('/') || new Response('Offline', { status: 503 })
+          )
+        )
     )
+    return
   }
 })
