@@ -86,25 +86,9 @@ function ServiceWorkerRegister() {
         __html: `
           if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-              navigator.serviceWorker.getRegistrations().then(registrations => {
-                // Unregister any old SWs so stale caches are wiped before re-registering
-                return Promise.all(registrations.map(r => r.unregister()))
-              }).then(() => {
-                return navigator.serviceWorker.register('/sw.js')
-              }).then(reg => {
-                // Force the new SW to activate immediately without waiting for tabs to close
-                if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' })
-                reg.addEventListener('updatefound', () => {
-                  const newWorker = reg.installing
-                  if (newWorker) {
-                    newWorker.addEventListener('statechange', () => {
-                      if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                        newWorker.postMessage({ type: 'SKIP_WAITING' })
-                      }
-                    })
-                  }
-                })
-              }).catch(err => console.error('[PWA] Service Worker error:', err))
+              // Register the self-destructing SW — it wipes all caches and
+              // unregisters itself, ensuring no stale JS chunks survive rebuilds.
+              navigator.serviceWorker.register('/sw.js').catch(() => {})
             })
           }
         `,
