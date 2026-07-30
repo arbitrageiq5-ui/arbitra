@@ -8,10 +8,12 @@ import {
   generateAiArbitrageStrategy, getSavedAiStrategy, getTransferRoutes,
   getExchangeBalances, executeExchangeTransfer, getTransferHistory,
   getBotConfig, saveBotConfig, getBotAnalytics, executeBotTrade, evaluateRiskFilters,
+} from '@/app/actions/admin-arbitrage'
+import type {
   AdminLivePrice, AdminArbitrageOpp, ExchangeStatus, ExchangeApiKey,
   AiArbitrageStrategy, TransferRoute, ExchangeBalance, TransferLog,
   BotConfig, BotAnalytics, RiskFilterResult,
-} from '@/app/actions/admin-arbitrage'
+} from '@/lib/types/arbitrage-types'
 import { calcNetProfit, type NetProfitBreakdown } from '@/lib/utils/arbitrage-calc'
 import { SniperBotTab } from '@/components/sniper-bot-tab'
 import {

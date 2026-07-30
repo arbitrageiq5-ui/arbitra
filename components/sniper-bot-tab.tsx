@@ -11,8 +11,8 @@ import {
 import {
   getSniperBotConfig, saveSniperBotConfig, grabLiveOpportunities,
   getDepositAddress, executeExchangeTransfer,
-  SniperBotConfig, ScoredOpportunity,
 } from '@/app/actions/admin-arbitrage'
+import type { SniperBotConfig, ScoredOpportunity } from '@/lib/types/arbitrage-types'
 
 // ─── Exchange helpers ─────────────────────────────────────────────────────────
 

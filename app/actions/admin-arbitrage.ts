@@ -42,12 +42,6 @@ import type {
   TransferRequest, TransferResult, BotConfig, RiskFilterResult,
   BotAnalytics, BotTradeResult, TransferLog, SniperBotConfig, ScoredOpportunity,
 } from '@/lib/types/arbitrage-types'
-export type {
-  AdminLivePrice, AdminArbitrageOpp, ExchangeStatus, TransferRoute,
-  ExchangeApiKey, AiArbitrageStrategy, ExchangeBalance,
-  TransferRequest, TransferResult, BotConfig, RiskFilterResult,
-  BotAnalytics, BotTradeResult, TransferLog, SniperBotConfig, ScoredOpportunity,
-} from '@/lib/types/arbitrage-types'
 
 async function requireAdmin() {
   const session = await auth.api.getSession({ headers: await headers() })
