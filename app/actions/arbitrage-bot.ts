@@ -7,8 +7,6 @@ import { headers } from 'next/headers'
 import { eq, desc, and } from 'drizzle-orm'
 import { computeProfitBreakdown, type BotTradeInput } from '@/lib/arb-bot-utils'
 
-export type { BotTradeInput } from '@/lib/arb-bot-utils'
-
 // ── Auth helper ───────────────────────────────────────────────────────────────
 async function getUserId() {
   const session = await auth.api.getSession({ headers: await headers() })
