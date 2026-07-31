@@ -6,11 +6,6 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  // Disable Turbopack due to client-reference stub corruption in server actions (Next.js 16 dev mode bug)
-  // Use SWC bundler instead for reliable builds
-  experimental: {
-    turbopack: false,
-  },
   serverExternalPackages: ['ccxt', 'protobufjs'],
 
   // Compression and optimization

@@ -21,56 +21,33 @@ async function requireAdmin() {
   return session
 }
 
-// Compute a user's live wallet balance from all sources
+// Compute a user's live wallet balance — all 7 queries run in parallel
 export async function computeWalletBalance(userId: string): Promise<number> {
-  // 1. Confirmed deposits (fund_requests confirmed)
-  const depRes = await db
-    .select({ total: sum(fundRequests.amount) })
-    .from(fundRequests)
-    .where(sql`"userId" = ${userId} AND status = 'confirmed'`)
-  const deposits = parseFloat(String(depRes[0]?.total ?? '0')) || 0
+  const [depRes, profitRes, commRes, withRes, pendingWithRes, userRow, shiftRes] = await Promise.all([
+    db.select({ total: sum(fundRequests.amount) }).from(fundRequests)
+      .where(sql`"userId" = ${userId} AND status = 'confirmed'`),
+    db.select({ total: sum(autoTradeLogs.dailyNet) }).from(autoTradeLogs)
+      .where(eq(autoTradeLogs.userId, userId)),
+    db.select({ total: sum(referralCommissions.amount) }).from(referralCommissions)
+      .where(sql`"userId" = ${userId} AND status IN ('pending','paid')`),
+    db.select({ total: sum(withdrawals.amount) }).from(withdrawals)
+      .where(sql`"userId" = ${userId} AND status = 'approved'`),
+    db.select({ total: sum(withdrawals.amount) }).from(withdrawals)
+      .where(sql`"userId" = ${userId} AND status = 'pending'`),
+    db.select({ isActivated: user.isActivated }).from(user).where(eq(user.id, userId)).limit(1),
+    db.select({ total: sum(walletTransactions.amount) }).from(walletTransactions)
+      .where(sql`"userId" = ${userId} AND type = 'auto_trade_principal' AND status = 'completed'`),
+  ])
 
-  // 2. Auto-trade net profits (sum of daily_net from logs)
-  const profitRes = await db
-    .select({ total: sum(autoTradeLogs.dailyNet) })
-    .from(autoTradeLogs)
-    .where(eq(autoTradeLogs.userId, userId))
-  const profits = parseFloat(String(profitRes[0]?.total ?? '0')) || 0
-
-  // 3. Referral commissions (all — pending + paid both accumulate in wallet)
-  const commRes = await db
-    .select({ total: sum(referralCommissions.amount) })
-    .from(referralCommissions)
-    .where(sql`"userId" = ${userId} AND status IN ('pending','paid')`)
-  const commissions = parseFloat(String(commRes[0]?.total ?? '0')) || 0
-
-  // 4. Approved withdrawals (debit)
-  const withRes = await db
-    .select({ total: sum(withdrawals.amount) })
-    .from(withdrawals)
-    .where(sql`"userId" = ${userId} AND status = 'approved'`)
-  const withdrawn = parseFloat(String(withRes[0]?.total ?? '0')) || 0
-
-  // 5. Pending withdrawals (locked)
-  const pendingWithRes = await db
-    .select({ total: sum(withdrawals.amount) })
-    .from(withdrawals)
-    .where(sql`"userId" = ${userId} AND status = 'pending'`)
-  const pendingWithdrawn = parseFloat(String(pendingWithRes[0]?.total ?? '0')) || 0
-
-  // 6. Activation fee paid (debit $100)
-  const userRow = await db.select({ isActivated: user.isActivated }).from(user).where(eq(user.id, userId)).limit(1)
+  const deposits      = parseFloat(String(depRes[0]?.total        ?? '0')) || 0
+  const profits       = parseFloat(String(profitRes[0]?.total     ?? '0')) || 0
+  const commissions   = parseFloat(String(commRes[0]?.total       ?? '0')) || 0
+  const withdrawn     = parseFloat(String(withRes[0]?.total       ?? '0')) || 0
+  const pendingWith   = parseFloat(String(pendingWithRes[0]?.total ?? '0')) || 0
   const activationDebit = userRow[0]?.isActivated ? 100 : 0
-
-  // 7. Wallet-to-auto-trade shifts (debit)
-  const shiftRes = await db
-    .select({ total: sum(walletTransactions.amount) })
-    .from(walletTransactions)
-    .where(sql`"userId" = ${userId} AND type = 'auto_trade_principal' AND status = 'completed'`)
-  // amount is stored as negative, so sum is negative — negate to get the debit magnitude
   const autoTradeShifted = Math.abs(parseFloat(String(shiftRes[0]?.total ?? '0')) || 0)
 
-  const available = deposits + profits + commissions - withdrawn - pendingWithdrawn - activationDebit - autoTradeShifted
+  const available = deposits + profits + commissions - withdrawn - pendingWith - activationDebit - autoTradeShifted
   return Math.max(0, parseFloat(available.toFixed(2)))
 }
 
@@ -89,89 +66,53 @@ export async function getWalletSummary() {
   const session = await getSession()
   const userId = session.user.id
 
-  // Confirmed deposits
-  const depRes = await db
-    .select({ total: sum(fundRequests.amount) })
-    .from(fundRequests)
-    .where(sql`"userId" = ${userId} AND status = 'confirmed'`)
-  const totalDeposited = parseFloat(String(depRes[0]?.total ?? '0')) || 0
+  // All 11 queries fire in parallel — dramatically faster than sequential awaits
+  const [
+    depRes, pendDepRes, profitRes, commRes,
+    withApproved, withPending, uRows, shiftRes,
+    recentDeposits, recentWithdrawals, lastWithdrawalRows,
+  ] = await Promise.all([
+    db.select({ total: sum(fundRequests.amount) }).from(fundRequests)
+      .where(sql`"userId" = ${userId} AND status = 'confirmed'`),
+    db.select({ total: sum(fundRequests.amount) }).from(fundRequests)
+      .where(sql`"userId" = ${userId} AND status = 'pending'`),
+    db.select({ total: sum(autoTradeLogs.dailyNet) }).from(autoTradeLogs)
+      .where(eq(autoTradeLogs.userId, userId)),
+    db.select({ total: sum(referralCommissions.amount) }).from(referralCommissions)
+      .where(sql`"userId" = ${userId} AND status IN ('pending','paid')`),
+    db.select({ total: sum(withdrawals.amount) }).from(withdrawals)
+      .where(sql`"userId" = ${userId} AND status = 'approved'`),
+    db.select({ total: sum(withdrawals.amount) }).from(withdrawals)
+      .where(sql`"userId" = ${userId} AND status = 'pending'`),
+    db.select().from(user).where(eq(user.id, userId)).limit(1),
+    db.select({ total: sum(walletTransactions.amount) }).from(walletTransactions)
+      .where(sql`"userId" = ${userId} AND type = 'auto_trade_principal' AND status = 'completed'`),
+    db.select().from(fundRequests).where(eq(fundRequests.userId, userId))
+      .orderBy(desc(fundRequests.createdAt)).limit(10),
+    db.select().from(withdrawals).where(eq(withdrawals.userId, userId))
+      .orderBy(desc(withdrawals.createdAt)).limit(10),
+    db.select({ createdAt: withdrawals.createdAt }).from(withdrawals)
+      .where(sql`"userId" = ${userId} AND status IN ('pending','approved')`)
+      .orderBy(desc(withdrawals.createdAt)).limit(1),
+  ])
 
-  // Pending deposits
-  const pendDepRes = await db
-    .select({ total: sum(fundRequests.amount) })
-    .from(fundRequests)
-    .where(sql`"userId" = ${userId} AND status = 'pending'`)
-  const pendingDeposit = parseFloat(String(pendDepRes[0]?.total ?? '0')) || 0
+  const totalDeposited    = parseFloat(String(depRes[0]?.total      ?? '0')) || 0
+  const pendingDeposit    = parseFloat(String(pendDepRes[0]?.total   ?? '0')) || 0
+  const tradeProfits      = parseFloat(String(profitRes[0]?.total    ?? '0')) || 0
+  const referralEarnings  = parseFloat(String(commRes[0]?.total      ?? '0')) || 0
+  const totalWithdrawn    = parseFloat(String(withApproved[0]?.total ?? '0')) || 0
+  const pendingWithdrawal = parseFloat(String(withPending[0]?.total  ?? '0')) || 0
+  const u                 = uRows[0]
+  const activationDebit   = u?.isActivated ? 100 : 0
+  const autoTradeShifted  = Math.abs(parseFloat(String(shiftRes[0]?.total ?? '0')) || 0)
+  const pendingReferral   = 0
 
-  // Auto-trade net profits
-  const profitRes = await db
-    .select({ total: sum(autoTradeLogs.dailyNet) })
-    .from(autoTradeLogs)
-    .where(eq(autoTradeLogs.userId, userId))
-  const tradeProfits = parseFloat(String(profitRes[0]?.total ?? '0')) || 0
-
-  // Referral commissions — ALL statuses accumulate in wallet (paid + pending)
-  const commRes = await db
-    .select({ total: sum(referralCommissions.amount) })
-    .from(referralCommissions)
-    .where(sql`"userId" = ${userId} AND status IN ('pending','paid')`)
-  const referralEarnings = parseFloat(String(commRes[0]?.total ?? '0')) || 0
-
-  // Keep pendingReferral as 0 (already included above, no separate "pending" bucket)
-  const pendingReferral = 0
-
-  // Withdrawals
-  const withApproved = await db
-    .select({ total: sum(withdrawals.amount) })
-    .from(withdrawals)
-    .where(sql`"userId" = ${userId} AND status = 'approved'`)
-  const totalWithdrawn = parseFloat(String(withApproved[0]?.total ?? '0')) || 0
-
-  const withPending = await db
-    .select({ total: sum(withdrawals.amount) })
-    .from(withdrawals)
-    .where(sql`"userId" = ${userId} AND status = 'pending'`)
-  const pendingWithdrawal = parseFloat(String(withPending[0]?.total ?? '0')) || 0
-
-  // Activation fee
-  const [u] = await db.select().from(user).where(eq(user.id, userId)).limit(1)
-  const activationDebit = u?.isActivated ? 100 : 0
-
-  // Wallet-to-auto-trade shifts (debit)
-  const shiftRes = await db
-    .select({ total: sum(walletTransactions.amount) })
-    .from(walletTransactions)
-    .where(sql`"userId" = ${userId} AND type = 'auto_trade_principal' AND status = 'completed'`)
-  const autoTradeShifted = Math.abs(parseFloat(String(shiftRes[0]?.total ?? '0')) || 0)
-
-  // Available balance
   const available = Math.max(
     0,
     parseFloat((totalDeposited + tradeProfits + referralEarnings - totalWithdrawn - pendingWithdrawal - activationDebit - autoTradeShifted).toFixed(2))
   )
 
-  // Recent transactions (deposits + withdrawals)
-  const recentDeposits = await db
-    .select()
-    .from(fundRequests)
-    .where(eq(fundRequests.userId, userId))
-    .orderBy(desc(fundRequests.createdAt))
-    .limit(10)
-
-  const recentWithdrawals = await db
-    .select()
-    .from(withdrawals)
-    .where(eq(withdrawals.userId, userId))
-    .orderBy(desc(withdrawals.createdAt))
-    .limit(10)
-
-  // Weekly withdrawal window — find last approved OR pending withdrawal
-  const [lastWithdrawal] = await db
-    .select({ createdAt: withdrawals.createdAt })
-    .from(withdrawals)
-    .where(sql`"userId" = ${userId} AND status IN ('pending','approved')`)
-    .orderBy(desc(withdrawals.createdAt))
-    .limit(1)
+  const lastWithdrawal = lastWithdrawalRows[0]
 
   const lastWithdrawalAt = lastWithdrawal?.createdAt ?? null
   const nextWithdrawalAvailable = lastWithdrawalAt
