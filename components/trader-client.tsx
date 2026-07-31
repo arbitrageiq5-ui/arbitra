@@ -3,10 +3,14 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { authClient } from '@/lib/auth-client'
-import { getMarketOpportunities } from '@/app/actions/arbitrage'
-import { getDepositAddresses, submitFundRequest, getMyFundRequests } from '@/app/actions/deposits'
-import { getWalletSummary } from '@/app/actions/wallet'
 import { copyToClipboard } from '@/lib/utils'
+
+// Use dynamic imports for server actions to bypass broken client reference chunk
+let getMarketOpportunities: any
+let getDepositAddresses: any
+let submitFundRequest: any
+let getMyFundRequests: any
+let getWalletSummary: any
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import {
@@ -90,6 +94,20 @@ function CopyButton({ text }: { text: string }) {
 export function TraderClient({ user, isActivated }: { user: { id: string; name?: string | null; email?: string }; isActivated: boolean }) {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<Tab>('opportunities')
+  const [importsReady, setImportsReady] = useState(false)
+
+  // Dynamically import server actions to bypass Turbopack client reference bug
+  useEffect(() => {
+    Promise.all([
+      import('@/app/actions/arbitrage').then(m => { getMarketOpportunities = m.getMarketOpportunities }),
+      import('@/app/actions/deposits').then(m => { 
+        getDepositAddresses = m.getDepositAddresses
+        submitFundRequest = m.submitFundRequest
+        getMyFundRequests = m.getMyFundRequests
+      }),
+      import('@/app/actions/wallet').then(m => { getWalletSummary = m.getWalletSummary }),
+    ]).then(() => setImportsReady(true))
+  }, [])
 
   // Opportunities state
   const [opportunities, setOpportunities] = useState<Opportunity[]>([])
@@ -130,6 +148,7 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
 
   // Load wallet balance on mount and refresh every 60s
   useEffect(() => {
+    if (!importsReady) return
     const fetchBalance = async () => {
       try {
         const summary = await getWalletSummary()
@@ -139,14 +158,15 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
     fetchBalance()
     const interval = setInterval(fetchBalance, 60000)
     return () => clearInterval(interval)
-  }, [])
+  }, [importsReady])
 
   // Load opportunities on mount with live refresh (every 15 seconds for real-time rates)
   useEffect(() => {
+    if (!importsReady) return
     loadOpportunities()
     const interval = setInterval(() => loadOpportunities(true), 15000)
     return () => clearInterval(interval)
-  }, [])
+  }, [importsReady])
 
   // Load fund data when switching to funds tab
   useEffect(() => {
