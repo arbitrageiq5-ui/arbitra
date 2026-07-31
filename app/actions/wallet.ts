@@ -74,6 +74,15 @@ export async function computeWalletBalance(userId: string): Promise<number> {
   return Math.max(0, parseFloat(available.toFixed(2)))
 }
 
+// ─── Trader: get FAST wallet balance only ────────────────────────────────────
+// Quick balance fetch - only calls computeWalletBalance, no full breakdown
+export async function getWalletBalanceFast() {
+  const session = await getSession()
+  const userId = session.user.id
+  const available = await computeWalletBalance(userId)
+  return { available }
+}
+
 // ─── Trader: get full wallet summary ──────────────────────────────────────────
 
 export async function getWalletSummary() {

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { authClient } from '@/lib/auth-client'
 import { getMarketOpportunities } from '@/app/actions/arbitrage'
 import { getDepositAddresses, submitFundRequest, getMyFundRequests } from '@/app/actions/deposits'
-import { getWalletSummary } from '@/app/actions/wallet'
+import { getWalletSummary, getWalletBalanceFast } from '@/app/actions/wallet'
 import { copyToClipboard } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -136,16 +136,26 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitSuccess, setSubmitSuccess] = useState(false)
 
-  // Load wallet balance on mount and refresh every 120s (reduced from 60s for performance)
+  // Load wallet balance: fast load on mount, then full summary periodically
   useEffect(() => {
-    const fetchBalance = async () => {
+    // Fast initial load - just the balance
+    const loadBalanceFast = async () => {
+      try {
+        const data = await getWalletBalanceFast()
+        setWalletBalance(data.available)
+      } catch { /* silent */ }
+    }
+    
+    loadBalanceFast()
+    
+    // Full wallet summary every 120s
+    const fetchFullSummary = async () => {
       try {
         const summary = await getWalletSummary()
         setWalletBalance(summary.available)
       } catch { /* silent */ }
     }
-    fetchBalance()
-    const interval = setInterval(fetchBalance, 120000)
+    const interval = setInterval(fetchFullSummary, 120000)
     return () => clearInterval(interval)
   }, [])
 
