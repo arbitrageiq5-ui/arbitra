@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, lazy, Suspense, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { authClient } from '@/lib/auth-client'
 import { getMarketOpportunities } from '@/app/actions/arbitrage'
@@ -14,18 +14,26 @@ import {
   Copy, Check, ChevronUp, ChevronDown, Filter, X,
   Clock, CheckCircle2, XCircle, PlusCircle, ArrowRightLeft,
   Activity, BarChart3, AlertTriangle, Shield, Link2, Gift, ArrowDownCircle,
-  Eye, EyeOff, Bot, Sparkles,
+  Eye, EyeOff, Bot, Sparkles, Loader,
 } from 'lucide-react'
-import { ExchangeConnectionManager } from '@/components/exchange-connection-manager'
-import { TradeExecutionPanel } from '@/components/trade-execution-panel'
-import { AutoTradePlatform } from '@/components/auto-trade-platform'
-import { PassiveIncome } from '@/components/passive-income'
-import { TraderWallet } from '@/components/trader-wallet'
 import { ActivationFeeModal } from '@/components/activation-fee-modal'
-import { TradingBot } from '@/components/trading-bot'
 import { TraderAiArbitrageModal } from '@/components/trader-ai-modal'
-import { Lending } from '@/components/lending'
-import { ArbitrageBotPanel } from '@/components/arbitrage-bot-panel'
+
+// Lazy load non-critical tabs for faster initial load
+const ExchangeConnectionManager = lazy(() => import('@/components/exchange-connection-manager').then(m => ({ default: m.ExchangeConnectionManager })))
+const TradeExecutionPanel = lazy(() => import('@/components/trade-execution-panel').then(m => ({ default: m.TradeExecutionPanel })))
+const AutoTradePlatform = lazy(() => import('@/components/auto-trade-platform').then(m => ({ default: m.AutoTradePlatform })))
+const PassiveIncome = lazy(() => import('@/components/passive-income').then(m => ({ default: m.PassiveIncome })))
+const TraderWallet = lazy(() => import('@/components/trader-wallet').then(m => ({ default: m.TraderWallet })))
+const TradingBot = lazy(() => import('@/components/trading-bot').then(m => ({ default: m.TradingBot })))
+const Lending = lazy(() => import('@/components/lending').then(m => ({ default: m.Lending })))
+const ArbitrageBotPanel = lazy(() => import('@/components/arbitrage-bot-panel').then(m => ({ default: m.ArbitrageBotPanel })))
+
+const TabLoader = () => (
+  <div className="flex items-center justify-center py-12">
+    <Loader className="w-5 h-5 animate-spin text-amber-400" />
+  </div>
+)
 
 type Opportunity = Awaited<ReturnType<typeof getMarketOpportunities>>[number]
 type DepositAddress = Awaited<ReturnType<typeof getDepositAddresses>>[number]
@@ -128,7 +136,7 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitSuccess, setSubmitSuccess] = useState(false)
 
-  // Load wallet balance on mount and refresh every 60s
+  // Load wallet balance on mount and refresh every 120s (reduced from 60s for performance)
   useEffect(() => {
     const fetchBalance = async () => {
       try {
@@ -137,14 +145,14 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
       } catch { /* silent */ }
     }
     fetchBalance()
-    const interval = setInterval(fetchBalance, 60000)
+    const interval = setInterval(fetchBalance, 120000)
     return () => clearInterval(interval)
   }, [])
 
-  // Load opportunities on mount with live refresh (every 15 seconds for real-time rates)
+  // Load opportunities on mount with less aggressive refresh (every 30s instead of 15s for performance)
   useEffect(() => {
     loadOpportunities()
-    const interval = setInterval(() => loadOpportunities(true), 15000)
+    const interval = setInterval(() => loadOpportunities(true), 30000)
     return () => clearInterval(interval)
   }, [])
 
@@ -153,7 +161,7 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
     if (activeTab === 'funds') loadFunds()
   }, [activeTab])
 
-  const loadOpportunities = async (silent = false) => {
+  const loadOpportunities = useCallback(async (silent = false) => {
     if (!silent) setLoadingOpps(true)
     else setRefreshing(true)
     try {
@@ -166,9 +174,9 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
       setLoadingOpps(false)
       setRefreshing(false)
     }
-  }
+  }, [])
 
-  const loadFunds = async () => {
+  const loadFunds = useCallback(async () => {
     setLoadingFunds(true)
     try {
       const [addrs, reqs] = await Promise.all([getDepositAddresses(), getMyFundRequests()])
@@ -179,13 +187,15 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
     } finally {
       setLoadingFunds(false)
     }
-  }
+  }, [])
 
-  const handleSort = (key: SortKey) => {
-    if (key === sortKey) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
-    else { setSortKey(key); setSortDir('desc') }
+  const handleSort = useCallback((key: SortKey) => {
+    setSortKey(prev => {
+      setSortDir(prev === sortKey && sortDir === 'asc' ? 'desc' : 'asc')
+      return key
+    })
     setOppPage(0)
-  }
+  }, [sortKey, sortDir])
 
   const filtered = useMemo(() => {
     let data = opportunities
@@ -221,7 +231,7 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
     topProfit: filtered[0]?.netProfit ?? 0,
   }), [filtered])
 
-  const handleSubmitDeposit = async () => {
+  const handleSubmitDeposit = useCallback(async () => {
     if (!selectedNetwork || !amount) return
     setSubmitting(true)
     setSubmitError(null)
@@ -238,12 +248,12 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
     } finally {
       setSubmitting(false)
     }
-  }
+  }, [selectedNetwork, amount, txHash, loadFunds])
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     await authClient.signOut()
     router.push('/sign-in')
-  }
+  }, [router])
 
   const configuredNetworks = depositAddresses.map(a => a.network as Network)
   const selectedAddressData = depositAddresses.find(a => a.network === selectedNetwork)
@@ -370,9 +380,46 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
       </div>
 
       <main className="flex-1 max-w-screen-xl mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6 w-full">
-        {/* ── TAB: WALLET ─��� */}
+        {/* ── TAB: WALLET ───── */}
         {activeTab === 'wallet' && (
-          <TraderWallet />
+          <Suspense fallback={<TabLoader />}>
+            <TraderWallet />
+          </Suspense>
+        )}
+
+        {/* ── TAB: AUTO TRADE ── */}
+        {activeTab === 'auto-trade' && (
+          <Suspense fallback={<TabLoader />}>
+            <AutoTradePlatform />
+          </Suspense>
+        )}
+
+  {/* ── TAB: LENDING ── */}
+  {activeTab === 'lending' && (
+    <Suspense fallback={<TabLoader />}>
+      <Lending />
+    </Suspense>
+  )}
+
+  {/* ── TAB: TRADING BOTS ── */}
+  {activeTab === 'trading-bot' && (
+    <Suspense fallback={<TabLoader />}>
+      <TradingBot />
+    </Suspense>
+  )}
+
+        {/* ── TAB: ARB BOT ── */}
+        {activeTab === 'arb-bot' && (
+          <Suspense fallback={<TabLoader />}>
+            <ArbitrageBotPanel />
+          </Suspense>
+        )}
+
+        {/* ── TAB: PASSIVE INCOME ── */}
+        {activeTab === 'passive-income' && (
+          <Suspense fallback={<TabLoader />}>
+            <PassiveIncome />
+          </Suspense>
         )}
 
         {/* ── TAB: AUTO TRADE ── */}
@@ -797,16 +844,20 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
 
         {/* ── TAB: EXCHANGES ── */}
         {activeTab === 'exchanges' && (
-          <div className="space-y-6">
-            <ExchangeConnectionManager />
-          </div>
+          <Suspense fallback={<TabLoader />}>
+            <div className="space-y-6">
+              <ExchangeConnectionManager />
+            </div>
+          </Suspense>
         )}
 
         {/* ── TAB: TRADE & TRANSFER ── */}
         {activeTab === 'trade' && (
-          <div className="space-y-6">
-            <TradeExecutionPanel />
-          </div>
+          <Suspense fallback={<TabLoader />}>
+            <div className="space-y-6">
+              <TradeExecutionPanel />
+            </div>
+          </Suspense>
         )}
 
         {/* ── TAB: FUNDS & DEPOSITS ── */}
