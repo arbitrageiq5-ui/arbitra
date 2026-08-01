@@ -6,6 +6,23 @@ import { eq, desc, sum, sql, and, gte } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 import { headers } from 'next/headers'
 
+// ─── 30-second server-side balance cache ──────────────────────────────────────
+// Prevents repeated DB hits when the trader navigates between tabs quickly.
+const _balanceCache = new Map<string, { value: number; expiresAt: number }>()
+const CACHE_TTL_MS = 30_000
+
+function getCachedBalance(userId: string): number | null {
+  const entry = _balanceCache.get(userId)
+  if (!entry || Date.now() > entry.expiresAt) { _balanceCache.delete(userId); return null }
+  return entry.value
+}
+function setCachedBalance(userId: string, value: number) {
+  _balanceCache.set(userId, { value, expiresAt: Date.now() + CACHE_TTL_MS })
+}
+export function invalidateBalanceCache(userId: string) {
+  _balanceCache.delete(userId)
+}
+
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
 async function getSession() {
@@ -21,8 +38,11 @@ async function requireAdmin() {
   return session
 }
 
-// Compute a user's live wallet balance — all queries run in parallel
+// Compute a user's live wallet balance — all queries run in parallel, result cached 30s
 export async function computeWalletBalance(userId: string): Promise<number> {
+  const cached = getCachedBalance(userId)
+  if (cached !== null) return cached
+
   const results = await Promise.all([
     db.select({ total: sum(fundRequests.amount) }).from(fundRequests)
       .where(sql`"userId" = ${userId} AND status = 'confirmed'`),
@@ -50,7 +70,9 @@ export async function computeWalletBalance(userId: string): Promise<number> {
   const autoTradeShifted = Math.abs(parseFloat(String(shiftRes[0]?.total ?? '0')) || 0)
 
   const available = deposits + profits + commissions - withdrawn - pendingWith - activationDebit - autoTradeShifted
-  return Math.max(0, parseFloat(available.toFixed(2)))
+  const result = Math.max(0, parseFloat(available.toFixed(2)))
+  setCachedBalance(userId, result)
+  return result
 }
 
 // ─── Trader: get FAST wallet balance only ────────────────────────────────────

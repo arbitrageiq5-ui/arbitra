@@ -132,14 +132,16 @@ export async function updateAutoTradePlanStatus(
 export async function getAllAutoTradePlans() {
   await getAdminSession()
 
-  const plans = await db.select().from(autoTradePlans).orderBy(desc(autoTradePlans.createdAt))
-  const users = await db.select({ id: user.id, name: user.name, email: user.email }).from(user)
+  // Fetch plans + users in parallel
+  const [plans, users] = await Promise.all([
+    db.select().from(autoTradePlans).orderBy(desc(autoTradePlans.createdAt)),
+    db.select({ id: user.id, name: user.name, email: user.email }).from(user),
+  ])
   const userMap = Object.fromEntries(users.map(u => [u.id, u]))
 
-  // Sync today's log for active plans
-  for (const plan of plans.filter(p => p.status === 'active')) {
-    await syncTodayLog(plan)
-  }
+  // Sync today's log for all active plans in parallel
+  const activePlans = plans.filter(p => p.status === 'active')
+  await Promise.all(activePlans.map(plan => syncTodayLog(plan)))
 
   return plans.map(p => ({
     ...p,
@@ -149,18 +151,19 @@ export async function getAllAutoTradePlans() {
 
 async function syncTodayLog(plan: typeof autoTradePlans.$inferSelect) {
   const today = new Date().toISOString().split('T')[0]
-  const existing = await db.select()
-    .from(autoTradeLogs)
-    .where(and(eq(autoTradeLogs.planId, plan.id), eq(autoTradeLogs.tradeDate, today)))
-    .limit(1)
-  if (existing.length) return
 
-  // Get last running total
-  const [last] = await db.select()
-    .from(autoTradeLogs)
-    .where(eq(autoTradeLogs.planId, plan.id))
-    .orderBy(desc(autoTradeLogs.tradeDate))
-    .limit(1)
+  // Run both checks in parallel: today's log existence + last running total
+  const [existingRows, lastRows] = await Promise.all([
+    db.select({ id: autoTradeLogs.id }).from(autoTradeLogs)
+      .where(and(eq(autoTradeLogs.planId, plan.id), eq(autoTradeLogs.tradeDate, today)))
+      .limit(1),
+    db.select({ runningTotal: autoTradeLogs.runningTotal }).from(autoTradeLogs)
+      .where(eq(autoTradeLogs.planId, plan.id))
+      .orderBy(desc(autoTradeLogs.tradeDate))
+      .limit(1),
+  ])
+  if (existingRows.length) return
+  const last = lastRows[0]
 
   const principal = parseFloat(String(plan.principal))
   const grossPct = parseFloat(String(plan.grossReturnPct))
@@ -237,11 +240,9 @@ export async function selfFundAutoTrade(amount: number) {
     await db.insert(autoTradeLogs).values(rows)
   }
 
-  // Record the wallet debit — we insert a "pending" fund_request with negative-like
-  // treatment: mark a special wallet_transaction debit instead.
-  // We store it in wallet_transactions directly.
+  // Reuse already-fetched balance — no second DB round-trip needed
   const { walletTransactions } = await import('@/lib/db/schema')
-  const bal = await computeWalletBalance(userId)
+  const bal = available
   await db.insert(walletTransactions).values({
     userId,
     type: 'auto_trade_principal',

@@ -13,7 +13,17 @@ const nextConfig = {
   productionBrowserSourceMaps: false,
   swcMinify: true,
   optimizeFonts: true,
-  optimizePackageImports: ['@radix-ui/react-dialog'],
+  optimizePackageImports: [
+    'lucide-react',
+    'framer-motion',
+    '@radix-ui/react-dialog',
+    '@radix-ui/react-label',
+    '@radix-ui/react-select',
+    '@radix-ui/react-tabs',
+    '@radix-ui/react-tooltip',
+    '@radix-ui/react-dropdown-menu',
+    '@base-ui/react',
+  ],
 
   // PWA: service worker must never be cached so updates are picked up immediately
   async headers() {
@@ -26,13 +36,11 @@ const nextConfig = {
           { key: 'Pragma', value: 'no-cache' },
         ],
       },
-      // /_next/static/chunks — these include server-action client reference manifests
-      // (e.g. app/actions/data:xxxx) which are NOT content-hashed in Turbopack dev mode.
-      // Must always be revalidated to prevent "module factory not available" errors.
+      // /_next/static — content-hashed by Next.js; safe to cache for 1 year
       {
-        source: '/_next/static/chunks/:path*',
+        source: '/_next/static/:path*',
         headers: [
-          { key: 'Cache-Control', value: 'no-cache, must-revalidate' },
+          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
         ],
       },
       // Manifest

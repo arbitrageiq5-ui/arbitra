@@ -159,5 +159,12 @@ export async function reviewFundRequest(
     })
     .where(eq(fundRequests.id, id))
     .returning()
+
+  // Invalidate cached balance for the trader whose deposit changed
+  if (status === 'confirmed' && row?.userId) {
+    const { invalidateBalanceCache } = await import('@/app/actions/wallet')
+    invalidateBalanceCache(row.userId)
+  }
+
   return row
 }

@@ -30,22 +30,35 @@ export async function creditIncomeCommission(
 ) {
   if (incomeAmount <= 0) return
 
-  let currentUserId = earnerUserId
+  // Walk the referral chain: fetch all 3 levels in one query using a CTE
+  const chainRows = await db.execute(sql`
+    WITH RECURSIVE chain AS (
+      SELECT id, "referredBy", 1 AS level
+      FROM "user" WHERE id = ${earnerUserId}
+      UNION ALL
+      SELECT u.id, u."referredBy", c.level + 1
+      FROM "user" u JOIN chain c ON u.id = c."referredBy"
+      WHERE c.level < 3
+    )
+    SELECT u.id, u."isActivated", chain.level
+    FROM chain
+    JOIN "user" u ON u.id = chain."referredBy"
+    WHERE chain."referredBy" IS NOT NULL
+    ORDER BY chain.level
+  `)
+  const rows = (chainRows as { rows?: unknown[] }).rows ?? (chainRows as unknown as unknown[])
 
-  for (let level = 1; level <= 3; level++) {
-    const [currentUser] = await db.select({ referredBy: user.referredBy })
-      .from(user).where(eq(user.id, currentUserId)).limit(1)
-    if (!currentUser?.referredBy) break
-
-    const referrerId = currentUser.referredBy
-    const [referrer] = await db.select({ id: user.id, isActivated: user.isActivated })
-      .from(user).where(eq(user.id, referrerId)).limit(1)
-    if (!referrer?.isActivated) { currentUserId = referrerId; continue }
-
+  // Insert all commissions in parallel
+  await Promise.all(rows.map((row) => {
+    const r = row as Record<string, unknown>
+    const referrerId = r.id as string
+    const isActivated = r.isActivated as boolean
+    const level = r.level as number
+    if (!isActivated) return Promise.resolve()
     const pct = INCOME_COMMISSION_RATES[level]
+    if (!pct) return Promise.resolve()
     const commissionAmount = (incomeAmount * pct) / 100
-
-    await db.execute(
+    return db.execute(
       sql`INSERT INTO referral_income_commissions
             ("userId", "fromUserId", level, source_type, income_amount, commission_pct, amount, ref_id, status)
           VALUES
@@ -53,9 +66,7 @@ export async function creditIncomeCommission(
              ${incomeAmount.toFixed(8)}, ${pct.toFixed(4)}, ${commissionAmount.toFixed(8)},
              ${refId ?? null}, 'paid')`
     )
-
-    currentUserId = referrerId
-  }
+  }))
 }
 
 // Generate a unique 8-char alphanumeric referral code
@@ -106,17 +117,18 @@ export async function getMyReferralData() {
   if (!me.referralCode) await ensureReferralCode()
   const referralCode = me.referralCode || (await ensureReferralCode())
 
-  // Activation status + pending activation fee
-  const [activationFee] = await db
-    .select()
-    .from(activationFees)
-    .where(eq(activationFees.userId, session.user.id))
-    .orderBy(desc(activationFees.createdAt))
-    .limit(1)
-
-  // All commissions earned by this user
-  const commissionsRaw = await db
-    .select({
+  // All data fetched in parallel — activationFee, commissions, directReferrals, L2/L3 counts
+  const [
+    activationFeeRows,
+    commissionsRaw,
+    directReferrals,
+    l2CountRows,
+    l3CountRows,
+  ] = await Promise.all([
+    db.select().from(activationFees)
+      .where(eq(activationFees.userId, session.user.id))
+      .orderBy(desc(activationFees.createdAt)).limit(1),
+    db.select({
       id: referralCommissions.id,
       level: referralCommissions.level,
       amount: referralCommissions.amount,
@@ -125,35 +137,18 @@ export async function getMyReferralData() {
       createdAt: referralCommissions.createdAt,
       fromUserName: user.name,
       fromUserEmail: user.email,
-    })
-    .from(referralCommissions)
-    .leftJoin(user, eq(referralCommissions.fromUserId, user.id))
-    .where(eq(referralCommissions.userId, session.user.id))
-    .orderBy(desc(referralCommissions.createdAt))
-
-  // Reshape to match expected interface
-  const commissions = commissionsRaw.map(c => ({
-    id: c.id,
-    level: c.level,
-    amount: c.amount,
-    status: c.status,
-    paidAt: c.paidAt,
-    createdAt: c.createdAt,
-    fromUser: { name: c.fromUserName, email: c.fromUserEmail },
-  }))
-
-  // Direct referrals (L1) — people referred by this user
-  const directReferrals = await db
-    .select({
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      isActivated: user.isActivated,
-      createdAt: user.createdAt,
-    })
-    .from(user)
-    .where(eq(user.referredBy, session.user.id))
-    .orderBy(desc(user.createdAt))
+    }).from(referralCommissions)
+      .leftJoin(user, eq(referralCommissions.fromUserId, user.id))
+      .where(eq(referralCommissions.userId, session.user.id))
+      .orderBy(desc(referralCommissions.createdAt)),
+    db.select({ id: user.id, name: user.name, email: user.email, isActivated: user.isActivated, createdAt: user.createdAt })
+      .from(user).where(eq(user.referredBy, session.user.id)).orderBy(desc(user.createdAt)),
+    db.select({ count: sql<number>`count(*)` }).from(user)
+      .where(sql`referred_by IN (SELECT id FROM "user" WHERE referred_by = ${session.user.id})`),
+    db.select({ count: sql<number>`count(*)` }).from(user)
+      .where(sql`referred_by IN (SELECT id FROM "user" WHERE referred_by IN (SELECT id FROM "user" WHERE referred_by = ${session.user.id}))`),
+  ])
+  const activationFee = activationFeeRows[0]
 
   // Income commissions (bot + auto-trade %) — raw SQL to avoid quoted column name issues
   let incomeCommissions: {
@@ -198,6 +193,17 @@ export async function getMyReferralData() {
     incomeCommissions = []
   }
 
+  // Reshape commissionsRaw into commissions with nested fromUser
+  const commissions = commissionsRaw.map(c => ({
+    id: c.id,
+    level: c.level,
+    amount: c.amount,
+    status: c.status,
+    paidAt: c.paidAt,
+    createdAt: c.createdAt,
+    fromUser: { name: c.fromUserName, email: c.fromUserEmail },
+  }))
+
   // Commission summary (activation flat fees)
   const totalEarned = commissions
     .filter(c => c.status === 'paid')
@@ -219,24 +225,9 @@ export async function getMyReferralData() {
 
   const l1Count = directReferrals.length
   const l1Activated = directReferrals.filter(r => r.isActivated).length
-
-  // Count L2 referrals
-  const l2Count = l1Count > 0
-    ? (await db
-        .select({ count: sql<number>`count(*)` })
-        .from(user)
-        .where(sql`referred_by IN (SELECT id FROM "user" WHERE referred_by = ${session.user.id})`)
-      )[0]?.count ?? 0
-    : 0
-
-  // Count L3 referrals
-  const l3Count = l2Count > 0
-    ? (await db
-        .select({ count: sql<number>`count(*)` })
-        .from(user)
-        .where(sql`referred_by IN (SELECT id FROM "user" WHERE referred_by IN (SELECT id FROM "user" WHERE referred_by = ${session.user.id}))`)
-      )[0]?.count ?? 0
-    : 0
+  // L2 and L3 counts already fetched in parallel above
+  const l2Count = Number(l2CountRows[0]?.count ?? 0)
+  const l3Count = Number(l3CountRows[0]?.count ?? 0)
 
   return {
     referralCode,
@@ -373,31 +364,40 @@ export async function approveActivationFee(feeId: number) {
     activationPaidAt: new Date(),
   }).where(eq(user.id, fee.userId))
 
-  // 3. Walk up 3 levels of referrers and credit commissions
-  let currentUserId = fee.userId
-  for (let level = 1; level <= 3; level++) {
-    const [currentUser] = await db.select().from(user).where(eq(user.id, currentUserId)).limit(1)
-    if (!currentUser?.referredBy) break
+  // 3. Walk up 3 levels via CTE and credit commissions in parallel
+  const chainResult = await db.execute(sql`
+    WITH RECURSIVE chain AS (
+      SELECT id, "referredBy", 1 AS level
+      FROM "user" WHERE id = ${fee.userId}
+      UNION ALL
+      SELECT u.id, u."referredBy", c.level + 1
+      FROM "user" u JOIN chain c ON u.id = c."referredBy"
+      WHERE c.level < 3
+    )
+    SELECT u.id, u."isActivated", chain.level
+    FROM chain
+    JOIN "user" u ON u.id = chain."referredBy"
+    WHERE chain."referredBy" IS NOT NULL
+    ORDER BY chain.level
+  `)
+  const chainRows = (chainResult as { rows?: unknown[] }).rows ?? (chainResult as unknown as unknown[])
 
-    const referrerId = currentUser.referredBy
-    // Check referrer is activated before crediting
-    const [referrer] = await db.select().from(user).where(eq(user.id, referrerId)).limit(1)
-    if (!referrer) break
-
+  await Promise.all(chainRows.map((row) => {
+    const r = row as Record<string, unknown>
+    const referrerId = r.id as string
+    const isActivated = r.isActivated as boolean
+    const level = r.level as number
     const commissionAmount = LEVEL_COMMISSIONS[level]
-    if (commissionAmount) {
-      await db.insert(referralCommissions).values({
-        userId: referrerId,
-        fromUserId: fee.userId,
-        level,
-        amount: commissionAmount.toString(),
-        status: referrer.isActivated ? 'paid' : 'pending',
-        paidAt: referrer.isActivated ? new Date() : null,
-      })
-    }
-
-    currentUserId = referrerId
-  }
+    if (!commissionAmount) return Promise.resolve()
+    return db.insert(referralCommissions).values({
+      userId: referrerId,
+      fromUserId: fee.userId,
+      level,
+      amount: commissionAmount.toString(),
+      status: isActivated ? 'paid' : 'pending',
+      paidAt: isActivated ? new Date() : null,
+    })
+  }))
 
   return { success: true }
 }
