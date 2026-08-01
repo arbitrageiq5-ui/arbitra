@@ -21,9 +21,9 @@ async function requireAdmin() {
   return session
 }
 
-// Compute a user's live wallet balance — all 7 queries run in parallel
+// Compute a user's live wallet balance — all queries run in parallel
 export async function computeWalletBalance(userId: string): Promise<number> {
-  const [depRes, profitRes, commRes, withRes, pendingWithRes, userRow, shiftRes] = await Promise.all([
+  const results = await Promise.all([
     db.select({ total: sum(fundRequests.amount) }).from(fundRequests)
       .where(sql`"userId" = ${userId} AND status = 'confirmed'`),
     db.select({ total: sum(autoTradeLogs.dailyNet) }).from(autoTradeLogs)
@@ -38,6 +38,8 @@ export async function computeWalletBalance(userId: string): Promise<number> {
     db.select({ total: sum(walletTransactions.amount) }).from(walletTransactions)
       .where(sql`"userId" = ${userId} AND type = 'auto_trade_principal' AND status = 'completed'`),
   ])
+
+  const [depRes, profitRes, commRes, withRes, pendingWithRes, userRow, shiftRes] = results
 
   const deposits      = parseFloat(String(depRes[0]?.total        ?? '0')) || 0
   const profits       = parseFloat(String(profitRes[0]?.total     ?? '0')) || 0
@@ -66,12 +68,8 @@ export async function getWalletSummary() {
   const session = await getSession()
   const userId = session.user.id
 
-  // All 11 queries fire in parallel — dramatically faster than sequential awaits
-  const [
-    depRes, pendDepRes, profitRes, commRes,
-    withApproved, withPending, uRows, shiftRes,
-    recentDeposits, recentWithdrawals, lastWithdrawalRows,
-  ] = await Promise.all([
+  // All queries fire in parallel for speed
+  const results = await Promise.all([
     db.select({ total: sum(fundRequests.amount) }).from(fundRequests)
       .where(sql`"userId" = ${userId} AND status = 'confirmed'`),
     db.select({ total: sum(fundRequests.amount) }).from(fundRequests)
@@ -95,6 +93,12 @@ export async function getWalletSummary() {
       .where(sql`"userId" = ${userId} AND status IN ('pending','approved')`)
       .orderBy(desc(withdrawals.createdAt)).limit(1),
   ])
+
+  const [
+    depRes, pendDepRes, profitRes, commRes,
+    withApproved, withPending, uRows, shiftRes,
+    recentDeposits, recentWithdrawals, lastWithdrawalRows,
+  ] = results
 
   const totalDeposited    = parseFloat(String(depRes[0]?.total      ?? '0')) || 0
   const pendingDeposit    = parseFloat(String(pendDepRes[0]?.total   ?? '0')) || 0
