@@ -355,7 +355,7 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
               { key: 'auto-trade' as Tab, label: 'Auto Trade', icon: Zap, count: null },
               { key: 'trading-bot' as Tab, label: 'Bots', icon: Bot, count: null },
               { key: 'arb-bot' as Tab, label: 'Arb Bot', icon: ArrowRightLeft, count: null },
-              { key: 'lending' as Tab, label: 'Lending', icon: TrendingUp, count: null },
+
               { key: 'passive-income' as Tab, label: 'Passive', icon: Gift, count: null },
               { key: 'opportunities' as Tab, label: 'Markets', icon: TrendingUp, count: null },
               { key: 'trade' as Tab, label: 'Trade', icon: ArrowRightLeft, count: null },
@@ -398,13 +398,6 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
             <AutoTradePlatform />
           </Suspense>
         )}
-
-  {/* ── TAB: LENDING ── */}
-  {activeTab === 'lending' && (
-    <Suspense fallback={<TabLoader />}>
-      <Lending />
-    </Suspense>
-  )}
 
   {/* ── TAB: TRADING BOTS ── */}
   {activeTab === 'trading-bot' && (
