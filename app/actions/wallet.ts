@@ -19,7 +19,7 @@ function getCachedBalance(userId: string): number | null {
 function setCachedBalance(userId: string, value: number) {
   _balanceCache.set(userId, { value, expiresAt: Date.now() + CACHE_TTL_MS })
 }
-export function invalidateBalanceCache(userId: string) {
+export async function invalidateBalanceCache(userId: string) {
   _balanceCache.delete(userId)
 }
 
@@ -166,7 +166,7 @@ export async function getWalletSummary() {
   }
 }
 
-// ─── Trader: request withdrawal ───────────────────────────────────────────────
+// ��── Trader: request withdrawal ───────────────────────────────────────────────
 
 export async function requestWithdrawal(
   amount: number,
