@@ -168,6 +168,36 @@ export async function getWalletSummary() {
 
 // ��── Trader: request withdrawal ───────────────────────────────────────────────
 
+// ─── Check if withdrawal is available (fast check without inserting) ──────────
+
+export async function checkWithdrawalAvailable() {
+  const session = await getSession()
+  const userId = session.user.id
+  
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+  const [recentWithdrawal] = await db
+    .select({ createdAt: withdrawals.createdAt })
+    .from(withdrawals)
+    .where(and(
+      eq(withdrawals.userId, userId),
+      sql`status IN ('pending','approved')`,
+      gte(withdrawals.createdAt, sevenDaysAgo),
+    ))
+    .orderBy(desc(withdrawals.createdAt))
+    .limit(1)
+
+  if (!recentWithdrawal) return { available: true }
+  
+  const nextAvailable = new Date(new Date(recentWithdrawal.createdAt).getTime() + 7 * 24 * 60 * 60 * 1000)
+  const daysLeft = Math.ceil((nextAvailable.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+  return { 
+    available: false,
+    nextAvailableDate: nextAvailable,
+    daysLeft,
+    message: `Withdrawals are weekly. Next withdrawal in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}`,
+  }
+}
+
 export async function requestWithdrawal(
   amount: number,
   network: 'TRC20' | 'BEP20' | 'ERC20',
@@ -185,24 +215,9 @@ export async function requestWithdrawal(
   const available = await computeWalletBalance(userId)
   if (amount > available) throw new Error(`Insufficient balance. Available: $${available.toFixed(2)}`)
 
-  // Weekly withdrawal gate — only one withdrawal per 7 days
-  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-  const [recentWithdrawal] = await db
-    .select({ createdAt: withdrawals.createdAt })
-    .from(withdrawals)
-    .where(and(
-      eq(withdrawals.userId, userId),
-      sql`status IN ('pending','approved')`,
-      gte(withdrawals.createdAt, sevenDaysAgo),
-    ))
-    .orderBy(desc(withdrawals.createdAt))
-    .limit(1)
-
-  if (recentWithdrawal) {
-    const nextAvailable = new Date(new Date(recentWithdrawal.createdAt).getTime() + 7 * 24 * 60 * 60 * 1000)
-    const daysLeft = Math.ceil((nextAvailable.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-    throw new Error(`Withdrawals are weekly. Next withdrawal available in ${daysLeft} day${daysLeft !== 1 ? 's' : ''} (${nextAvailable.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}).`)
-  }
+  // Check withdrawal availability
+  const withdrawalCheck = await checkWithdrawalAvailable()
+  if (!withdrawalCheck.available) throw new Error(withdrawalCheck.message)
 
   const [row] = await db.insert(withdrawals).values({
     userId,
@@ -213,6 +228,41 @@ export async function requestWithdrawal(
     status: 'pending',
   }).returning()
 
+  // Invalidate cached balance — pending withdrawal affects available balance
+  invalidateBalanceCache(userId)
+
+  return row
+}
+
+// ─── Fast withdrawal (streamlined for quick submission) ──────────────────────
+
+export async function requestWithdrawalQuick(
+  amount: number,
+  network: 'TRC20' | 'BEP20' | 'ERC20',
+  walletAddress: string,
+) {
+  const session = await getSession()
+  const userId = session.user.id
+
+  if (amount < 100 || amount > 1_000_000) throw new Error('Invalid amount')
+  if (!walletAddress?.trim() || walletAddress.length < 20) throw new Error('Invalid address')
+
+  const available = await computeWalletBalance(userId)
+  if (amount > available) throw new Error('Insufficient balance')
+
+  const withdrawalCheck = await checkWithdrawalAvailable()
+  if (!withdrawalCheck.available) throw new Error('Withdrawal not available this week')
+
+  const [row] = await db.insert(withdrawals).values({
+    userId,
+    amount: String(amount),
+    network,
+    walletAddress: walletAddress.trim(),
+    txHash: '', // Skip txHash for quick flow
+    status: 'pending',
+  }).returning()
+
+  invalidateBalanceCache(userId)
   return row
 }
 
@@ -240,29 +290,24 @@ export async function getAllTraderBalances() {
 
   const results = await Promise.all(
     traders.map(async (t) => {
-      // Confirmed deposits
-      const depRes = await db.select({ total: sum(fundRequests.amount) }).from(fundRequests)
-        .where(sql`"userId" = ${t.id} AND status = 'confirmed'`)
+      // All 5 balance queries fire in parallel for each trader
+      const [depRes, profitRes, commRes, withRes, pendRes] = await Promise.all([
+        db.select({ total: sum(fundRequests.amount) }).from(fundRequests)
+          .where(sql`"userId" = ${t.id} AND status = 'confirmed'`),
+        db.select({ total: sum(autoTradeLogs.dailyNet) }).from(autoTradeLogs)
+          .where(eq(autoTradeLogs.userId, t.id)),
+        db.select({ total: sum(referralCommissions.amount) }).from(referralCommissions)
+          .where(sql`"userId" = ${t.id} AND status = 'paid'`),
+        db.select({ total: sum(withdrawals.amount) }).from(withdrawals)
+          .where(sql`"userId" = ${t.id} AND status = 'approved'`),
+        db.select({ total: sum(withdrawals.amount) }).from(withdrawals)
+          .where(sql`"userId" = ${t.id} AND status = 'pending'`),
+      ])
+
       const totalDeposited = parseFloat(String(depRes[0]?.total ?? '0')) || 0
-
-      // Auto-trade profits
-      const profitRes = await db.select({ total: sum(autoTradeLogs.dailyNet) }).from(autoTradeLogs)
-        .where(eq(autoTradeLogs.userId, t.id))
       const tradeProfits = parseFloat(String(profitRes[0]?.total ?? '0')) || 0
-
-      // Referral commissions (paid)
-      const commRes = await db.select({ total: sum(referralCommissions.amount) }).from(referralCommissions)
-        .where(sql`"userId" = ${t.id} AND status = 'paid'`)
       const referralEarnings = parseFloat(String(commRes[0]?.total ?? '0')) || 0
-
-      // Approved withdrawals
-      const withRes = await db.select({ total: sum(withdrawals.amount) }).from(withdrawals)
-        .where(sql`"userId" = ${t.id} AND status = 'approved'`)
       const totalWithdrawn = parseFloat(String(withRes[0]?.total ?? '0')) || 0
-
-      // Pending withdrawals
-      const pendRes = await db.select({ total: sum(withdrawals.amount) }).from(withdrawals)
-        .where(sql`"userId" = ${t.id} AND status = 'pending'`)
       const pendingWithdrawal = parseFloat(String(pendRes[0]?.total ?? '0')) || 0
 
       const activationDebit = t.isActivated ? 100 : 0

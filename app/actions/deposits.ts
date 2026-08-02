@@ -105,6 +105,42 @@ export async function submitFundRequest(
     })
     .returning()
 
+  // Invalidate cached balance — new deposit request submitted
+  const { invalidateBalanceCache } = await import('@/app/actions/wallet')
+  invalidateBalanceCache(session.user.id)
+
+  return row
+}
+
+// ─── Fast deposit submission (minimal validation) ───────────────────────────
+
+export async function submitFundRequestQuick(
+  network: Network,
+  amount: number,
+  txHash: string
+) {
+  const session = await getSession()
+  const u = session.user as unknown as { role?: string }
+  if (u.role !== 'trader' && u.role !== 'protrader') throw new Error('Trader access required')
+
+  if (amount <= 0 || amount > 1_000_000) throw new Error('Invalid amount')
+  if (!txHash?.trim() || txHash.length < 10) throw new Error('Invalid tx hash')
+
+  const [row] = await db
+    .insert(fundRequests)
+    .values({
+      userId: session.user.id,
+      network,
+      amount: amount.toString(),
+      txHash: txHash.trim(),
+      screenshotUrl: '',
+      status: 'pending',
+    })
+    .returning()
+
+  const { invalidateBalanceCache } = await import('@/app/actions/wallet')
+  invalidateBalanceCache(session.user.id)
+
   return row
 }
 
