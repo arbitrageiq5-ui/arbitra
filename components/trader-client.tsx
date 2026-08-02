@@ -99,10 +99,11 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<Tab>('opportunities')
 
-  // Opportunities state
+  // Opportunities state — no auto-scan, user triggers manually
   const [opportunities, setOpportunities] = useState<Opportunity[]>([])
-  const [loadingOpps, setLoadingOpps] = useState(true)
+  const [loadingOpps, setLoadingOpps] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  const [hasScanned, setHasScanned] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [minProfit, setMinProfit] = useState(0)
   const [selectedBuyExchanges, setSelectedBuyExchanges] = useState<string[]>([])
@@ -159,13 +160,6 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
     return () => clearInterval(interval)
   }, [])
 
-  // Load opportunities on mount with less aggressive refresh (every 30s instead of 15s for performance)
-  useEffect(() => {
-    loadOpportunities()
-    const interval = setInterval(() => loadOpportunities(true), 30000)
-    return () => clearInterval(interval)
-  }, [])
-
   // Load fund data when switching to funds tab
   useEffect(() => {
     if (activeTab === 'funds') loadFunds()
@@ -178,6 +172,7 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
       const data = await getMarketOpportunities()
       setOpportunities(data)
       setLastUpdated(new Date())
+      setHasScanned(true)
     } catch (e) {
       console.error('Failed to load opportunities:', e)
     } finally {
@@ -460,90 +455,146 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
         {/* ��─ TAB: TRADE OPPORTUNITIES ── */}
         {activeTab === 'opportunities' && (
           <div className="space-y-4">
-            {/* Stats — 3-col on sm+, compact row on mobile */}
-            <div className="grid grid-cols-3 gap-2 sm:gap-4">
-              {[
-                { label: 'Opportunities', value: stats.total.toLocaleString(), icon: TrendingUp, color: 'text-amber-400' },
-                { label: 'Avg Profit', value: `${stats.avgProfit.toFixed(2)}%`, icon: BarChart3, color: 'text-green-400' },
-                { label: 'Best', value: `${stats.topProfit.toFixed(2)}%`, icon: Zap, color: 'text-cyan-400' },
-              ].map(({ label, value, icon: Icon, color }) => (
-                <Card key={label} className="bg-slate-900 border-slate-800 p-3 sm:p-4 flex flex-col sm:flex-row items-center sm:items-center gap-2 sm:gap-4">
-                  <div className="p-2 sm:p-2.5 rounded-xl bg-slate-800 shrink-0">
-                    <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${color}`} />
-                  </div>
-                  <div className="text-center sm:text-left">
-                    <p className="text-slate-500 text-[10px] sm:text-xs leading-tight">{label}</p>
-                    <p className={`text-lg sm:text-2xl font-bold ${color} leading-tight`}>{value}</p>
-                  </div>
-                </Card>
-              ))}
-            </div>
 
-            {/* AI Advisor Banner */}
-            <button
-              onClick={() => setShowAiModal(true)}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-gradient-to-r from-amber-500/8 via-orange-500/5 to-transparent border border-amber-500/20 hover:border-amber-500/40 hover:from-amber-500/12 transition-all group"
-            >
-              <div className="w-8 h-8 rounded-lg bg-amber-500/15 border border-amber-500/25 flex items-center justify-center shrink-0">
-                <Bot className="w-4 h-4 text-amber-400" />
-              </div>
-              <div className="flex-1 text-left min-w-0">
-                <p className="text-white text-sm font-semibold leading-none">AI Arbitrage Advisor</p>
-                <p className="text-slate-500 text-xs mt-0.5 truncate">
-                  Ask AI to analyze your {opportunities.length} live opportunities, find the best plays, calculate profits
-                </p>
-              </div>
-              <div className="flex items-center gap-1.5 shrink-0">
-                <span className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 transition-colors text-black text-xs font-bold">
-                  <Sparkles className="w-3 h-3" />
-                  Ask AI
-                </span>
-                <span className="sm:hidden w-7 h-7 rounded-lg bg-amber-500 flex items-center justify-center">
-                  <Sparkles className="w-3.5 h-3.5 text-black" />
-                </span>
-              </div>
-            </button>
-
-            {/* Search + filters */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="relative flex-1 min-w-0">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                <input
-                  value={searchQuery}
-                  onChange={e => { setSearchQuery(e.target.value); setOppPage(0) }}
-                  placeholder="Search coin or exchange..."
-                  className="w-full pl-9 pr-4 py-2 bg-slate-900 border border-slate-800 rounded-lg text-sm text-white placeholder-slate-600 focus:outline-none focus:border-amber-500/50 transition-colors"
-                />
-              </div>
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-medium transition-colors shrink-0 ${
-                  showFilters || minProfit > 0 || selectedBuyExchanges.length > 0 || selectedSellExchanges.length > 0 || selectedRisks.length > 0 || minVolume > 0
-                    ? 'bg-amber-500/10 border-amber-500/40 text-amber-400'
-                    : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
-                }`}
-              >
-                <Filter className="w-4 h-4" />
-                <span className="hidden sm:inline">Filter</span>
-              </button>
-              <button
-                onClick={() => loadOpportunities(true)}
-                disabled={refreshing}
-                className="shrink-0 p-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-white transition-colors"
-              >
-                <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin text-amber-400' : ''}`} />
-              </button>
-              {(searchQuery || minProfit > 0 || selectedBuyExchanges.length > 0 || selectedSellExchanges.length > 0 || selectedRisks.length > 0 || minVolume > 0) && (
+            {/* ── NOT YET SCANNED: hero prompt ── */}
+            {!hasScanned && !loadingOpps && (
+              <div className="flex flex-col items-center justify-center py-16 sm:py-24 gap-6">
+                <div className="relative">
+                  <div className="w-20 h-20 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                    <Activity className="w-10 h-10 text-amber-400" />
+                  </div>
+                  <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center">
+                    <div className="w-2.5 h-2.5 rounded-full bg-slate-600" />
+                  </div>
+                </div>
+                <div className="text-center max-w-sm px-4">
+                  <h2 className="text-white text-xl font-bold mb-2">Market Scanner Ready</h2>
+                  <p className="text-slate-400 text-sm leading-relaxed">
+                    Scan live prices across 12+ exchanges to discover arbitrage opportunities instantly. No auto-polling — scan on demand for zero background load.
+                  </p>
+                </div>
                 <button
-                  onClick={() => { setSearchQuery(''); setMinProfit(0); setSelectedBuyExchanges([]); setSelectedSellExchanges([]); setSelectedRisks([]); setMinVolume(0); setOppPage(0) }}
-                  className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-white transition-colors shrink-0"
+                  onClick={() => loadOpportunities()}
+                  className="flex items-center gap-2.5 px-8 py-3.5 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-95 transition-all text-black font-bold text-base shadow-lg shadow-amber-500/25"
                 >
-                  <X className="w-3.5 h-3.5" /> Clear
+                  <Search className="w-5 h-5" />
+                  Start Scanning
                 </button>
-              )}
-            </div>
+                <p className="text-slate-600 text-xs">12 exchanges &bull; Real-time prices &bull; Zero background usage</p>
+              </div>
+            )}
 
-            {showFilters && (
+            {/* ── SCANNING LOADER ── */}
+            {loadingOpps && (
+              <div className="flex flex-col items-center justify-center py-20 gap-5">
+                <div className="relative w-16 h-16">
+                  <div className="absolute inset-0 rounded-full border-2 border-amber-500/20" />
+                  <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-amber-400 animate-spin" />
+                  <div className="absolute inset-2 rounded-full border-2 border-transparent border-t-amber-500/40 animate-spin" style={{ animationDirection: 'reverse', animationDuration: '0.8s' }} />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Activity className="w-5 h-5 text-amber-400" />
+                  </div>
+                </div>
+                <div className="text-center">
+                  <p className="text-white font-semibold">Scanning Markets...</p>
+                  <p className="text-slate-500 text-sm mt-1">Fetching live prices from 12+ exchanges</p>
+                </div>
+              </div>
+            )}
+
+            {/* ── RESULTS (only shown after a scan completes) ── */}
+            {hasScanned && !loadingOpps && (
+              <>
+                {/* Stats */}
+                <div className="grid grid-cols-3 gap-2 sm:gap-4">
+                  {[
+                    { label: 'Opportunities', value: stats.total.toLocaleString(), icon: TrendingUp, color: 'text-amber-400' },
+                    { label: 'Avg Profit', value: `${stats.avgProfit.toFixed(2)}%`, icon: BarChart3, color: 'text-green-400' },
+                    { label: 'Best', value: `${stats.topProfit.toFixed(2)}%`, icon: Zap, color: 'text-cyan-400' },
+                  ].map(({ label, value, icon: Icon, color }) => (
+                    <Card key={label} className="bg-slate-900 border-slate-800 p-3 sm:p-4 flex flex-col sm:flex-row items-center sm:items-center gap-2 sm:gap-4">
+                      <div className="p-2 sm:p-2.5 rounded-xl bg-slate-800 shrink-0">
+                        <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${color}`} />
+                      </div>
+                      <div className="text-center sm:text-left">
+                        <p className="text-slate-500 text-[10px] sm:text-xs leading-tight">{label}</p>
+                        <p className={`text-lg sm:text-2xl font-bold ${color} leading-tight`}>{value}</p>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+
+                {/* AI Advisor Banner */}
+                <button
+                  onClick={() => setShowAiModal(true)}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-gradient-to-r from-amber-500/8 via-orange-500/5 to-transparent border border-amber-500/20 hover:border-amber-500/40 hover:from-amber-500/12 transition-all group"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-amber-500/15 border border-amber-500/25 flex items-center justify-center shrink-0">
+                    <Bot className="w-4 h-4 text-amber-400" />
+                  </div>
+                  <div className="flex-1 text-left min-w-0">
+                    <p className="text-white text-sm font-semibold leading-none">AI Arbitrage Advisor</p>
+                    <p className="text-slate-500 text-xs mt-0.5 truncate">
+                      Ask AI to analyze your {opportunities.length} live opportunities, find the best plays, calculate profits
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 transition-colors text-black text-xs font-bold">
+                      <Sparkles className="w-3 h-3" />
+                      Ask AI
+                    </span>
+                    <span className="sm:hidden w-7 h-7 rounded-lg bg-amber-500 flex items-center justify-center">
+                      <Sparkles className="w-3.5 h-3.5 text-black" />
+                    </span>
+                  </div>
+                </button>
+
+                {/* Search + Rescan toolbar */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="relative flex-1 min-w-0">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <input
+                      value={searchQuery}
+                      onChange={e => { setSearchQuery(e.target.value); setOppPage(0) }}
+                      placeholder="Search coin or exchange..."
+                      className="w-full pl-9 pr-4 py-2 bg-slate-900 border border-slate-800 rounded-lg text-sm text-white placeholder-slate-600 focus:outline-none focus:border-amber-500/50 transition-colors"
+                    />
+                  </div>
+                  <button
+                    onClick={() => setShowFilters(!showFilters)}
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-medium transition-colors shrink-0 ${
+                      showFilters || minProfit > 0 || selectedBuyExchanges.length > 0 || selectedSellExchanges.length > 0 || selectedRisks.length > 0 || minVolume > 0
+                        ? 'bg-amber-500/10 border-amber-500/40 text-amber-400'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Filter className="w-4 h-4" />
+                    <span className="hidden sm:inline">Filter</span>
+                  </button>
+                  <button
+                    onClick={() => loadOpportunities(false)}
+                    disabled={refreshing || loadingOpps}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 hover:border-amber-500/50 font-medium text-sm transition-all disabled:opacity-50 shrink-0"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+                    <span className="hidden sm:inline">Rescan</span>
+                  </button>
+                  {(searchQuery || minProfit > 0 || selectedBuyExchanges.length > 0 || selectedSellExchanges.length > 0 || selectedRisks.length > 0 || minVolume > 0) && (
+                    <button
+                      onClick={() => { setSearchQuery(''); setMinProfit(0); setSelectedBuyExchanges([]); setSelectedSellExchanges([]); setSelectedRisks([]); setMinVolume(0); setOppPage(0) }}
+                      className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-white transition-colors shrink-0"
+                    >
+                      <X className="w-3.5 h-3.5" /> Clear
+                    </button>
+                  )}
+                </div>
+                {lastUpdated && (
+                  <p className="text-slate-600 text-xs">
+                    Last scanned {lastUpdated.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                  </p>
+                )}
+
+                {showFilters && (
               <Card className="bg-slate-900 border-slate-800 p-4 space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                   {/* Min Net Profit */}
@@ -848,7 +899,9 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
                   )}
                 </>
               )}
-            </Card>
+                </Card>
+              </>
+            )}
           </div>
         )}
 
