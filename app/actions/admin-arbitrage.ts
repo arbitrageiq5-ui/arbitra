@@ -37,12 +37,7 @@ function calcNetProfit(symbol:string,buyExchange:string,sellExchange:string,buyP
   return { symbol,buyExchange,sellExchange,tradeAmountUsd,buyPrice,sellPrice,tradingFeeBuy:tfBuy,tradingFeeSell:tfSell,withdrawalFee:wd,networkFee:nf,estimatedSlippage:slip,safetyBuffer:safe,grossProfit:gross,totalCosts:costs,netProfit:net,grossProfitPct:gPct,netProfitPct:nPct,roi:nPct,viable:!reject,rejectReason:reject,estimatedTransferMin:xfer }
 }
 import OpenAI from 'openai'
-import type {
-  AdminLivePrice, AdminArbitrageOpp, ExchangeStatus, TransferRoute,
-  ExchangeApiKey, AiArbitrageStrategy, ExchangeBalance,
-  TransferRequest, TransferResult, BotConfig, RiskFilterResult,
-  BotAnalytics, BotTradeResult, TransferLog, SniperBotConfig, ScoredOpportunity,
-} from '@/lib/types/arbitrage-types'
+// Types are declared locally in this file (see interfaces below)
 
 async function requireAdmin() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -297,7 +292,7 @@ function calcRiskScore(params: {
   return { riskScore: score, riskLevel }
 }
 
-// ─── LIVE PRICE SCAN ────────────────────────────────────────────────────────
+// ─── LIVE PRICE SCAN ─────────────────────────��──────────────────────────────
 
 // Complete display name map — covers all exchanges in our API list
 const EXCHANGE_DISPLAY_NAMES: Record<string, string> = {

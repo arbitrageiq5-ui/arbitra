@@ -2,7 +2,7 @@
 
 import { auth } from '@/lib/auth'
 import { db, pool } from '@/lib/db'
-import { user, session } from '@/lib/db/schema'
+import { user, session as sessionTable } from '@/lib/db/schema'
 import { eq, sql } from 'drizzle-orm'
 import { headers } from 'next/headers'
 import { UserRole } from '@/lib/roles'
@@ -89,7 +89,7 @@ export async function changeUserRole(userId: string, newRole: UserRole) {
 
   // Invalidate all existing sessions for that user so their next request
   // picks up the new role from the DB (Better Auth caches role in session).
-  await db.delete(session).where(eq(session.userId, userId))
+  await db.delete(sessionTable).where(eq(sessionTable.userId, userId))
 
   // Log the action
   await logAudit({

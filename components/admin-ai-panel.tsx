@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button'
 import {
   Bot, Send, X, RefreshCw, Sparkles, TrendingUp,
   Users, Wallet, BarChart3, Activity, ChevronRight,
-  Shield, Copy, Check, AlertCircle, Zap,
+  Shield, AlertCircle, Zap,
 } from 'lucide-react'
+import { CopyButton } from '@/lib/trader-utils'
 
 interface Message {
   id: string
@@ -142,19 +143,6 @@ function inlineFormat(text: string): React.ReactNode {
       return <code key={i} className="font-mono text-xs bg-slate-800 text-emerald-300 px-1.5 py-0.5 rounded">{part.slice(1, -1)}</code>
     return part
   })
-}
-
-function CopyButton({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false)
-  return (
-    <button
-      onClick={() => { navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1500) }}
-      className="p-1 rounded hover:bg-slate-700 text-slate-600 hover:text-slate-400 transition-colors"
-      title="Copy response"
-    >
-      {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
-    </button>
-  )
 }
 
 export default function AdminAiPanel({ context }: AdminAiPanelProps) {

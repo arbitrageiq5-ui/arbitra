@@ -63,6 +63,18 @@ export interface ExchangeApiKey {
   isPublicOnly: boolean
   lastTestedAt: string | null
   connectionStatus: string | null
+  // Extended runtime fields added by ALL_EXCHANGES metadata
+  region?: string
+  color?: string
+  lastTestStatus?: string | null
+  lastTestMs?: number | null
+  hasPassphrase?: boolean
+  permissions?: string[]
+  note?: string
+  docsUrl?: string
+  docsLabel?: string
+  tradingFee?: number
+  requiresIpWhitelist?: boolean
 }
 
 export interface AiArbitrageStrategy {

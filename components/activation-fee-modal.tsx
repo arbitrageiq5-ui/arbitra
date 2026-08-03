@@ -4,12 +4,12 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { getActivationStatus, submitActivationFee } from '@/app/actions/referral'
 import {
-  Shield, Copy, Check, Clock, CheckCircle2, XCircle,
+  Shield, Clock, CheckCircle2, XCircle,
   ChevronRight, AlertTriangle, Wallet, X, RefreshCw, LogOut,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { copyToClipboard } from '@/lib/utils'
 import { authClient } from '@/lib/auth-client'
+import { CopyButton as CopyBtn } from '@/lib/trader-utils'
 
 type DepositAddress = {
   id: number
@@ -27,22 +27,7 @@ const NETWORK_META: Record<string, { color: string; bg: string; border: string; 
   ERC20: { color: 'text-blue-400',   bg: 'bg-blue-500/10',   border: 'border-blue-500/30',   badge: 'Ethereum' },
 }
 
-function CopyBtn({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false)
-  return (
-    <button
-      onClick={async () => {
-        await copyToClipboard(text)
-        setCopied(true)
-        setTimeout(() => setCopied(false), 2000)
-      }}
-      className="shrink-0 p-1.5 rounded-md hover:bg-slate-700 transition-colors text-slate-400 hover:text-white"
-      title="Copy"
-    >
-      {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
-    </button>
-  )
-}
+
 
 export function ActivationFeeModal({ serverIsActivated }: { serverIsActivated: boolean }) {
   const router = useRouter()

@@ -6,12 +6,12 @@ import { authClient } from '@/lib/auth-client'
 import { getMarketOpportunities } from '@/app/actions/arbitrage'
 import { getDepositAddresses, submitFundRequest, getMyFundRequests } from '@/app/actions/deposits'
 import { getWalletSummary, getWalletBalanceFast } from '@/app/actions/wallet'
-import { copyToClipboard } from '@/lib/utils'
+
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import {
   LogOut, Zap, Wallet, TrendingUp, RefreshCw, Search,
-  Copy, Check, ChevronUp, ChevronDown, Filter, X,
+  ChevronUp, ChevronDown, Filter, X,
   Clock, CheckCircle2, XCircle, PlusCircle, ArrowRightLeft,
   Activity, BarChart3, AlertTriangle, Shield, Link2, Gift, ArrowDownCircle,
   Eye, EyeOff, Bot, Sparkles, Loader,
@@ -55,44 +55,8 @@ const STATUS_META = {
   rejected:  { icon: XCircle,        color: 'text-red-400',    bg: 'bg-red-500/10 border-red-500/20',       label: 'Rejected' },
 }
 
-function formatPrice(p: number) {
-  if (p >= 1000) return `$${p.toLocaleString('en-US', { maximumFractionDigits: 0 })}`
-  if (p >= 1) return `$${p.toFixed(3)}`
-  if (p >= 0.01) return `$${p.toFixed(4)}`
-  if (p >= 0.0001) return `$${p.toFixed(6)}`
-  return `$${p.toFixed(8)}`
-}
-
-function formatVolume(v: number) {
-  if (v >= 1e9) return `$${(v / 1e9).toFixed(1)}B`
-  if (v >= 1e6) return `$${(v / 1e6).toFixed(1)}M`
-  return `$${(v / 1e3).toFixed(0)}K`
-}
-
-function timeAgo(iso: string) {
-  const secs = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
-  if (secs < 60) return `${secs}s ago`
-  if (secs < 3600) return `${Math.floor(secs / 60)}m ago`
-  return `${Math.floor(secs / 3600)}h ago`
-}
-
-function CopyButton({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false)
-  const handleCopy = async () => {
-    await copyToClipboard(text)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-  return (
-    <button
-      onClick={handleCopy}
-      className="p-1.5 rounded hover:bg-slate-700 transition-colors text-slate-400 hover:text-white"
-      title="Copy address"
-    >
-      {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
-    </button>
-  )
-}
+// Helpers imported from shared lib — see lib/trader-utils.tsx
+import { formatPrice, formatVolume, timeAgo, CopyButton } from '@/lib/trader-utils'
 
 export function TraderClient({ user, isActivated }: { user: { id: string; name?: string | null; email?: string }; isActivated: boolean }) {
   const router = useRouter()
@@ -398,12 +362,12 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
           </Suspense>
         )}
 
-  {/* ── TAB: TRADING BOTS ── */}
-  {activeTab === 'trading-bot' && (
-    <Suspense fallback={<TabLoader />}>
-      <TradingBot />
-    </Suspense>
-  )}
+        {/* ── TAB: TRADING BOTS ── */}
+        {activeTab === 'trading-bot' && (
+          <Suspense fallback={<TabLoader />}>
+            <TradingBot />
+          </Suspense>
+        )}
 
         {/* ── TAB: ARB BOT ── */}
         {activeTab === 'arb-bot' && (

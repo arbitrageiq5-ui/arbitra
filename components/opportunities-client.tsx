@@ -50,29 +50,7 @@ const LIQUIDITY_CONFIG = {
   Low: { color: 'text-red-400', dots: 1 },
 }
 
-function timeAgo(iso: string) {
-  const diffMs = Date.now() - new Date(iso).getTime()
-  const secs = Math.floor(diffMs / 1000)
-  if (secs < 60) return `${secs}s ago`
-  const mins = Math.floor(secs / 60)
-  if (mins < 60) return `${mins}m ago`
-  return `${Math.floor(mins / 60)}h ago`
-}
-
-function formatVolume(v: number) {
-  if (v >= 1e9) return `$${(v / 1e9).toFixed(1)}B`
-  if (v >= 1e6) return `$${(v / 1e6).toFixed(1)}M`
-  if (v >= 1e3) return `$${(v / 1e3).toFixed(0)}K`
-  return `$${v.toFixed(0)}`
-}
-
-function formatPrice(p: number) {
-  if (p >= 1000) return `$${p.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
-  if (p >= 1) return `$${p.toFixed(3)}`
-  if (p >= 0.01) return `$${p.toFixed(4)}`
-  if (p >= 0.0001) return `$${p.toFixed(6)}`
-  return `$${p.toFixed(8)}`
-}
+import { formatPrice, formatVolume, timeAgo } from '@/lib/trader-utils'
 
 function LiquidityDots({ level }: { level: 'High' | 'Medium' | 'Low' }) {
   const { color, dots } = LIQUIDITY_CONFIG[level]

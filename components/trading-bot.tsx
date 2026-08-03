@@ -359,7 +359,7 @@ const GOLD_SILVER_STRATEGIES = [
 
 // ─── Helpers ────────────────────────────────────────────────────────────────────
 
-function StatusBadge({ status }: { status: string }) {
+function BotStatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
     active:  'bg-green-500/10 text-green-400 border-green-500/20',
     paused:  'bg-amber-500/10 text-amber-400 border-amber-500/20',
@@ -1028,7 +1028,7 @@ function BotCard({ bot, onRefresh, onToast }: {
             </div>
           </div>
         </div>
-        <StatusBadge status={bot.status} />
+        <BotStatusBadge status={bot.status} />
       </div>
 
       {/* Metrics grid */}

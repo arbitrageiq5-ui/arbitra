@@ -26,6 +26,7 @@ import {
   NETWORK_MIN_CONFIRMATIONS, NETWORK_BLOCK_TIME_SECS, NETWORK_WITHDRAW_FEE_USD,
 } from '@/lib/arb-bot-utils'
 import { getMarketOpportunities } from '@/app/actions/arbitrage'
+import { StatusBadge, RiskChip, CopyButton as CopyBtn } from '@/lib/trader-utils'
 
 type Opportunity = Awaited<ReturnType<typeof getMarketOpportunities>>[number]
 type ViewTab = 'setup' | 'history' | 'analytics'
@@ -59,53 +60,7 @@ const PIPELINE_STEPS = [
   { key: 'completed',   label: 'Completed',    icon: CheckCircle2,   desc: 'Trade completed'                       },
 ]
 
-const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
-  pending:    { label: 'Queued',      color: 'text-slate-400',  bg: 'bg-slate-700/40 border-slate-600/40'   },
-  buying:     { label: 'Buying',      color: 'text-blue-400',   bg: 'bg-blue-500/10 border-blue-500/25'     },
-  withdrawing:{ label: 'Withdrawing', color: 'text-amber-400',  bg: 'bg-amber-500/10 border-amber-500/25'   },
-  depositing: { label: 'Depositing',  color: 'text-violet-400', bg: 'bg-violet-500/10 border-violet-500/25' },
-  selling:    { label: 'Selling',     color: 'text-cyan-400',   bg: 'bg-cyan-500/10 border-cyan-500/25'     },
-  completed:  { label: 'Completed',   color: 'text-green-400',  bg: 'bg-green-500/10 border-green-500/25'   },
-  failed:     { label: 'Failed',      color: 'text-red-400',    bg: 'bg-red-500/10 border-red-500/25'       },
-}
-
-const RISK_META: Record<string, { color: string; dot: string }> = {
-  Low:      { color: 'text-green-400', dot: 'bg-green-400' },
-  Medium:   { color: 'text-amber-400', dot: 'bg-amber-400' },
-  High:     { color: 'text-red-400',   dot: 'bg-red-400'   },
-  Critical: { color: 'text-rose-400',  dot: 'bg-rose-400 animate-pulse' },
-}
-
 // ── Sub-components ─────────────────────────────────────────────────────────────
-
-function StatusBadge({ status }: { status: string }) {
-  const m = STATUS_META[status] ?? STATUS_META.pending
-  return (
-    <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded border font-semibold ${m.color} ${m.bg}`}>
-      {m.label}
-    </span>
-  )
-}
-
-function RiskChip({ level, score }: { level: string; score: number }) {
-  const m = RISK_META[level] ?? RISK_META.Medium
-  return (
-    <span className={`inline-flex items-center gap-1 text-[10px] font-bold ${m.color}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${m.dot}`} />
-      {level} <span className="opacity-50 font-normal">({score})</span>
-    </span>
-  )
-}
-
-function CopyBtn({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false)
-  return (
-    <button onClick={async () => { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1500) }}
-      className="text-slate-500 hover:text-slate-300 transition-colors">
-      {copied ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />}
-    </button>
-  )
-}
 
 // ── Safety Check Panel ────────────────────────────────────────────────────────
 function SafetyChecklist({ checks, onConfirm, onCancel, executing }: {
