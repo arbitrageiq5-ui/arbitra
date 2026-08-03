@@ -26,7 +26,6 @@ const AutoTradePlatform = lazy(() => import('@/components/auto-trade-platform').
 const PassiveIncome = lazy(() => import('@/components/passive-income').then(m => ({ default: m.PassiveIncome })))
 const TraderWallet = lazy(() => import('@/components/trader-wallet').then(m => ({ default: m.TraderWallet })))
 const TradingBot = lazy(() => import('@/components/trading-bot').then(m => ({ default: m.TradingBot })))
-const Lending = lazy(() => import('@/components/lending').then(m => ({ default: m.Lending })))
 const ArbitrageBotPanel = lazy(() => import('@/components/arbitrage-bot-panel').then(m => ({ default: m.ArbitrageBotPanel })))
 
 const TabLoader = () => (
@@ -40,7 +39,7 @@ type DepositAddress = Awaited<ReturnType<typeof getDepositAddresses>>[number]
 type FundRequest = Awaited<ReturnType<typeof getMyFundRequests>>[number]
 
 type Network = 'TRC20' | 'BEP20' | 'ERC20'
-type Tab = 'wallet' | 'opportunities' | 'funds' | 'exchanges' | 'trade' | 'auto-trade' | 'passive-income' | 'lending' | 'trading-bot' | 'arb-bot'
+type Tab = 'wallet' | 'opportunities' | 'funds' | 'exchanges' | 'trade' | 'auto-trade' | 'passive-income' | 'trading-bot' | 'arb-bot'
 type SortKey = 'netProfit' | 'spread' | 'volume24h' | 'symbol'
 type SortDir = 'asc' | 'desc'
 
