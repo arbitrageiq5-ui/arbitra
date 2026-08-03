@@ -42,7 +42,7 @@ function generateChallenge(): CaptchaChallenge {
   return { question, answer }
 }
 
-export function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
+function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [name, setName] = useState('')
@@ -387,3 +387,5 @@ export function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
     </main>
   )
 }
+
+export default AuthForm
