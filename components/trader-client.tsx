@@ -419,25 +419,6 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
           </Suspense>
         )}
 
-        {/* ── TAB: AUTO TRADE ── */}
-        {activeTab === 'auto-trade' && (
-          <AutoTradePlatform />
-        )}
-
-  {/* ── TAB: TRADING BOTS ── */}
-  {activeTab === 'trading-bot' && (
-    <TradingBot />
-  )}
-
-        {/* ── TAB: ARB BOT ── */}
-        {activeTab === 'arb-bot' && (
-          <ArbitrageBotPanel />
-        )}
-
-        {/* ── TAB: PASSIVE INCOME ── */}
-        {activeTab === 'passive-income' && (
-          <PassiveIncome />
-        )}
 
         {/* ��─ TAB: TRADE OPPORTUNITIES ── */}
         {activeTab === 'opportunities' && (
