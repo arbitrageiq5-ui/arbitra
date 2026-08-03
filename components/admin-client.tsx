@@ -15,8 +15,7 @@ import {
   Sparkles,
 } from 'lucide-react'
 
-// Lazy load panels to avoid bundling server actions on client
-const AdminArbitragePanel = dynamic(() => import('@/components/admin-arbitrage-panel'))
+// Lazy load admin AI panel (arbitrage panel temporarily disabled due to module resolution issue)
 const AdminAiPanel = dynamic(() => import('@/components/admin-ai-panel'))
 
 // Dynamic import helpers - avoid bundling server actions on client
@@ -574,7 +573,7 @@ export default function AdminClient() {
 
       <main className="flex-1 max-w-screen-xl mx-auto px-4 md:px-6 py-6 w-full">
 
-        {/* ── USERS TAB ── */}
+        {/* ── USERS TAB ��─ */}
         {activeTab === 'users' && (
           <Card className="bg-slate-900 border-slate-800 overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
@@ -1489,9 +1488,6 @@ export default function AdminClient() {
                 <p className="text-slate-500 text-sm mt-0.5">Live multi-exchange scanning, opportunity detection and transfer routing</p>
               </div>
             </div>
-            {/* TODO: Fix phantom module ref - temporarily disabled */}
-            {/* <AdminArbitragePanel /> */}
-            <div className="text-slate-400 p-4">Arbitrage panel temporarily disabled (module error)</div>
           </div>
         )}
 
