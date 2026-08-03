@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Rebuild trigger for chunk error fix
+  // Cache bust: clear stale module references (v2)
   typescript: {
     ignoreBuildErrors: true,
   },
