@@ -23,7 +23,7 @@ import {
   type BotTradeInput, type SafetyCheck,
   NETWORK_SUPPORTED_COINS,
   checkContractAddress, validateVolume, getTransferTiming, getSpreadFreshness,
-  NETWORK_MIN_CONFIRMATIONS, NETWORK_BLOCK_TIME_SECS,
+  NETWORK_MIN_CONFIRMATIONS, NETWORK_BLOCK_TIME_SECS, NETWORK_WITHDRAW_FEE_USD,
 } from '@/lib/arb-bot-utils'
 import { getMarketOpportunities } from '@/app/actions/arbitrage'
 
@@ -562,6 +562,217 @@ function AnalyticsView({ history }: { history: BotTradeRow[] }) {
   )
 }
 
+// ── Network Fee Comparison Table ──────────────────────────────────────────────
+function NetworkFeeComparison({ symbol, amountUsd }: { symbol: string; amountUsd: number }) {
+  if (!symbol || amountUsd <= 0) return null
+  const rows = NETWORKS.map(n => {
+    const withdrawFee = NETWORK_WITHDRAW_FEE_USD[n.id] ?? 2
+    const totalFeeEst = withdrawFee + (amountUsd * 0.002) // rough taker fee both sides
+    const isSupported = !symbol || (NETWORK_SUPPORTED_COINS[n.id] ?? []).includes(symbol) || (NETWORK_SUPPORTED_COINS[n.id] ?? []).length === 0
+    return { ...n, withdrawFee, totalFeeEst, isSupported }
+  })
+  const cheapest = rows.filter(r => r.isSupported).sort((a, b) => a.totalFeeEst - b.totalFeeEst)[0]
+
+  return (
+    <div className="rounded-xl border border-slate-700/60 bg-slate-800/40 overflow-hidden">
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-slate-700/50">
+        <BarChart3 className="w-3.5 h-3.5 text-slate-400" />
+        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider flex-1">Network Fee Comparison</p>
+        <span className="text-[9px] text-slate-600">for ${amountUsd.toLocaleString()} capital</span>
+      </div>
+      <div className="divide-y divide-slate-800/60">
+        {rows.map(n => (
+          <div key={n.id} className={`flex items-center gap-3 px-3 py-2 ${!n.isSupported ? 'opacity-30' : n.id === cheapest?.id ? 'bg-green-500/5' : ''}`}>
+            <span className={`text-[10px] font-bold w-16 shrink-0 ${n.color}`}>{n.label}</span>
+            <span className="text-[9px] text-slate-600 flex-1">{n.sub}</span>
+            <span className="text-[10px] text-slate-400 font-mono w-12 text-right">{n.time}</span>
+            <span className="text-[10px] text-slate-300 font-mono w-12 text-right">${n.withdrawFee.toFixed(1)}</span>
+            {n.id === cheapest?.id && n.isSupported && (
+              <span className="text-[9px] text-green-400 bg-green-500/10 border border-green-500/20 rounded px-1.5 font-bold shrink-0">CHEAPEST</span>
+            )}
+            {!n.isSupported && (
+              <span className="text-[9px] text-slate-600 border border-slate-700/40 rounded px-1.5 shrink-0">N/A</span>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── Execution Log Feed ─────────────────────────────────────────────────────────
+type LogEntry = { ts: Date; level: 'info' | 'warn' | 'error' | 'success'; msg: string }
+
+function ExecutionLog({ entries }: { entries: LogEntry[] }) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+  }, [entries])
+
+  if (entries.length === 0) return null
+
+  return (
+    <div className="rounded-xl border border-slate-700/50 bg-slate-950 overflow-hidden">
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-slate-800">
+        <div className="flex gap-1">
+          <span className="w-2 h-2 rounded-full bg-red-500/60" />
+          <span className="w-2 h-2 rounded-full bg-amber-500/60" />
+          <span className="w-2 h-2 rounded-full bg-green-500/60" />
+        </div>
+        <p className="text-[10px] font-mono text-slate-500 flex-1">execution.log</p>
+        <span className="text-[9px] text-slate-600">{entries.length} entries</span>
+      </div>
+      <div ref={scrollRef} className="max-h-48 overflow-y-auto p-3 space-y-1 font-mono scrollbar-thin">
+        {entries.map((e, i) => (
+          <div key={i} className="flex items-start gap-2 text-[10px] leading-relaxed">
+            <span className="text-slate-600 shrink-0 select-none">
+              {e.ts.toTimeString().slice(0, 8)}
+            </span>
+            <span className={`font-bold shrink-0 w-12 ${
+              e.level === 'success' ? 'text-green-400' :
+              e.level === 'error'   ? 'text-red-400'   :
+              e.level === 'warn'    ? 'text-amber-400'  :
+              'text-slate-500'
+            }`}>[{e.level.toUpperCase().slice(0,4)}]</span>
+            <span className={`${
+              e.level === 'success' ? 'text-green-300' :
+              e.level === 'error'   ? 'text-red-300'   :
+              e.level === 'warn'    ? 'text-amber-300'  :
+              'text-slate-400'
+            }`}>{e.msg}</span>
+          </div>
+        ))}
+        {entries[entries.length - 1]?.level !== 'success' && entries[entries.length - 1]?.level !== 'error' && (
+          <div className="flex items-center gap-2 text-[10px]">
+            <span className="text-slate-600">
+              {new Date().toTimeString().slice(0, 8)}
+            </span>
+            <span className="text-amber-400 font-bold">[INFO]</span>
+            <span className="text-slate-500 animate-pulse">waiting...</span>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Opportunity Refresh Ticker ─────────────────────────────────────────────────
+function RefreshCountdown({ onRefresh, intervalSecs = 30 }: { onRefresh: () => void; intervalSecs?: number }) {
+  const [remaining, setRemaining] = useState(intervalSecs)
+  useEffect(() => {
+    const tick = setInterval(() => {
+      setRemaining(r => {
+        if (r <= 1) { onRefresh(); return intervalSecs }
+        return r - 1
+      })
+    }, 1000)
+    return () => clearInterval(tick)
+  }, [onRefresh, intervalSecs])
+  const pct = ((intervalSecs - remaining) / intervalSecs) * 100
+
+  return (
+    <div className="flex items-center gap-2 px-3 py-1.5">
+      <div className="relative w-3.5 h-3.5 shrink-0">
+        <svg className="w-3.5 h-3.5 -rotate-90" viewBox="0 0 14 14">
+          <circle cx="7" cy="7" r="5" strokeWidth="1.5" className="stroke-slate-700" fill="none" />
+          <circle cx="7" cy="7" r="5" strokeWidth="1.5"
+            stroke="#f59e0b" fill="none" strokeDasharray={`${2 * Math.PI * 5}`}
+            strokeDashoffset={`${2 * Math.PI * 5 * (1 - pct / 100)}`}
+            strokeLinecap="round" />
+        </svg>
+      </div>
+      <span className="text-[10px] text-slate-600">Auto-refresh in <span className="text-amber-400 font-mono font-bold">{remaining}s</span></span>
+    </div>
+  )
+}
+
+// ── Post-Trade Next Opportunity Recommender ────────────────────────────────────
+function NextOpportunityCard({ opps, lastTrade, onSelect }: {
+  opps: Opportunity[]
+  lastTrade: BotTradeRow
+  onSelect: (opp: Opportunity) => void
+}) {
+  const next = opps
+    .filter(o => o.netProfit > 0 && !(o.buyExchange === lastTrade.buyExchange && o.sellExchange === lastTrade.sellExchange && o.symbol === lastTrade.symbol))
+    .sort((a, b) => b.netProfit - a.netProfit)[0]
+
+  if (!next) return null
+
+  return (
+    <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 space-y-2">
+      <div className="flex items-center gap-2">
+        <Zap className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+        <p className="text-[10px] font-semibold text-amber-300 uppercase tracking-wider">Next Best Opportunity</p>
+      </div>
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-white font-bold text-sm">{next.symbol}</p>
+          <p className="text-[10px] text-slate-500">{next.buyExchange} &rarr; {next.sellExchange}</p>
+          <p className="text-[10px] text-slate-500 font-mono">${next.buyPrice.toFixed(4)} &rarr; ${next.sellPrice.toFixed(4)}</p>
+        </div>
+        <div className="text-right space-y-1">
+          <p className="text-green-400 font-bold">+{next.netProfit.toFixed(2)}%</p>
+          <button onClick={() => onSelect(next)}
+            className="text-[10px] px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-lg transition-colors">
+            Load Trade
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Triangle Arbitrage Route ───────────────────────────────────────────────────
+function TriangleRouteCard({ symbol, buyExchange, sellExchange, opps }: {
+  symbol: string; buyExchange: string; sellExchange: string; opps: Opportunity[]
+}) {
+  if (!symbol || !buyExchange || !sellExchange) return null
+
+  // Find a 3rd exchange that has a better sell rate creating a triangle
+  const thirdLeg = opps
+    .filter(o => o.symbol === symbol && o.buyExchange === sellExchange && o.sellExchange !== buyExchange)
+    .sort((a, b) => b.netProfit - a.netProfit)[0]
+
+  if (!thirdLeg) return null
+
+  const totalProfit = opps.find(o =>
+    o.symbol === symbol && o.buyExchange === buyExchange && o.sellExchange === sellExchange
+  )?.netProfit ?? 0
+
+  const triangleProfit = (totalProfit + thirdLeg.netProfit) * 0.7 // conservative estimate
+
+  return (
+    <div className="rounded-xl border border-purple-500/20 bg-purple-500/5 p-3 space-y-2.5">
+      <div className="flex items-center gap-2">
+        <Layers className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+        <p className="text-[10px] font-semibold text-purple-300 uppercase tracking-wider">Triangle Route Detected</p>
+        <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded bg-purple-500/15 border border-purple-500/25 text-purple-300 font-bold">3-LEG</span>
+      </div>
+      <div className="flex items-center gap-2 text-[10px]">
+        <div className="flex-1 text-center">
+          <p className="text-slate-400 font-semibold">{buyExchange}</p>
+          <p className="text-[9px] text-slate-600">Buy {symbol}</p>
+        </div>
+        <ChevronRight className="w-3 h-3 text-slate-600 shrink-0" />
+        <div className="flex-1 text-center">
+          <p className="text-slate-400 font-semibold">{sellExchange}</p>
+          <p className="text-[9px] text-slate-600">Sell / Re-buy</p>
+        </div>
+        <ChevronRight className="w-3 h-3 text-slate-600 shrink-0" />
+        <div className="flex-1 text-center">
+          <p className="text-slate-400 font-semibold">{thirdLeg.sellExchange}</p>
+          <p className="text-[9px] text-slate-600">Final Sell</p>
+        </div>
+      </div>
+      <div className="flex items-center justify-between text-[10px]">
+        <span className="text-slate-500">Est. combined net profit</span>
+        <span className="text-purple-400 font-bold">+{triangleProfit.toFixed(2)}%</span>
+      </div>
+      <p className="text-[9px] text-slate-600">Triangle route requires 2 sequential trades and 2 network transfers — higher fees but potentially greater return. Execute as two separate bot trades.</p>
+    </div>
+  )
+}
+
 // ── Contract Address Verifier ──────────────────────────────────────────────────
 function ContractAddressPanel({ symbol, network }: { symbol: string; network: string }) {
   const [copied, setCopied] = useState(false)
@@ -774,8 +985,14 @@ export function ArbitrageBotPanel() {
   const [showChecklist, setShowChecklist] = useState(false)
   const [safetyChecks, setSafetyChecks]   = useState<SafetyCheck[]>([])
   const [lastResult, setLastResult]   = useState<BotTradeRow | null>(null)
-  const [showAdvanced, setShowAdvanced]       = useState(false)
-  const [transferStartedAt, setTransferStartedAt] = useState<Date | null>(null)
+  const [showAdvanced, setShowAdvanced]               = useState(false)
+  const [transferStartedAt, setTransferStartedAt]     = useState<Date | null>(null)
+  const [executionLog, setExecutionLog]               = useState<LogEntry[]>([])
+  const [showFeeTable, setShowFeeTable]               = useState(false)
+
+  const addLog = useCallback((level: LogEntry['level'], msg: string) => {
+    setExecutionLog(prev => [...prev, { ts: new Date(), level, msg }])
+  }, [])
 
   // Form state
   const [selectedOpp,    setSelectedOpp]    = useState<Opportunity | null>(null)
@@ -839,9 +1056,23 @@ export function ArbitrageBotPanel() {
     const input = buildInput()
     if (!input) return
     const opp = selectedOpp ?? opps.find(o => o.symbol === symbol && o.buyExchange === buyExchange && o.sellExchange === sellExchange)
-    const volume24hUsd    = opp ? opp.volume24h * (opp.buyPrice || 1) : 0
+    const volume24hUsd     = opp ? opp.volume24h * (opp.buyPrice || 1) : 0
     const spreadAgeSeconds = opp ? Math.floor((Date.now() - new Date(opp.detectedAt).getTime()) / 1000) : undefined
-    setSafetyChecks(runSafetyChecks({ ...input, volume24hUsd, spreadAgeSeconds }))
+    const checks = runSafetyChecks({ ...input, volume24hUsd, spreadAgeSeconds })
+    setSafetyChecks(checks)
+    setExecutionLog([])
+    addLog('info', `Safety check initiated — ${input.symbol} ${input.buyExchange} → ${input.sellExchange}`)
+    addLog('info', `Capital: $${input.amountUsd} | Network: ${input.network} | Slippage: ${input.slippagePct}%`)
+    addLog('info', `Live buy: $${input.buyPrice.toFixed(4)} | Live sell: $${input.sellPrice.toFixed(4)}`)
+    checks.forEach(c => {
+      if (c.status === 'fail')  addLog('error', `[FAIL] ${c.label}: ${c.detail}`)
+      else if (c.status === 'warn') addLog('warn', `[WARN] ${c.label}: ${c.detail}`)
+      else addLog('info', `[PASS] ${c.label}`)
+    })
+    const fails = checks.filter(c => c.status === 'fail').length
+    const warns = checks.filter(c => c.status === 'warn').length
+    addLog(fails > 0 ? 'error' : warns > 0 ? 'warn' : 'success',
+      `Check complete — ${checks.length - fails - warns} pass, ${warns} warn, ${fails} fail`)
     setShowChecklist(true)
   }
 
@@ -849,14 +1080,26 @@ export function ArbitrageBotPanel() {
     const input = buildInput()
     if (!input) return
     setExecuting(true)
+    setShowChecklist(false)
     try {
+      addLog('info', `Executing trade — sending to server...`)
+      addLog('info', `Re-fetching live prices to guard against stale data...`)
       const result = await executeBotTrade(input)
       setLastResult(result)
-      setShowChecklist(false)
       setTransferStartedAt(new Date())
+      if (result.status === 'completed') {
+        addLog('success', `Trade completed — Net: $${parseFloat(result.netProfitUsd ?? '0').toFixed(2)} (${parseFloat(result.netProfitPct ?? '0').toFixed(2)}%)`)
+        addLog('success', `Buy order: ${result.buyOrderId} | Sell order: ${result.sellOrderId}`)
+        if (result.withdrawTxId) addLog('info', `Withdraw TX: ${result.withdrawTxId}`)
+      } else if (result.status === 'failed') {
+        addLog('error', `Trade failed: ${result.errorMessage ?? result.statusDetail ?? 'Unknown error'}`)
+      } else {
+        addLog('info', `Trade status: ${result.status} — ${result.statusDetail ?? ''}`)
+        addLog('info', `Transfer in progress via ${input.network} — timer started`)
+      }
       await getBotTradeHistory(50).then(setHistory)
     } catch (err) {
-      console.error('[ArbitrageBotPanel] execution error:', err)
+      addLog('error', `Execution error: ${err instanceof Error ? err.message : 'Unknown'}`)
     } finally {
       setExecuting(false)
     }
@@ -925,9 +1168,12 @@ export function ArbitrageBotPanel() {
               <Card className="bg-slate-900 border-slate-800 p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Live Opportunities</p>
-                  <button onClick={() => setManualMode(true)} className="text-[10px] text-slate-500 hover:text-amber-400 transition-colors">
-                    Enter manually
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {opps.length > 0 && <RefreshCountdown onRefresh={loadData} intervalSecs={30} />}
+                    <button onClick={() => setManualMode(true)} className="text-[10px] text-slate-500 hover:text-amber-400 transition-colors">
+                      Manual
+                    </button>
+                  </div>
                 </div>
                 {loading ? (
                   <div className="flex items-center gap-2 text-slate-500 text-xs py-4 justify-center">
@@ -1065,6 +1311,24 @@ export function ArbitrageBotPanel() {
                 </div>
               </div>
 
+              {/* Fee comparison table toggle */}
+              {symbol && parseFloat(amountUsd) > 0 && (
+                <div>
+                  <button onClick={() => setShowFeeTable(v => !v)}
+                    className="flex items-center gap-1.5 text-[10px] text-slate-500 hover:text-slate-300 transition-colors w-full justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <BarChart3 className="w-3 h-3" /> Compare network fees
+                    </span>
+                    {showFeeTable ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                  </button>
+                  {showFeeTable && (
+                    <div className="mt-2">
+                      <NetworkFeeComparison symbol={symbol} amountUsd={parseFloat(amountUsd) || 0} />
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Advanced settings */}
               <button onClick={() => setShowAdvanced(v => !v)}
                 className="flex items-center gap-1.5 text-[10px] text-slate-500 hover:text-slate-300 transition-colors">
@@ -1156,6 +1420,16 @@ export function ArbitrageBotPanel() {
               <SpreadFreshnessBar detectedAt={selectedOpp.detectedAt} />
             )}
 
+            {/* Triangle Route Detector */}
+            {symbol && buyExchange && sellExchange && opps.length > 0 && (
+              <TriangleRouteCard
+                symbol={symbol}
+                buyExchange={buyExchange}
+                sellExchange={sellExchange}
+                opps={opps}
+              />
+            )}
+
             {/* Contract Address Verifier */}
             {symbol && network && (
               <Card className="bg-slate-900 border-slate-800 p-4">
@@ -1205,10 +1479,30 @@ export function ArbitrageBotPanel() {
               </Card>
             )}
 
+            {/* Execution Log */}
+            {executionLog.length > 0 && (
+              <ExecutionLog entries={executionLog} />
+            )}
+
+            {/* Next Opportunity Recommender */}
+            {lastResult && lastResult.status === 'completed' && opps.length > 0 && (
+              <NextOpportunityCard
+                opps={opps}
+                lastTrade={lastResult}
+                onSelect={(opp) => {
+                  setSelectedOpp(opp)
+                  setManualMode(false)
+                  setLastResult(null)
+                  setExecutionLog([])
+                  setTransferStartedAt(null)
+                }}
+              />
+            )}
+
             <div className="flex gap-2.5 p-3 rounded-xl bg-slate-800/50 border border-slate-700/50">
               <Info className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
               <p className="text-[10px] text-slate-500 leading-relaxed">
-                The bot verifies live prices, contract addresses, volume impact, and spread freshness before execution. It runs a safety checklist, places a market buy, withdraws via the chosen network, confirms on-chain, then places a market sell. Slippage is baked in. Funds are never left in an incomplete state on failure.
+                Full arbitrage pipeline: live price re-verification, contract address validation, volume slippage guard, spread freshness check, 11-point safety checklist, market buy, on-chain withdrawal, deposit confirmation wait, then market sell. Triangle routes show 3-exchange compound opportunities. Execution log records every step with timestamps.
               </p>
             </div>
           </div>
