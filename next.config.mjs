@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Rebuild trigger for chunk error fix
   typescript: {
     ignoreBuildErrors: true,
   },
