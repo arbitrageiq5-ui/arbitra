@@ -15,7 +15,7 @@ import { registerWithCaptcha, saveRegistrationProfile } from '@/app/actions/secu
 import { recordUserLogin } from '@/app/actions/user-session'
 import { RefreshCw, Shield, Eye, EyeOff, ArrowLeft } from 'lucide-react'
 
-// ── Math captcha helpers ───────────────────────────────────────────────────────
+// ── Math captcha helpers ─────────────────────────────────────────────────────
 type CaptchaChallenge = { question: string; answer: number }
 
 function generateChallenge(): CaptchaChallenge {

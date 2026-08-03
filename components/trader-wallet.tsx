@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
@@ -116,7 +116,7 @@ export function TraderWallet() {
     } finally { setLoading(false) }
   }, [])
 
-  useState(() => { load() })
+  useEffect(() => { load() }, [])
 
   const copyToClipboard = async (text: string, key: string) => {
     await copyUtil(text)
