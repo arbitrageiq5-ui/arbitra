@@ -2,13 +2,6 @@
 
 import { useState, useEffect, useCallback, useMemo, memo } from 'react'
 import { Card } from '@/components/ui/card'
-import {
-  adminFetchLivePrices, testExchangeConnection, testAllExchanges,
-  getExchangeApiKeys, saveExchangeApiKey, toggleExchangeEnabled, deleteExchangeApiKey,
-  generateAiArbitrageStrategy, getSavedAiStrategy, getTransferRoutes,
-  getExchangeBalances, executeExchangeTransfer, getTransferHistory,
-  getBotConfig, saveBotConfig, getBotAnalytics, executeBotTrade, evaluateRiskFilters,
-} from '@/app/actions/admin-arbitrage'
 import type {
   AdminLivePrice, AdminArbitrageOpp, ExchangeStatus, ExchangeApiKey,
   AiArbitrageStrategy, TransferRoute, ExchangeBalance, TransferLog,
@@ -27,6 +20,10 @@ import {
   CheckCircle, XCircle as XCircleIcon, Minus, Percent, Timer,
   BadgeDollarSign, Layers, SlidersHorizontal,
 } from 'lucide-react'
+
+// ── Server Action Loader ───────────────────────────────────────────────────────
+// Lazy load server actions to avoid bundling them on client
+const loadServerActions = async () => import('@/app/actions/admin-arbitrage')
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -273,6 +270,7 @@ export default function AdminArbitragePanel() {
 
   async function loadAllExchangeBalances() {
     setLoadingAllBalances(true)
+    const { getExchangeBalances } = await loadServerActions()
     const result: Record<string, ExchangeBalance[]> = {}
     for (const ex of apiKeys.filter(k => k.isEnabled)) {
       try {
@@ -289,6 +287,7 @@ export default function AdminArbitragePanel() {
   async function loadBalances() {
     setLoadingBalances(true)
     try {
+      const { getExchangeBalances } = await loadServerActions()
       const bal = await getExchangeBalances(txFromEx)
       setTxBalances(bal)
     } catch { setTxBalances([]) }
@@ -298,6 +297,7 @@ export default function AdminArbitragePanel() {
   async function loadHistory() {
     setLoadingHistory(true)
     try {
+      const { getTransferHistory } = await loadServerActions()
       const h = await getTransferHistory(30)
       setTxHistory(h)
     } catch { setTxHistory([]) }
@@ -308,6 +308,7 @@ export default function AdminArbitragePanel() {
     setTxSubmitting(true)
     setTxResult(null)
     try {
+      const { executeExchangeTransfer } = await loadServerActions()
       const result = await executeExchangeTransfer({
         fromExchange: txFromEx,
         toExchange:   txToEx,
@@ -334,6 +335,7 @@ export default function AdminArbitragePanel() {
   async function loadBotConfig() {
     setLoadingBotConfig(true)
     try {
+      const { getBotConfig } = await loadServerActions()
       const cfg = await getBotConfig()
       setBotConfig(cfg)
       setBotRunning(cfg.isRunning)
@@ -346,7 +348,10 @@ export default function AdminArbitragePanel() {
     const updated = { ...botConfig, ...partial }
     setBotConfig(updated)
     setSavingBotConfig(true)
-    try { await saveBotConfig(partial) } catch { /* ignore */ }
+    try {
+      const { saveBotConfig } = await loadServerActions()
+      await saveBotConfig(partial)
+    } catch { /* ignore */ }
     finally { setSavingBotConfig(false) }
   }
 
@@ -364,6 +369,7 @@ export default function AdminArbitragePanel() {
     setExecResult(null)
     setBotLog(prev => [...prev, `[${new Date().toLocaleTimeString()}] Executing trade: ${opp.symbol} BUY ${opp.buyExchange} → SELL ${opp.sellExchange}`])
     try {
+      const { executeBotTrade } = await loadServerActions()
       const res = await executeBotTrade(opp, botConfig)
       setExecResult({ success: res.success, message: res.message })
       setBotLog(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${res.success ? 'SUCCESS' : 'FAILED'}: ${res.message}`])
@@ -380,6 +386,7 @@ export default function AdminArbitragePanel() {
     setLoadingRisk(true)
     setSelectedOppForExec(opp)
     try {
+      const { evaluateRiskFilters } = await loadServerActions()
       const filters = await evaluateRiskFilters(opp, botConfig)
       setRiskFilters(filters)
       const bd = calcNetProfit(
@@ -394,6 +401,7 @@ export default function AdminArbitragePanel() {
   async function loadAnalytics() {
     setLoadingAnalytics(true)
     try {
+      const { getBotAnalytics } = await loadServerActions()
       const a = await getBotAnalytics()
       setAnalytics(a)
     } catch { /* ignore */ }
@@ -429,6 +437,7 @@ export default function AdminArbitragePanel() {
   async function loadApiKeys() {
     setLoadingKeys(true)
     try {
+      const { getExchangeApiKeys } = await loadServerActions()
       const keys = await getExchangeApiKeys()
       setApiKeys(keys)
     } finally {
@@ -436,11 +445,12 @@ export default function AdminArbitragePanel() {
     }
   }
 
-  // ── Live scan ───────────────────────────────────��────────────────���────────
+  // ── Live scan ───────────────────────────────────────────────────────────────
   const runScan = useCallback(async () => {
     setScanError(null)
     setScanning(true)
     try {
+      const { adminFetchLivePrices } = await loadServerActions()
       const result = await adminFetchLivePrices(selectedSymbols)
       setPrices(result.prices)
       setOpportunities(result.opportunities)
@@ -463,6 +473,7 @@ export default function AdminArbitragePanel() {
   async function handleTestOne(exchange: string) {
     setTestingExchange(exchange)
     try {
+      const { testExchangeConnection } = await loadServerActions()
       const res = await testExchangeConnection(exchange)
       setTestResults(prev => ({ ...prev, [exchange]: res }))
       await loadApiKeys()
@@ -474,6 +485,7 @@ export default function AdminArbitragePanel() {
   async function handleTestAll() {
     setTestingAll(true)
     try {
+      const { testAllExchanges } = await loadServerActions()
       const res = await testAllExchanges()
       setTestResults(res)
       await loadApiKeys()
@@ -483,6 +495,7 @@ export default function AdminArbitragePanel() {
   }
 
   async function handleToggleEnabled(exchange: string, current: boolean) {
+    const { toggleExchangeEnabled } = await loadServerActions()
     await toggleExchangeEnabled(exchange, !current)
     setApiKeys(prev => prev.map(k => k.exchange === exchange ? { ...k, isEnabled: !current } : k))
   }
@@ -491,6 +504,7 @@ export default function AdminArbitragePanel() {
     if (!editingExchange) return
     setSavingExchange(true)
     try {
+      const { saveExchangeApiKey } = await loadServerActions()
       await saveExchangeApiKey({
         exchange: editingExchange,
         apiKey: editForm.apiKey || undefined,
@@ -510,6 +524,7 @@ export default function AdminArbitragePanel() {
   async function handleDeleteApiKey(exchange: string) {
     setDeletingExchange(exchange)
     try {
+      const { deleteExchangeApiKey } = await loadServerActions()
       await deleteExchangeApiKey(exchange)
       await loadApiKeys()
       setConfirmDeleteExchange(null)
@@ -523,6 +538,7 @@ export default function AdminArbitragePanel() {
     setGeneratingAi(true)
     setAiError(null)
     try {
+      const { generateAiArbitrageStrategy } = await loadServerActions()
       const strategy = await generateAiArbitrageStrategy(aiContext || undefined)
       setAiStrategy(strategy)
     } catch (e) {
@@ -536,6 +552,7 @@ export default function AdminArbitragePanel() {
   async function handleLoadRoutes() {
     setLoadingRoutes(true)
     try {
+      const { getTransferRoutes } = await loadServerActions()
       const r = await getTransferRoutes(trFrom, trTo, trSymbol)
       setRoutes(r)
     } finally {
