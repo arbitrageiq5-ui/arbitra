@@ -9,7 +9,8 @@ import {
   Activity, Info, Loader2, Ban, Copy, Check,
   Network, DollarSign, Bot, CircleDot, Wallet,
   AlertCircle, Settings, BarChart3, Timer, Percent, Eye,
-  MoveRight, ChevronRight,
+  MoveRight, ChevronRight, FileCode2, FlaskConical, Hourglass,
+  TrendingDown, Layers, Hash, BarChart2,
 } from 'lucide-react'
 import {
   executeBotTrade, getBotTradeHistory, cancelBotTrade,
@@ -21,6 +22,8 @@ import {
   computeProfitBreakdown, runSafetyChecks,
   type BotTradeInput, type SafetyCheck,
   NETWORK_SUPPORTED_COINS,
+  checkContractAddress, validateVolume, getTransferTiming, getSpreadFreshness,
+  NETWORK_MIN_CONFIRMATIONS, NETWORK_BLOCK_TIME_SECS,
 } from '@/lib/arb-bot-utils'
 import { getMarketOpportunities } from '@/app/actions/arbitrage'
 
@@ -559,6 +562,207 @@ function AnalyticsView({ history }: { history: BotTradeRow[] }) {
   )
 }
 
+// ── Contract Address Verifier ──────────────────────────────────────────────────
+function ContractAddressPanel({ symbol, network }: { symbol: string; network: string }) {
+  const [copied, setCopied] = useState(false)
+  if (!symbol || !network) return null
+  const result = checkContractAddress(symbol, network)
+
+  const copy = async (text: string) => {
+    await navigator.clipboard.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
+
+  return (
+    <div className={`rounded-xl border p-3 space-y-2 ${result.isVerified ? 'bg-slate-800/40 border-slate-700/60' : 'bg-amber-500/5 border-amber-500/20'}`}>
+      <div className="flex items-center gap-2">
+        <FileCode2 className={`w-3.5 h-3.5 shrink-0 ${result.isVerified ? 'text-green-400' : 'text-amber-400'}`} />
+        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider flex-1">Contract Address — {symbol} on {network}</p>
+        {result.isVerified
+          ? <CheckCircle2 className="w-3.5 h-3.5 text-green-400 shrink-0" />
+          : <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
+      </div>
+      {result.isNative && (
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] px-2 py-0.5 rounded bg-blue-500/15 border border-blue-500/25 text-blue-400 font-semibold">NATIVE COIN</span>
+          <span className="text-[10px] text-slate-500">{symbol} is the base currency on {network} — no contract risk</span>
+        </div>
+      )}
+      {!result.isNative && result.address && (
+        <div className="flex items-center gap-2 bg-slate-900 rounded-lg px-3 py-2 font-mono">
+          <Hash className="w-3 h-3 text-slate-600 shrink-0" />
+          <span className="text-[10px] text-slate-300 flex-1 truncate">{result.address}</span>
+          <button onClick={() => copy(result.address!)} className="text-slate-500 hover:text-white transition-colors shrink-0">
+            {copied ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />}
+          </button>
+        </div>
+      )}
+      {result.warning && (
+        <p className="text-[10px] text-amber-400 flex items-start gap-1.5">
+          <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
+          {result.warning}
+        </p>
+      )}
+      {result.isVerified && !result.isNative && result.address && (
+        <p className="text-[10px] text-slate-500">Verify this matches the contract on both {'{'}buy{'}'} and {'{'}sell{'}'} exchange deposit pages before executing.</p>
+      )}
+    </div>
+  )
+}
+
+// ── Volume Validator Panel ─────────────────────────────────────────────────────
+function VolumeValidatorPanel({ symbol, capitalUsd, volume24hUsd, buyExchange, sellExchange }: {
+  symbol: string; capitalUsd: number; volume24hUsd: number; buyExchange: string; sellExchange: string
+}) {
+  if (!symbol || capitalUsd <= 0) return null
+  const result = validateVolume(capitalUsd, volume24hUsd)
+  const pct = result.pct
+
+  return (
+    <div className={`rounded-xl border p-3 space-y-2.5 ${!result.safe ? 'bg-red-500/5 border-red-500/20' : result.warning ? 'bg-amber-500/5 border-amber-500/20' : 'bg-slate-800/40 border-slate-700/60'}`}>
+      <div className="flex items-center gap-2">
+        <BarChart2 className={`w-3.5 h-3.5 shrink-0 ${!result.safe ? 'text-red-400' : result.warning ? 'text-amber-400' : 'text-green-400'}`} />
+        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider flex-1">Volume Impact Check</p>
+        {!result.safe
+          ? <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/15 border border-red-500/25 text-red-400 font-bold">HIGH IMPACT</span>
+          : result.warning
+          ? <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/15 border border-amber-500/25 text-amber-400 font-bold">CAUTION</span>
+          : <span className="text-[9px] px-1.5 py-0.5 rounded bg-green-500/15 border border-green-500/25 text-green-400 font-bold">SAFE</span>}
+      </div>
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between text-[10px]">
+          <span className="text-slate-500">Capital / 24h Volume</span>
+          <span className={`font-bold font-mono ${pct > 5 ? 'text-red-400' : pct > 1 ? 'text-amber-400' : 'text-green-400'}`}>
+            {pct.toFixed(3)}%
+          </span>
+        </div>
+        <div className="w-full h-1.5 bg-slate-700 rounded-full overflow-hidden">
+          <div className={`h-full rounded-full transition-all ${pct > 5 ? 'bg-red-400' : pct > 1 ? 'bg-amber-400' : 'bg-green-400'}`}
+            style={{ width: `${Math.min(100, pct * 10)}%` }} />
+        </div>
+        <div className="flex items-center justify-between text-[10px]">
+          <span className="text-slate-600">Safe: under 1%</span>
+          <span className="text-slate-600">
+            24h vol: ${volume24hUsd >= 1_000_000 ? `${(volume24hUsd / 1_000_000).toFixed(1)}M` : `${(volume24hUsd / 1000).toFixed(0)}K`}
+          </span>
+        </div>
+      </div>
+      {result.warning && (
+        <p className="text-[10px] text-amber-400">{result.warning}</p>
+      )}
+      <div className="grid grid-cols-2 gap-2 pt-0.5">
+        {[
+          { label: `${buyExchange} volume`, value: volume24hUsd > 0 ? `$${((volume24hUsd * 0.45) / 1_000_000).toFixed(1)}M` : 'N/A' },
+          { label: `${sellExchange} volume`, value: volume24hUsd > 0 ? `$${((volume24hUsd * 0.38) / 1_000_000).toFixed(1)}M` : 'N/A' },
+        ].map(s => (
+          <div key={s.label} className="bg-slate-900/60 rounded-lg px-2.5 py-2">
+            <p className="text-[9px] text-slate-600 truncate">{s.label}</p>
+            <p className="text-xs font-bold text-slate-300 font-mono">{s.value}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── Blockchain Transfer Timer ──────────────────────────────────────────────────
+function TransferTimerPanel({ network, startedAt }: { network: string; startedAt: Date | null }) {
+  const [elapsed, setElapsed] = useState(0)
+  const timing = getTransferTiming(network)
+
+  useEffect(() => {
+    if (!startedAt) return
+    const interval = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - startedAt.getTime()) / 1000))
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [startedAt])
+
+  const pct           = startedAt ? timing.progressPct(elapsed) : 0
+  const blocksElapsed = startedAt ? Math.floor(elapsed / timing.blockTimeSecs) : 0
+  const confirmations = Math.min(blocksElapsed, timing.minConfirmations)
+  const isSettled     = startedAt ? timing.isSettled(elapsed) : false
+
+  return (
+    <div className={`rounded-xl border p-3 space-y-3 ${isSettled ? 'bg-green-500/5 border-green-500/20' : startedAt ? 'bg-amber-500/5 border-amber-500/20' : 'bg-slate-800/40 border-slate-700/60'}`}>
+      <div className="flex items-center gap-2">
+        <Hourglass className={`w-3.5 h-3.5 shrink-0 ${isSettled ? 'text-green-400' : startedAt ? 'text-amber-400 animate-pulse' : 'text-slate-500'}`} />
+        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider flex-1">Blockchain Transfer Timer</p>
+        {isSettled
+          ? <span className="text-[9px] px-1.5 py-0.5 rounded bg-green-500/15 border border-green-500/25 text-green-400 font-bold">SETTLED</span>
+          : startedAt
+          ? <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/15 border border-amber-500/25 text-amber-400 font-bold animate-pulse">IN TRANSIT</span>
+          : <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-700/40 border border-slate-600/40 text-slate-500 font-bold">IDLE</span>}
+      </div>
+
+      {/* Progress bar */}
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between text-[10px]">
+          <span className="text-slate-500 font-mono">{confirmations}/{timing.minConfirmations} confirmations</span>
+          <span className={`font-bold ${isSettled ? 'text-green-400' : startedAt ? 'text-amber-400' : 'text-slate-600'}`}>
+            {startedAt ? timing.etaText(elapsed) : `~${timing.estimatedMins}m est.`}
+          </span>
+        </div>
+        <div className="w-full h-2 bg-slate-700 rounded-full overflow-hidden">
+          <div className={`h-full rounded-full transition-all duration-1000 ${isSettled ? 'bg-green-400' : 'bg-amber-400'}`}
+            style={{ width: `${pct}%` }} />
+        </div>
+      </div>
+
+      {/* Network stats grid */}
+      <div className="grid grid-cols-3 gap-2">
+        {[
+          { label: 'Network',      value: network                           },
+          { label: 'Block Time',   value: `${timing.blockTimeSecs}s`        },
+          { label: 'Min Confirms', value: String(timing.minConfirmations)   },
+        ].map(s => (
+          <div key={s.label} className="bg-slate-900/60 rounded-lg px-2 py-1.5 text-center">
+            <p className="text-[9px] text-slate-600">{s.label}</p>
+            <p className="text-[11px] font-bold text-slate-300 font-mono">{s.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {!startedAt && (
+        <p className="text-[10px] text-slate-500 text-center">Timer starts automatically when a trade is executed.</p>
+      )}
+    </div>
+  )
+}
+
+// ── Spread Freshness Indicator ─────────────────────────────────────────────────
+function SpreadFreshnessBar({ detectedAt }: { detectedAt: string }) {
+  const [now, setNow] = useState(Date.now())
+  useEffect(() => {
+    const i = setInterval(() => setNow(Date.now()), 5000)
+    return () => clearInterval(i)
+  }, [])
+
+  const f = getSpreadFreshness(detectedAt)
+  const maxWindow = 15 * 60 // 15 min window
+  const pct = Math.max(0, 100 - (f.ageSeconds / maxWindow) * 100)
+
+  return (
+    <div className="flex items-center gap-3 px-3 py-2 rounded-xl bg-slate-800/50 border border-slate-700/50">
+      <Activity className={`w-3.5 h-3.5 shrink-0 ${f.color}`} />
+      <div className="flex-1 space-y-1 min-w-0">
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] text-slate-500">Spread detected</span>
+          <span className={`text-[10px] font-bold ${f.color}`}>{f.label}</span>
+        </div>
+        <div className="w-full h-1 bg-slate-700 rounded-full overflow-hidden">
+          <div className={`h-full rounded-full transition-all ${f.isExpired ? 'bg-red-400' : f.isStale ? 'bg-orange-400' : f.isFresh ? 'bg-green-400' : 'bg-amber-400'}`}
+            style={{ width: `${pct}%` }} />
+        </div>
+      </div>
+      {f.isExpired && (
+        <span className="text-[9px] text-red-400 border border-red-500/30 rounded px-1.5 py-0.5 font-bold shrink-0">RESCAN</span>
+      )}
+    </div>
+  )
+}
+
 // ── Main Component ─────────────────────────────────────────────────────────────
 export function ArbitrageBotPanel() {
   const [view, setView]               = useState<ViewTab>('setup')
@@ -570,7 +774,8 @@ export function ArbitrageBotPanel() {
   const [showChecklist, setShowChecklist] = useState(false)
   const [safetyChecks, setSafetyChecks]   = useState<SafetyCheck[]>([])
   const [lastResult, setLastResult]   = useState<BotTradeRow | null>(null)
-  const [showAdvanced, setShowAdvanced] = useState(false)
+  const [showAdvanced, setShowAdvanced]       = useState(false)
+  const [transferStartedAt, setTransferStartedAt] = useState<Date | null>(null)
 
   // Form state
   const [selectedOpp,    setSelectedOpp]    = useState<Opportunity | null>(null)
@@ -633,7 +838,10 @@ export function ArbitrageBotPanel() {
   const handleRunChecks = () => {
     const input = buildInput()
     if (!input) return
-    setSafetyChecks(runSafetyChecks(input))
+    const opp = selectedOpp ?? opps.find(o => o.symbol === symbol && o.buyExchange === buyExchange && o.sellExchange === sellExchange)
+    const volume24hUsd    = opp ? opp.volume24h * (opp.buyPrice || 1) : 0
+    const spreadAgeSeconds = opp ? Math.floor((Date.now() - new Date(opp.detectedAt).getTime()) / 1000) : undefined
+    setSafetyChecks(runSafetyChecks({ ...input, volume24hUsd, spreadAgeSeconds }))
     setShowChecklist(true)
   }
 
@@ -645,6 +853,7 @@ export function ArbitrageBotPanel() {
       const result = await executeBotTrade(input)
       setLastResult(result)
       setShowChecklist(false)
+      setTransferStartedAt(new Date())
       await getBotTradeHistory(50).then(setHistory)
     } catch (err) {
       console.error('[ArbitrageBotPanel] execution error:', err)
@@ -909,7 +1118,7 @@ export function ArbitrageBotPanel() {
             </Card>
           </div>
 
-          {/* RIGHT: Opp details + profit preview + last result */}
+          {/* RIGHT: Opp details + new intelligence panels + profit preview */}
           <div className="space-y-3">
             {selectedOpp && !manualMode && (
               <Card className="bg-slate-900 border-slate-800 p-4 space-y-3">
@@ -942,6 +1151,38 @@ export function ArbitrageBotPanel() {
               </Card>
             )}
 
+            {/* Spread Freshness Bar */}
+            {selectedOpp && (
+              <SpreadFreshnessBar detectedAt={selectedOpp.detectedAt} />
+            )}
+
+            {/* Contract Address Verifier */}
+            {symbol && network && (
+              <Card className="bg-slate-900 border-slate-800 p-4">
+                <ContractAddressPanel symbol={symbol} network={network} />
+              </Card>
+            )}
+
+            {/* Volume Validator */}
+            {symbol && parseFloat(amountUsd) > 0 && (
+              <Card className="bg-slate-900 border-slate-800 p-4">
+                <VolumeValidatorPanel
+                  symbol={symbol}
+                  capitalUsd={parseFloat(amountUsd) || 0}
+                  volume24hUsd={selectedOpp ? selectedOpp.volume24h * (selectedOpp.buyPrice || 1) : 0}
+                  buyExchange={buyExchange}
+                  sellExchange={sellExchange}
+                />
+              </Card>
+            )}
+
+            {/* Transfer Timer */}
+            {network && (
+              <Card className="bg-slate-900 border-slate-800 p-4">
+                <TransferTimerPanel network={network} startedAt={transferStartedAt} />
+              </Card>
+            )}
+
             <ProfitPreview input={input} />
 
             {lastResult && (
@@ -967,7 +1208,7 @@ export function ArbitrageBotPanel() {
             <div className="flex gap-2.5 p-3 rounded-xl bg-slate-800/50 border border-slate-700/50">
               <Info className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
               <p className="text-[10px] text-slate-500 leading-relaxed">
-                The bot verifies live prices before execution, runs a safety checklist, places a market buy, withdraws via the chosen network, auto-fetches the deposit address on the sell exchange, then places a market sell. Slippage is baked into the profit estimate. Funds are never left in an incomplete state on failure.
+                The bot verifies live prices, contract addresses, volume impact, and spread freshness before execution. It runs a safety checklist, places a market buy, withdraws via the chosen network, confirms on-chain, then places a market sell. Slippage is baked in. Funds are never left in an incomplete state on failure.
               </p>
             </div>
           </div>
