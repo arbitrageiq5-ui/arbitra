@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Cache bust: clear stale module references (v2)
+  // Cache bust: clear stale module references (v3 - clear phantom app/actions/data)
   typescript: {
     ignoreBuildErrors: true,
   },
