@@ -424,11 +424,6 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
           <AutoTradePlatform />
         )}
 
-  {/* ── TAB: LENDING ── */}
-  {activeTab === 'lending' && (
-    <Lending />
-  )}
-
   {/* ── TAB: TRADING BOTS ── */}
   {activeTab === 'trading-bot' && (
     <TradingBot />
