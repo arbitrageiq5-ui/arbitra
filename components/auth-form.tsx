@@ -10,11 +10,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card } from '@/components/ui/card'
 import { getRoleLabel, getRoleDescription, UserRole } from '@/lib/roles'
-import { validateReferralCode } from '@/app/actions/referral'
-import { storeReferredBy } from '@/app/actions/users'
-import { registerWithCaptcha, saveRegistrationProfile } from '@/app/actions/secure-registration'
-import { recordUserLogin } from '@/app/actions/user-session'
 import { RefreshCw, Shield, Eye, EyeOff, ArrowLeft } from 'lucide-react'
+
+// Server actions are imported dynamically inside event handlers to avoid bundling them on the client
 
 // ── Math captcha helpers ─────────────────────────────────────────────────────
 type CaptchaChallenge = { question: string; answer: number }
@@ -88,6 +86,7 @@ function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
     }
     const timer = setTimeout(async () => {
       setReferralChecking(true)
+      const { validateReferralCode } = await import('@/app/actions/referral')
       const referrerId = await validateReferralCode(referralCode)
       setReferralValid(referrerId !== null)
       setReferralChecking(false)
@@ -115,6 +114,7 @@ function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
 
     if (isSignUp) {
       // Step 1 — Server pre-flight: captcha + rate limit + email uniqueness check
+      const { registerWithCaptcha } = await import('@/app/actions/secure-registration')
       const preflightResult = await registerWithCaptcha({
         email: email.toLowerCase(),
         captchaToken: 'math-captcha-passed',
@@ -142,12 +142,18 @@ function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
 
       // Step 3 — Save extra profile fields via server action
       if (signUpData?.user?.id) {
-        try { await saveRegistrationProfile({ userId: signUpData.user.id }) } catch { /* non-fatal */ }
+        try {
+          const { saveRegistrationProfile } = await import('@/app/actions/secure-registration')
+          await saveRegistrationProfile({ userId: signUpData.user.id })
+        } catch { /* non-fatal */ }
       }
 
       // Step 4 — Store referral association
       if (referralCode && referralValid) {
-        try { await storeReferredBy(referralCode) } catch { /* non-fatal */ }
+        try {
+          const { storeReferredBy } = await import('@/app/actions/users')
+          await storeReferredBy(referralCode)
+        } catch { /* non-fatal */ }
       }
     } else {
       const { data: signInData, error } = await authClient.signIn.email({ email, password })
@@ -160,7 +166,7 @@ function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
       // Fire-and-forget: record login IP without blocking the redirect
       const userId = signInData?.user?.id
       if (userId) {
-        recordUserLogin(userId).catch(() => {/* non-fatal */})
+        import('@/app/actions/user-session').then(mod => mod.recordUserLogin(userId)).catch(() => {/* non-fatal */})
       }
 
       // Redirect immediately using the role from the signIn response
