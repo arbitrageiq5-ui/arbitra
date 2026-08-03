@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import { authClient } from '@/lib/auth-client'
 import { Button } from '@/components/ui/button'
@@ -15,8 +14,7 @@ import {
   Sparkles,
 } from 'lucide-react'
 
-// Lazy load admin AI panel (arbitrage panel temporarily disabled due to module resolution issue)
-const AdminAiPanel = dynamic(() => import('@/components/admin-ai-panel'))
+// Admin panels temporarily disabled - clearing stale Turbopack cache
 
 // Dynamic import helpers - avoid bundling server actions on client
 const loadServerActions = async () => ({
@@ -1494,19 +1492,7 @@ export default function AdminClient() {
         {/* ── AI SUPPORT TAB ── */}
         {activeTab === 'ai-support' && (
           <Card className="bg-slate-900 border-slate-800 p-6">
-            <AdminAiPanel
-              context={{
-                userCount: users.length,
-                traderCount: users.filter(u => u.role === 'trader' || u.role === 'protrader').length,
-                pendingDeposits: fundRequests.filter(r => r.status === 'pending').length,
-                pendingWithdrawals: withdrawalReqs.filter(w => w.status === 'pending').length,
-                pendingActivations: activationFeeReqs.filter(f => f.status === 'pending').length,
-                activePlans: autoTradePlans.filter(p => p.status === 'active').length,
-                confirmedFunds: fundRequests
-                  .filter(r => r.status === 'confirmed')
-                  .reduce((s, r) => s + parseFloat(r.amount), 0),
-              }}
-            />
+            <p className="text-slate-400">AI support panel temporarily disabled</p>
           </Card>
         )}
 
