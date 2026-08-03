@@ -1,5 +1,6 @@
 'use client'
 
+// Force rebuild with new chunk hash - fixes ChunkLoadError
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'

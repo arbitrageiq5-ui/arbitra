@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic'
 // This eliminates hydration mismatches caused by client-only state
 // (showPassword, captcha, mounted checks) diverging from SSR output.
 const AuthFormDynamic = dynamic(
-  () => import('@/components/auth-form').then((m) => ({ default: m.AuthForm })),
+  () => import('@/components/auth-form').then(mod => ({ default: mod.AuthForm })),
   { ssr: false }
 )
 
