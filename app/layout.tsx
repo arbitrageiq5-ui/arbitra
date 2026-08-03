@@ -8,7 +8,6 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 export const metadata: Metadata = {
   title: 'ArbitrageIQ — Discover Arbitrage Opportunities Before Everyone Else',
   description: 'Monitor prices across global exchanges, compare spreads, estimate transaction costs, and identify potential arbitrage opportunities using AI-powered analytics.',
-  generator: 'v0.app',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
@@ -18,11 +17,20 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       {
+        url: '/favicon-32.png',
+        sizes: '32x32',
+        type: 'image/png',
+      },
+      {
         url: '/icon-light-32x32.png',
+        sizes: '32x32',
+        type: 'image/png',
         media: '(prefers-color-scheme: light)',
       },
       {
         url: '/icon-dark-32x32.png',
+        sizes: '32x32',
+        type: 'image/png',
         media: '(prefers-color-scheme: dark)',
       },
       {
@@ -40,6 +48,7 @@ export const metadata: Metadata = {
         type: 'image/png',
       },
     ],
+    shortcut: '/favicon-32.png',
     apple: '/apple-icon.png',
   },
 }
@@ -66,6 +75,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={inter.className} style={{ backgroundColor: '#050816' }}>
       <head>
+        <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+        <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+        <link rel="shortcut icon" href="/favicon-32.png" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
