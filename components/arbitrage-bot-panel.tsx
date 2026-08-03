@@ -601,7 +601,7 @@ export function ArbitrageBotPanel() {
     finally { setLoading(false) }
   }, [])
 
-  useEffect(() => { loadData() }, [loadData])
+  // No auto-load — user triggers manually to avoid duplicate scanning
 
   // Auto-fill from selected opportunity
   useEffect(() => {
@@ -675,28 +675,25 @@ export function ArbitrageBotPanel() {
         />
       )}
 
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/25 flex items-center justify-center shrink-0">
-          <Bot className="w-5 h-5 text-amber-400" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <h2 className="text-white font-bold text-lg leading-none">Arbitrage Bot</h2>
-          <p className="text-slate-500 text-xs mt-0.5">Buy on one exchange, transfer via blockchain, sell on another</p>
-        </div>
-        <div className="flex items-center gap-1.5 shrink-0">
+      {/* Compact tab bar — no duplicate title */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-1 p-1 bg-slate-900 border border-slate-800 rounded-xl">
           {(['setup', 'history', 'analytics'] as ViewTab[]).map(v => (
             <button key={v} onClick={() => { setView(v); if (v !== 'setup') loadData() }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors border capitalize ${
-                view === v ? 'bg-amber-500/20 border-amber-500/40 text-amber-400' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all border capitalize ${
+                view === v ? 'bg-slate-800 text-white border-slate-700' : 'text-slate-500 border-transparent hover:text-slate-300'
               }`}
             >
               {v === 'history' && history.length > 0
-                ? <>History <span className="ml-0.5 text-[9px] bg-amber-500 text-black rounded-full px-1">{history.length}</span></>
+                ? <span className="flex items-center gap-1.5">History <span className="text-[10px] bg-amber-500 text-black rounded-full px-1.5 py-0.5 font-bold">{history.length}</span></span>
                 : v.charAt(0).toUpperCase() + v.slice(1)}
             </button>
           ))}
         </div>
+        <button onClick={loadData} disabled={loading}
+          className="flex items-center gap-1.5 p-2 rounded-lg border border-slate-800 text-slate-500 hover:text-white hover:border-slate-700 transition-colors disabled:opacity-40">
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-amber-400' : ''}`} />
+        </button>
       </div>
 
       {/* API Key status banner */}
@@ -726,6 +723,14 @@ export function ArbitrageBotPanel() {
                 {loading ? (
                   <div className="flex items-center gap-2 text-slate-500 text-xs py-4 justify-center">
                     <Loader2 className="w-4 h-4 animate-spin" /> Fetching live rates...
+                  </div>
+                ) : opps.length === 0 ? (
+                  <div className="py-5 flex flex-col items-center gap-3">
+                    <p className="text-xs text-slate-500 text-center">Opportunities not loaded yet.</p>
+                    <button onClick={loadData}
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 active:scale-95 text-black font-bold text-xs transition-all">
+                      <Activity className="w-3.5 h-3.5" /> Load Opportunities
+                    </button>
                   </div>
                 ) : topOpps.length === 0 ? (
                   <p className="text-xs text-slate-500 py-4 text-center">No profitable opportunities right now.</p>

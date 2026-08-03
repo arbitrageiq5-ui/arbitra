@@ -9,7 +9,7 @@ import {
   ChevronDown, ChevronUp, Settings, BarChart3, Zap,
   ArrowDownCircle, ArrowUpCircle, Clock, Shield,
   Info, X, Activity, Sparkles, Target, Repeat2,
-  LineChart, Cpu, Layers, FlameKindling, Rocket,
+  LineChart, Cpu, FlameKindling, Rocket,
   Signal, GitCompareArrows, Grid2x2, Lock,
   Star, ChevronRight, LayoutDashboard, BookOpen, Gem,
 } from 'lucide-react'
@@ -27,7 +27,7 @@ import { BotAiAdvisorModal } from '@/components/bot-ai-advisor-modal'
 type Bot = Awaited<ReturnType<typeof getMyBots>>[number]
 type Order = Awaited<ReturnType<typeof getBotOrders>>[number]
 type ExchangeAccount = Awaited<ReturnType<typeof getMyExchangeAccountsForBot>>[number]
-type MainTab = 'overview' | 'bots' | 'opportunities' | 'strategies'
+type MainTab = 'bots' | 'strategies'
 
 // ─── Constants ──────────────────────────────────────────────────────────────────
 
@@ -1421,7 +1421,7 @@ function StrategiesPanel({ accounts, onLaunch, onLaunchGoldSilver }: {
 function OverviewPanel({ bots, onNewBot, onGoTab }: {
   bots: Bot[]
   onNewBot: () => void
-  onGoTab: (tab: MainTab) => void
+  onGoTab: (tab: 'bots' | 'strategies') => void
 }) {
   const activeBots = bots.filter(b => b.status === 'active')
   const totalRealized = bots.reduce((s, b) => s + parseFloat(String(b.realizedPnl)), 0)
@@ -1466,18 +1466,6 @@ function OverviewPanel({ bots, onNewBot, onGoTab }: {
             <p className="text-amber-400/70 text-xs mt-0.5">Start automated trading</p>
           </div>
           <ChevronRight className="w-4 h-4 text-amber-400/40 ml-auto group-hover:translate-x-0.5 transition-transform" />
-        </button>
-
-        <button onClick={() => onGoTab('opportunities')}
-          className="flex items-center gap-4 p-4 rounded-xl bg-cyan-500/10 border border-cyan-500/20 hover:border-cyan-500/40 hover:bg-cyan-500/15 transition-all text-left group">
-          <div className="p-3 rounded-xl bg-cyan-500/20 border border-cyan-500/30 shrink-0">
-            <Layers className="w-5 h-5 text-cyan-400" />
-          </div>
-          <div>
-            <p className="text-white font-bold text-sm">Explore Bots</p>
-            <p className="text-cyan-400/70 text-xs mt-0.5">8 bot types available</p>
-          </div>
-          <ChevronRight className="w-4 h-4 text-cyan-400/40 ml-auto group-hover:translate-x-0.5 transition-transform" />
         </button>
 
         <button onClick={() => onGoTab('strategies')}
@@ -1551,7 +1539,7 @@ export function TradingBot() {
   const [bots, setBots] = useState<Bot[]>([])
   const [accounts, setAccounts] = useState<ExchangeAccount[]>([])
   const [loading, setLoading] = useState(true)
-  const [mainTab, setMainTab] = useState<MainTab>('overview')
+  const [mainTab, setMainTab] = useState<MainTab>('bots')
   const [showCreate, setShowCreate] = useState(false)
   const [showGoldSilver, setShowGoldSilver] = useState(false)
   const [showAiAdvisor, setShowAiAdvisor] = useState(false)
@@ -1587,31 +1575,40 @@ export function TradingBot() {
   }
 
   const TABS: { key: MainTab; label: string; icon: React.ElementType; count?: number }[] = [
-    { key: 'overview',     label: 'Overview',     icon: LayoutDashboard },
-    { key: 'bots',         label: 'My Bots',      icon: Bot,              count: bots.length },
-    { key: 'opportunities',label: 'Opportunities', icon: Layers },
-    { key: 'strategies',   label: 'Strategies',    icon: BookOpen },
+    { key: 'bots',       label: 'My Bots',   icon: Bot,      count: bots.length },
+    { key: 'strategies', label: 'Strategies', icon: BookOpen },
   ]
 
   return (
-    <div className="space-y-5">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h2 className="text-white font-bold text-xl flex items-center gap-2">
-            <Cpu className="w-5 h-5 text-amber-400" />
-            Trading Bots
-          </h2>
-          <p className="text-slate-500 text-sm mt-0.5">
-            Automated strategies — DCA, Grid, Arbitrage, Signal &amp; more
-          </p>
+    <div className="space-y-4">
+      {/* Compact action bar — no duplicate title, just controls */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-1 p-1 bg-slate-900 border border-slate-800 rounded-xl">
+          {TABS.map(tab => {
+            const Icon = tab.icon
+            const active = mainTab === tab.key
+            return (
+              <button key={tab.key} onClick={() => setMainTab(tab.key)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                  active ? 'bg-slate-800 text-white border border-slate-700' : 'text-slate-500 hover:text-slate-300'
+                }`}>
+                <Icon className={`w-4 h-4 ${active ? 'text-amber-400' : ''}`} />
+                {tab.label}
+                {tab.count !== undefined && tab.count > 0 && (
+                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${active ? 'bg-amber-500/20 text-amber-300' : 'bg-slate-700 text-slate-400'}`}>
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            )
+          })}
         </div>
         <div className="flex items-center gap-2">
           <button onClick={load} className="p-2 rounded-lg hover:bg-slate-800 text-slate-500 hover:text-white border border-slate-800 transition-colors">
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
           <button onClick={() => setShowAiAdvisor(true)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 hover:border-amber-500/40 hover:bg-slate-700 text-slate-300 hover:text-amber-300 text-sm font-semibold transition-all">
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 hover:border-amber-500/40 text-slate-300 hover:text-amber-300 text-sm font-semibold transition-all">
             <Sparkles className="w-3.5 h-3.5 text-amber-400" /> AI Setup
           </button>
           <Button onClick={() => setShowCreate(true)} className="bg-amber-500 hover:bg-amber-400 text-black font-bold gap-2">
@@ -1620,40 +1617,14 @@ export function TradingBot() {
         </div>
       </div>
 
-      {/* Tab bar */}
-      <div className="flex items-center gap-1 p-1 bg-slate-900 border border-slate-800 rounded-xl w-fit">
-        {TABS.map(tab => {
-          const Icon = tab.icon
-          const active = mainTab === tab.key
-          return (
-            <button key={tab.key} onClick={() => setMainTab(tab.key)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                active ? 'bg-slate-800 text-white border border-slate-700' : 'text-slate-500 hover:text-slate-300'
-              }`}>
-              <Icon className={`w-4 h-4 ${active ? 'text-amber-400' : ''}`} />
-              {tab.label}
-              {tab.count !== undefined && tab.count > 0 && (
-                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${active ? 'bg-amber-500/20 text-amber-300' : 'bg-slate-700 text-slate-400'}`}>
-                  {tab.count}
-                </span>
-              )}
-            </button>
-          )
-        })}
-      </div>
-
       {/* Tab content */}
-      {loading && mainTab !== 'opportunities' && mainTab !== 'strategies' ? (
+      {loading ? (
         <div className="py-16 text-center text-slate-500">
           <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-3 text-amber-400" />
           Loading...
         </div>
       ) : (
         <>
-          {mainTab === 'overview' && (
-            <OverviewPanel bots={bots} onNewBot={() => setShowCreate(true)} onGoTab={setMainTab} />
-          )}
-
           {mainTab === 'bots' && (
             <div className="space-y-4">
               {bots.length === 0 ? (
@@ -1680,10 +1651,6 @@ export function TradingBot() {
                 ))
               )}
             </div>
-          )}
-
-          {mainTab === 'opportunities' && (
-            <OpportunitiesPanel onLaunchBot={handleLaunchBot} />
           )}
 
           {mainTab === 'strategies' && (
