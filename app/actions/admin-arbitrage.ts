@@ -37,7 +37,9 @@ function calcNetProfit(symbol:string,buyExchange:string,sellExchange:string,buyP
   return { symbol,buyExchange,sellExchange,tradeAmountUsd,buyPrice,sellPrice,tradingFeeBuy:tfBuy,tradingFeeSell:tfSell,withdrawalFee:wd,networkFee:nf,estimatedSlippage:slip,safetyBuffer:safe,grossProfit:gross,totalCosts:costs,netProfit:net,grossProfitPct:gPct,netProfitPct:nPct,roi:nPct,viable:!reject,rejectReason:reject,estimatedTransferMin:xfer }
 }
 import OpenAI from 'openai'
-// Types are declared locally in this file (see interfaces below)
+import type {
+  AdminLivePrice, AdminArbitrageOpp, ExchangeStatus, TransferRoute, ExchangeApiKey,
+} from '@/lib/types/arbitrage-types'
 
 async function requireAdmin() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -101,9 +103,10 @@ export async function getExchangeApiKeys(): Promise<ExchangeApiKey[]> {
       isEnabled: row?.isEnabled ?? true,
       isPublicOnly: row?.isPublicOnly ?? true,
       lastTestedAt: row?.lastTestedAt?.toISOString() ?? null,
+      connectionStatus: null,
       lastTestStatus: row?.lastTestStatus ?? null,
       lastTestMs: row?.lastTestMs ?? null,
-      note: row?.note ?? null,
+      note: row?.note ?? undefined,
       docsUrl: ex.docsUrl,
       docsLabel: ex.docsLabel,
       tradingFee: ex.tradingFee,
@@ -896,7 +899,7 @@ export async function executeExchangeTransfer(req: TransferRequest): Promise<Tra
       else errorMsg = data.msg ?? `HTTP ${res.status}`
     }
 
-    // ── Kraken Withdrawal ─────────────────────────────────────────────────
+    // ── Kraken Withdrawal ─────────────────────────────────��───────────────
     else if (req.fromExchange === 'kraken') {
       const crypto = await import('crypto')
       const nonce = Date.now().toString()

@@ -1799,7 +1799,7 @@ export default function AdminArbitragePanel() {
                         <div>
                           <p className="text-[9px] text-slate-600 uppercase tracking-wider mb-1">Required Permissions</p>
                           <div className="flex flex-wrap gap-1">
-                            {ex.permissions.map(p => (
+                            {(ex.permissions ?? []).map(p => (
                               <span key={p} className="text-[9px] px-1.5 py-0.5 bg-slate-800 border border-slate-700 text-slate-400 rounded">{p}</span>
                             ))}
                           </div>
@@ -1902,7 +1902,7 @@ export default function AdminArbitragePanel() {
                     <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
                       <p className="text-blue-300 text-[10px] font-medium mb-1.5">Required permissions when creating your API key:</p>
                       <div className="flex flex-wrap gap-1">
-                        {ex.permissions.map(p => (
+                        {(ex.permissions ?? []).map(p => (
                           <span key={p} className="text-[9px] px-1.5 py-0.5 bg-blue-500/20 border border-blue-500/30 text-blue-200 rounded">{p}</span>
                         ))}
                       </div>

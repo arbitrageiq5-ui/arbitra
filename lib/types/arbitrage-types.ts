@@ -73,7 +73,7 @@ export interface ExchangeApiKey {
   note?: string
   docsUrl?: string
   docsLabel?: string
-  tradingFee?: number
+  tradingFee?: number | string
   requiresIpWhitelist?: boolean
 }
 
