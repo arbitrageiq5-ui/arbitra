@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import { authClient } from '@/lib/auth-client'
 import { Button } from '@/components/ui/button'
@@ -14,9 +15,9 @@ import {
   Sparkles,
 } from 'lucide-react'
 
-// Server actions are imported dynamically inside event handlers
-import AdminArbitragePanel from '@/components/admin-arbitrage-panel'
-import AdminAiPanel from '@/components/admin-ai-panel'
+// Lazy load panels to avoid bundling server actions on client
+const AdminArbitragePanel = dynamic(() => import('@/components/admin-arbitrage-panel'))
+const AdminAiPanel = dynamic(() => import('@/components/admin-ai-panel'))
 
 // Dynamic import helpers - avoid bundling server actions on client
 const loadServerActions = async () => ({
@@ -318,6 +319,7 @@ export default function AdminClient() {
     if (!planStartDate) { showToast('Select a start date', 'error'); return }
     try {
       setCreatingPlan(true)
+      const { createAutoTradePlan } = await import('@/app/actions/auto-trade')
       await createAutoTradePlan(planTargetUserId, principal, planStartDate, planNote || undefined)
       await loadAutoTradePlans()
       setShowCreatePlan(false)
@@ -332,6 +334,7 @@ export default function AdminClient() {
   const handleTogglePlan = async (planId: number, currentStatus: string) => {
     try {
       setTogglingPlanId(planId)
+      const { updateAutoTradePlanStatus } = await import('@/app/actions/auto-trade')
       const next = currentStatus === 'active' ? 'paused' : 'active'
       await updateAutoTradePlanStatus(planId, next as 'active' | 'paused')
       await loadAutoTradePlans()
@@ -435,6 +438,7 @@ export default function AdminClient() {
     if (!editNetwork || !editAddress.trim()) return
     try {
       setSavingAddress(true)
+      const { upsertDepositAddress } = await import('@/app/actions/deposits')
       await upsertDepositAddress(editNetwork, editAddress, editLabel)
       await loadAddresses()
       setEditNetwork(null); setEditAddress(''); setEditLabel('')
@@ -452,6 +456,7 @@ export default function AdminClient() {
     if (!reviewModalId || !reviewAction) return
     try {
       setReviewingId(reviewModalId)
+      const { reviewFundRequest } = await import('@/app/actions/deposits')
       await reviewFundRequest(reviewModalId, reviewAction, reviewNote)
       await loadFundRequests()
       setReviewModalId(null); setReviewAction(null); setReviewNote('')
