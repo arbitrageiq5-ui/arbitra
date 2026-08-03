@@ -1489,7 +1489,9 @@ export default function AdminClient() {
                 <p className="text-slate-500 text-sm mt-0.5">Live multi-exchange scanning, opportunity detection and transfer routing</p>
               </div>
             </div>
-            <AdminArbitragePanel />
+            {/* TODO: Fix phantom module ref - temporarily disabled */}
+            {/* <AdminArbitragePanel /> */}
+            <div className="text-slate-400 p-4">Arbitrage panel temporarily disabled (module error)</div>
           </div>
         )}
 
