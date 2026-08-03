@@ -5,15 +5,7 @@ import { useRouter } from 'next/navigation'
 import { authClient } from '@/lib/auth-client'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { getAllUsers, changeUserRole, deleteUser, createAdminUser, createProTraderUser, resetUserPassword } from '@/app/actions/users'
-import {
-  getAllDepositAddresses, upsertDepositAddress,
-  getAllFundRequests, reviewFundRequest,
-} from '@/app/actions/deposits'
 import { getRoleLabel, UserRole } from '@/lib/roles'
-import { getAllAutoTradePlans, createAutoTradePlan, updateAutoTradePlanStatus } from '@/app/actions/auto-trade'
-import { getActivationFeeRequests, approveActivationFee, rejectActivationFee } from '@/app/actions/referral'
-import { getAllWithdrawals, reviewWithdrawal, getAllTraderBalances } from '@/app/actions/wallet'
 import {
   LogOut, Users, Trash2, ChevronDown, Wallet, Plus,
   CheckCircle2, XCircle, Clock, AlertCircle, Pencil,
@@ -21,8 +13,19 @@ import {
   TrendingUp, Activity, PauseCircle, StopCircle, DollarSign, Gift, ArrowUpCircle,
   Sparkles,
 } from 'lucide-react'
+
+// Server actions are imported dynamically inside event handlers
 import AdminArbitragePanel from '@/components/admin-arbitrage-panel'
 import AdminAiPanel from '@/components/admin-ai-panel'
+
+// Dynamic import helpers - avoid bundling server actions on client
+const loadServerActions = async () => ({
+  users: await import('@/app/actions/users'),
+  deposits: await import('@/app/actions/deposits'),
+  autoTrade: await import('@/app/actions/auto-trade'),
+  referral: await import('@/app/actions/referral'),
+  wallet: await import('@/app/actions/wallet'),
+})
 
 type Tab = 'users' | 'deposit-addresses' | 'fund-requests' | 'auto-trade' | 'activation-fees' | 'withdrawals' | 'wallets' | 'arbitrage' | 'ai-support'
 type Network = 'TRC20' | 'BEP20' | 'ERC20'
@@ -186,26 +189,36 @@ export default function AdminClient() {
   }
 
   const loadUsers = async () => {
-    try { setLoadingUsers(true); setUsers((await getAllUsers()) as User[]) }
-    catch (e) { showToast(e instanceof Error ? e.message : 'Failed to load users', 'error') }
+    try {
+      setLoadingUsers(true)
+      const { getAllUsers } = await import('@/app/actions/users')
+      setUsers((await getAllUsers()) as User[])
+    } catch (e) { showToast(e instanceof Error ? e.message : 'Failed to load users', 'error') }
     finally { setLoadingUsers(false) }
   }
 
   const loadAddresses = async () => {
-    try { setLoadingAddresses(true); setAddresses((await getAllDepositAddresses()) as DepositAddress[]) }
-    catch (e) { showToast(e instanceof Error ? e.message : 'Failed to load addresses', 'error') }
+    try {
+      setLoadingAddresses(true)
+      const { getAllDepositAddresses } = await import('@/app/actions/deposits')
+      setAddresses((await getAllDepositAddresses()) as DepositAddress[])
+    } catch (e) { showToast(e instanceof Error ? e.message : 'Failed to load addresses', 'error') }
     finally { setLoadingAddresses(false) }
   }
 
   const loadFundRequests = async () => {
-    try { setLoadingRequests(true); setFundRequests((await getAllFundRequests()) as FundRequest[]) }
-    catch (e) { showToast(e instanceof Error ? e.message : 'Failed to load requests', 'error') }
+    try {
+      setLoadingRequests(true)
+      const { getAllFundRequests } = await import('@/app/actions/deposits')
+      setFundRequests((await getAllFundRequests()) as FundRequest[])
+    } catch (e) { showToast(e instanceof Error ? e.message : 'Failed to load requests', 'error') }
     finally { setLoadingRequests(false) }
   }
 
   const handleRoleChange = async (userId: string, newRole: UserRole) => {
     try {
       setUpdatingUserId(userId)
+      const { changeUserRole } = await import('@/app/actions/users')
       await changeUserRole(userId, newRole)
       await loadUsers()
       showToast('Role updated successfully')
@@ -218,6 +231,7 @@ export default function AdminClient() {
     if (!confirm('Delete this user? This cannot be undone.')) return
     try {
       setDeletingUserId(userId)
+      const { deleteUser } = await import('@/app/actions/users')
       await deleteUser(userId)
       await loadUsers()
       showToast('User deleted')
@@ -230,6 +244,7 @@ export default function AdminClient() {
     e.preventDefault()
     try {
       setCreatingAdmin(true)
+      const { createAdminUser } = await import('@/app/actions/users')
       await createAdminUser(newAdminName, newAdminEmail, newAdminPassword)
       await loadUsers()
       setShowCreateAdmin(false)
@@ -244,6 +259,7 @@ export default function AdminClient() {
     e.preventDefault()
     try {
       setCreatingProTrader(true)
+      const { createProTraderUser } = await import('@/app/actions/users')
       await createProTraderUser(newProTraderName, newProTraderEmail, newProTraderPassword)
       await loadUsers()
       setShowCreateProTrader(false)
@@ -259,6 +275,7 @@ export default function AdminClient() {
     if (!resetTarget) return
     try {
       setResetting(true)
+      const { resetUserPassword } = await import('@/app/actions/users')
       await resetUserPassword(resetTarget.id, resetPassword)
       // Store plaintext so admin can see/copy it with toggle
       setRevealedPasswords(prev => ({
@@ -284,6 +301,7 @@ export default function AdminClient() {
     setLoadingPlans(true)
     setPlansError(null)
     try {
+      const { getAllAutoTradePlans } = await import('@/app/actions/auto-trade')
       const data = await getAllAutoTradePlans()
       setAutoTradePlans(data as AutoTradePlan[])
     } catch (err) {
@@ -326,6 +344,7 @@ export default function AdminClient() {
   const loadActivationFeeReqs = async () => {
     setLoadingFeeReqs(true)
     try {
+      const { getActivationFeeRequests } = await import('@/app/actions/referral')
       const data = await getActivationFeeRequests()
       setActivationFeeReqs(data as ActivationFeeReq[])
     } catch { /* ignore */ }
@@ -335,6 +354,7 @@ export default function AdminClient() {
   const handleApproveFee = async (feeId: number) => {
     try {
       setReviewingFeeId(feeId)
+      const { approveActivationFee } = await import('@/app/actions/referral')
       await approveActivationFee(feeId)
       await loadActivationFeeReqs()
       showToast('Activation fee approved. Account activated and commissions distributed.')
@@ -346,6 +366,7 @@ export default function AdminClient() {
   const handleRejectFee = async (feeId: number) => {
     try {
       setReviewingFeeId(feeId)
+      const { rejectActivationFee } = await import('@/app/actions/referral')
       await rejectActivationFee(feeId, rejectNote || undefined)
       await loadActivationFeeReqs()
       setShowRejectModal(null)
@@ -359,6 +380,7 @@ export default function AdminClient() {
   const loadTraderBalances = async () => {
     setLoadingBalances(true)
     try {
+      const { getAllTraderBalances } = await import('@/app/actions/wallet')
       const data = await getAllTraderBalances()
       setTraderBalances(data as TraderBalance[])
     } catch { /* ignore */ }
@@ -368,6 +390,7 @@ export default function AdminClient() {
   const loadWithdrawalReqs = async () => {
     setLoadingWithdrawals(true)
     try {
+      const { getAllWithdrawals } = await import('@/app/actions/wallet')
       const data = await getAllWithdrawals()
       setWithdrawalReqs(data as WithdrawalReq[])
     } catch { /* ignore */ }
@@ -377,6 +400,7 @@ export default function AdminClient() {
   const handleApproveWithdrawal = async (id: number) => {
     try {
       setReviewingWithdrawId(id)
+      const { reviewWithdrawal } = await import('@/app/actions/wallet')
       await reviewWithdrawal(id, 'approved', withdrawTxHash || undefined)
       await loadWithdrawalReqs()
       setWithdrawTxHash('')
@@ -389,6 +413,7 @@ export default function AdminClient() {
   const handleRejectWithdrawal = async (id: number) => {
     try {
       setReviewingWithdrawId(id)
+      const { reviewWithdrawal } = await import('@/app/actions/wallet')
       await reviewWithdrawal(id, 'rejected', undefined, withdrawNote || undefined)
       await loadWithdrawalReqs()
       setShowWithdrawRejectModal(null)
@@ -1374,7 +1399,7 @@ export default function AdminClient() {
                                   </span>
                                 </div>
                                 <div>
-                                  <p className="text-white font-medium text-sm">{t.name || '—'}</p>
+                                  <p className="text-white font-medium text-sm">{t.name || '��'}</p>
                                   <p className="text-slate-500 text-xs">{t.email}</p>
                                 </div>
                               </div>
