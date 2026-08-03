@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Cache bust: clear stale module references (v3 - clear phantom app/actions/data)
+  // v4: Full rebuild - Turbopack corruption recovery
   typescript: {
     ignoreBuildErrors: true,
   },
