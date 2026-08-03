@@ -8,11 +8,10 @@ import {
   DollarSign, TrendingUp, Send, Loader2, ChevronRight,
   Target, BarChart3, Wifi, Network, ShieldCheck, Copy, Check,
 } from 'lucide-react'
-import {
-  getSniperBotConfig, saveSniperBotConfig, grabLiveOpportunities,
-  getDepositAddress, executeExchangeTransfer,
-} from '@/app/actions/admin-arbitrage'
 import type { SniperBotConfig, ScoredOpportunity } from '@/lib/types/arbitrage-types'
+
+// Lazy load server actions to avoid bundling them on client
+const loadServerActions = async () => import('@/app/actions/admin-arbitrage')
 
 // ─── Exchange helpers ─────────────────────────────────────────────────────────
 
@@ -94,13 +93,19 @@ function TransferWizard({ opp, onClose, onSuccess }: WizardProps) {
   const fetchAddress = useCallback(async () => {
     setFetchingAddr(true)
     setAddrError(null)
-    const res = await getDepositAddress(opp.sellExchange, opp.symbol, network)
-    setFetchingAddr(false)
-    if (res.address) {
-      setToAddress(res.address)
-      if (res.memo) setMemo(res.memo)
-    } else {
-      setAddrError(res.error ?? 'Could not fetch deposit address')
+    try {
+      const { getDepositAddress } = await loadServerActions()
+      const res = await getDepositAddress(opp.sellExchange, opp.symbol, network)
+      setFetchingAddr(false)
+      if (res.address) {
+        setToAddress(res.address)
+        if (res.memo) setMemo(res.memo)
+      } else {
+        setAddrError(res.error ?? 'Could not fetch deposit address')
+      }
+    } catch (e) {
+      setAddrError(e instanceof Error ? e.message : 'Failed to fetch address')
+      setFetchingAddr(false)
     }
   }, [opp.sellExchange, opp.symbol, network])
 
@@ -109,19 +114,25 @@ function TransferWizard({ opp, onClose, onSuccess }: WizardProps) {
 
   const handleExecute = async () => {
     setExecuting(true)
-    const res = await executeExchangeTransfer({
-      fromExchange: opp.buyExchange,
-      toExchange:   opp.sellExchange,
-      symbol:       opp.symbol,
-      network,
-      amount:       parseFloat(amount),
-      toAddress,
-      memo:         memo || undefined,
-    })
-    setExecuting(false)
-    setExecResult(res)
-    setStep(3)
-    if (res.success && res.txId) onSuccess(res.txId)
+    try {
+      const { executeExchangeTransfer } = await loadServerActions()
+      const res = await executeExchangeTransfer({
+        fromExchange: opp.buyExchange,
+        toExchange:   opp.sellExchange,
+        symbol:       opp.symbol,
+        network,
+        amount:       parseFloat(amount),
+        toAddress,
+        memo:         memo || undefined,
+      })
+      setExecuting(false)
+      setExecResult(res)
+      setStep(3)
+      if (res.success && res.txId) onSuccess(res.txId)
+    } catch (e) {
+      setExecuting(false)
+      setExecResult({ success: false, message: e instanceof Error ? e.message : 'Transfer failed' })
+    }
   }
 
   const copyAddr = () => {
@@ -631,13 +642,14 @@ export function SniperBotTab() {
 
   // Load config on mount
   useEffect(() => {
-    getSniperBotConfig().then(cfg => { setConfig(cfg); setLocalConfig(cfg) })
+    loadServerActions().then(mod => mod.getSniperBotConfig()).then(cfg => { setConfig(cfg); setLocalConfig(cfg) })
   }, [])
 
   const runScan = useCallback(async () => {
     if (!localConfig) return
     setScanning(true)
     try {
+      const { grabLiveOpportunities } = await loadServerActions()
       const results = await grabLiveOpportunities(localConfig)
       setOpps(results)
       setLastScan(new Date().toLocaleTimeString())
@@ -658,17 +670,24 @@ export function SniperBotTab() {
   const handleSaveConfig = async () => {
     if (!localConfig) return
     setSaving(true)
-    await saveSniperBotConfig(localConfig)
-    setConfig(localConfig)
-    setSaving(false)
+    try {
+      const { saveSniperBotConfig } = await loadServerActions()
+      await saveSniperBotConfig(localConfig)
+      setConfig(localConfig)
+    } finally {
+      setSaving(false)
+    }
   }
 
   const handleToggleBot = async () => {
     if (!localConfig) return
     const next = { ...localConfig, enabled: !localConfig.enabled }
     setLocalConfig(next)
-    await saveSniperBotConfig({ enabled: next.enabled })
-    setConfig(next)
+    try {
+      const { saveSniperBotConfig } = await loadServerActions()
+      await saveSniperBotConfig({ enabled: next.enabled })
+      setConfig(next)
+    } catch { /* ignore */ }
   }
 
   const handleSuccess = (oppId: string, txId: string) => {
