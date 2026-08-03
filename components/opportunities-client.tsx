@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { getMarketOpportunities } from '@/app/actions/arbitrage'
 import { authClient } from '@/lib/auth-client'
+import { formatPrice, formatVolume, timeAgo } from '@/lib/trader-utils'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import {
@@ -49,8 +50,6 @@ const LIQUIDITY_CONFIG = {
   Medium: { color: 'text-amber-400', dots: 2 },
   Low: { color: 'text-red-400', dots: 1 },
 }
-
-import { formatPrice, formatVolume, timeAgo } from '@/lib/trader-utils'
 
 function LiquidityDots({ level }: { level: 'High' | 'Medium' | 'Low' }) {
   const { color, dots } = LIQUIDITY_CONFIG[level]

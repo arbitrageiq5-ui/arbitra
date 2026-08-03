@@ -17,7 +17,6 @@ import {
   getEnabledExchangeKeys, fetchLivePricesForPair,
 } from '@/app/actions/arbitrage-bot'
 import type { arbitrageBotTrades } from '@/lib/db/schema'
-type BotTradeRow = typeof arbitrageBotTrades.$inferSelect
 import {
   computeProfitBreakdown, runSafetyChecks,
   type BotTradeInput, type SafetyCheck,
@@ -27,6 +26,8 @@ import {
 } from '@/lib/arb-bot-utils'
 import { getMarketOpportunities } from '@/app/actions/arbitrage'
 import { StatusBadge, RiskChip, CopyButton as CopyBtn } from '@/lib/trader-utils'
+
+type BotTradeRow = typeof arbitrageBotTrades.$inferSelect
 
 type Opportunity = Awaited<ReturnType<typeof getMarketOpportunities>>[number]
 type ViewTab = 'setup' | 'history' | 'analytics'
@@ -295,7 +296,7 @@ function LivePriceTicker({ buyExchange, sellExchange, symbol, onPricesUpdate }: 
   )
 }
 
-// ── Trade History Row ──────────────────────────────────────────────────────────
+// ── Trade History Row ─────���────────────────────────────────────────────────────
 function TradeRow({ trade, onCancel }: { trade: BotTradeRow; onCancel?: (id: number) => void }) {
   const [expanded, setExpanded] = useState(false)
   const netProfit = parseFloat(trade.netProfitUsd ?? '0')

@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { ActivationFeeModal } from '@/components/activation-fee-modal'
 import { TraderAiArbitrageModal } from '@/components/trader-ai-modal'
+import { formatPrice, formatVolume, timeAgo, CopyButton } from '@/lib/trader-utils'
 
 // Lazy load non-critical tabs for faster initial load
 const ExchangeConnectionManager = lazy(() => import('@/components/exchange-connection-manager').then(m => ({ default: m.ExchangeConnectionManager })))
@@ -54,9 +55,6 @@ const STATUS_META = {
   confirmed: { icon: CheckCircle2,   color: 'text-green-400',  bg: 'bg-green-500/10 border-green-500/20',   label: 'Confirmed' },
   rejected:  { icon: XCircle,        color: 'text-red-400',    bg: 'bg-red-500/10 border-red-500/20',       label: 'Rejected' },
 }
-
-// Helpers imported from shared lib — see lib/trader-utils.tsx
-import { formatPrice, formatVolume, timeAgo, CopyButton } from '@/lib/trader-utils'
 
 export function TraderClient({ user, isActivated }: { user: { id: string; name?: string | null; email?: string }; isActivated: boolean }) {
   const router = useRouter()
