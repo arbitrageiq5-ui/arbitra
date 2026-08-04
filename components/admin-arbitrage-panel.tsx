@@ -10,6 +10,7 @@ import type {
   BotAnalytics, RiskFilterResult, TransferResult,
 } from '@/lib/types/arbitrage-types'
 import { SniperBotTab } from '@/components/sniper-bot-tab'
+import { SUPPORTED_EXCHANGES } from '@/lib/exchange-constants'
 import {
   Activity, RefreshCw, CheckCircle2, XCircle, Wifi, WifiOff,
   Zap, Settings, Key, Plus, Trash2, Eye, EyeOff, TestTube2,
@@ -95,6 +96,11 @@ function riskBadge(level: string) {
 // ── Main Component ─────────────────────────────────────────────────────────
 export default function AdminArbitragePanel() {
   const [subTab, setSubTab] = useState<SubTab>('live-scan')
+  
+  // Trader exchange selection
+  const [selectedTraderExchange, setSelectedTraderExchange] = useState<string>('')
+  const [traderAccounts, setTraderAccounts] = useState<{ id: number; exchange: string; label: string | null }[]>([])
+  const [loadingAccounts, setLoadingAccounts] = useState(false)
 
   // Live-scan state
   const [prices, setPrices] = useState<AdminLivePrice[]>([])
@@ -397,9 +403,64 @@ export default function AdminArbitragePanel() {
   // ── Render helpers ───────────────────────────────────────────────────────
   const enabledKeys = useMemo(() => apiKeys.filter(k => k.isEnabled), [apiKeys])
 
+  // Load trader exchange accounts on mount
+  useEffect(() => {
+    setLoadingAccounts(true)
+    loadActions().then(mod => mod.getExchangeApiKeys?.())
+      .then(keys => {
+        if (keys) {
+          const uniqueExchanges = Array.from(new Map(
+            (keys as Array<{ exchange: string; id: number; label: string | null }>)
+              .map(k => [k.exchange, { id: k.id, exchange: k.exchange, label: k.label }])
+          ).values())
+          setTraderAccounts(uniqueExchanges)
+          if (uniqueExchanges.length > 0) setSelectedTraderExchange(uniqueExchanges[0].exchange)
+        }
+      })
+      .catch(() => { /* ignore */ })
+      .finally(() => setLoadingAccounts(false))
+  }, [])
+
   // ── JSX ──────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-4">
+      {/* Trader Exchange Selector */}
+      <Card className="bg-slate-900 border-slate-800 p-4">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-300 mb-1">Trader Exchange Selection</h3>
+            <p className="text-xs text-slate-500">Select which trader exchange account to use for arbitrage operations</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1 md:flex-none min-w-48">
+              <select
+                value={selectedTraderExchange}
+                onChange={e => setSelectedTraderExchange(e.target.value)}
+                disabled={loadingAccounts || traderAccounts.length === 0}
+                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm appearance-none cursor-pointer hover:border-slate-600 focus:outline-none focus:border-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <option value="">
+                  {loadingAccounts ? 'Loading exchanges...' : traderAccounts.length === 0 ? 'No exchanges connected' : 'Select exchange'}
+                </option>
+                {traderAccounts.map(acc => (
+                  <option key={acc.exchange} value={acc.exchange}>
+                    {SUPPORTED_EXCHANGES[acc.exchange]?.name || acc.exchange}
+                    {acc.label ? ` (${acc.label})` : ''}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            </div>
+            {selectedTraderExchange && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-slate-800 border border-emerald-500/30 rounded-lg">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                <span className="text-xs text-emerald-400 font-medium">Connected</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </Card>
+
       {/* Sub-tab bar */}
       <div className="flex flex-wrap gap-1 bg-slate-900 border border-slate-800 rounded-xl p-1">
         {SUB_TABS.map(({ key, label, icon: Icon }) => (
