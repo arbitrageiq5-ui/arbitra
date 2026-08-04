@@ -14,7 +14,8 @@ import {
   Sparkles,
 } from 'lucide-react'
 
-// Admin panels temporarily disabled - clearing stale Turbopack cache
+import AdminArbitragePanel from '@/components/admin-arbitrage-panel'
+import AdminAiPanel from '@/components/admin-ai-panel'
 
 // Dynamic import helpers - avoid bundling server actions on client
 const loadServerActions = async () => ({
@@ -1476,8 +1477,8 @@ export default function AdminClient() {
 
         {/* ── ARBITRAGE TAB ── */}
         {activeTab === 'arbitrage' && (
-          <div className="space-y-1">
-            <div className="flex items-center gap-3 mb-5">
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 mb-1">
               <div className="w-9 h-9 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
                 <Activity className="w-5 h-5 text-amber-400" />
               </div>
@@ -1486,13 +1487,26 @@ export default function AdminClient() {
                 <p className="text-slate-500 text-sm mt-0.5">Live multi-exchange scanning, opportunity detection and transfer routing</p>
               </div>
             </div>
+            <AdminArbitragePanel />
           </div>
         )}
 
         {/* ── AI SUPPORT TAB ── */}
         {activeTab === 'ai-support' && (
           <Card className="bg-slate-900 border-slate-800 p-6">
-            <p className="text-slate-400">AI support panel temporarily disabled</p>
+            <AdminAiPanel
+              context={{
+                userCount: users.length,
+                traderCount: users.filter(u => u.role === 'trader' || u.role === 'protrader').length,
+                pendingDeposits: fundRequests.filter(r => r.status === 'pending').length,
+                pendingWithdrawals: withdrawalReqs.filter(w => w.status === 'pending').length,
+                pendingActivations: activationFeeReqs.filter(f => f.status === 'pending').length,
+                activePlans: autoTradePlans.filter(p => p.status === 'active').length,
+                confirmedFunds: fundRequests
+                  .filter(r => r.status === 'confirmed')
+                  .reduce((s, r) => s + parseFloat(r.amount), 0),
+              }}
+            />
           </Card>
         )}
 
