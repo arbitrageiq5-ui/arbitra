@@ -3,7 +3,7 @@
 import { auth } from '@/lib/auth'
 import { headers } from 'next/headers'
 import { db } from '@/lib/db'
-import { exchangeApiKeys, arbitrageConfig, exchangeTransferLogs, arbitrageOpportunities } from '@/lib/db/schema'
+import { exchangeApiKeys, arbitrageConfig, exchangeTransferLogs, arbitrageOpportunities, exchangeAccounts, user as userTable } from '@/lib/db/schema'
 import { eq, desc } from 'drizzle-orm'
 import { getPricesAcrossExchanges, detectArbitrageOpportunities } from '@/lib/services/exchanges'
 import type { ExchangePrice } from '@/lib/services/exchanges'
@@ -97,7 +97,7 @@ export async function getExchangeApiKeys(): Promise<ExchangeApiKey[]> {
       id: row?.id ?? 0,
       exchange: ex.exchange,
       label: ex.label,
-      apiKey: row?.apiKey ? '••••••••' + row.apiKey.slice(-4) : null,
+      apiKey: row?.apiKey ? '••��•••••' + row.apiKey.slice(-4) : null,
       apiSecret: row?.apiSecret ? '••••••••' : null,
       passphrase: row?.passphrase ? '••••••••' : null,
       isEnabled: row?.isEnabled ?? true,
@@ -1572,5 +1572,134 @@ export async function getDepositAddress(
     return { address: null, memo: null, error: `Deposit address lookup not implemented for ${exchange}` }
   } catch (err) {
     return { address: null, memo: null, error: err instanceof Error ? err.message : 'Unknown error' }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ADMIN — TRADER EXCHANGE SELECTION
+// Lists every trader's connected exchange accounts so admin can use their
+// API keys for arbitrage scanning / execution.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export interface TraderWithExchanges {
+  userId: string
+  name:   string | null
+  email:  string
+  exchanges: {
+    id:        number
+    exchange:  string
+    label:     string | null
+    tradeMode: string
+    testStatus: string | null
+    lastTestedAt: string | null
+    isActive: boolean
+  }[]
+}
+
+/** Return all traders (role != admin) who have at least one active exchange account. */
+export async function adminGetTradersWithExchanges(): Promise<TraderWithExchanges[]> {
+  await requireAdmin()
+
+  // Fetch all active exchange accounts joined with their owner
+  const rows = await db
+    .select({
+      userId:       exchangeAccounts.userId,
+      userName:     userTable.name,
+      userEmail:    userTable.email,
+      accId:        exchangeAccounts.id,
+      exchange:     exchangeAccounts.exchange,
+      label:        exchangeAccounts.label,
+      tradeMode:    exchangeAccounts.tradeMode,
+      testStatus:   exchangeAccounts.testStatus,
+      lastTestedAt: exchangeAccounts.lastTestedAt,
+      isActive:     exchangeAccounts.isActive,
+    })
+    .from(exchangeAccounts)
+    .innerJoin(userTable, eq(exchangeAccounts.userId, userTable.id))
+    .where(eq(exchangeAccounts.isActive, true))
+    .orderBy(userTable.email, desc(exchangeAccounts.createdAt))
+
+  // Group by user
+  const map = new Map<string, TraderWithExchanges>()
+  for (const r of rows) {
+    if (!map.has(r.userId)) {
+      map.set(r.userId, { userId: r.userId, name: r.userName ?? null, email: r.userEmail, exchanges: [] })
+    }
+    map.get(r.userId)!.exchanges.push({
+      id:           r.accId,
+      exchange:     r.exchange,
+      label:        r.label ?? null,
+      tradeMode:    r.tradeMode,
+      testStatus:   r.testStatus ?? null,
+      lastTestedAt: r.lastTestedAt ? r.lastTestedAt.toISOString() : null,
+      isActive:     r.isActive ?? true,
+    })
+  }
+  return Array.from(map.values())
+}
+
+/** Test a specific trader's exchange account connection (admin-scoped — bypasses userId check). */
+export async function adminTestTraderExchange(accountId: number): Promise<{ ok: boolean; message: string; balances?: Record<string, number> }> {
+  await requireAdmin()
+
+  const [acc] = await db
+    .select()
+    .from(exchangeAccounts)
+    .where(eq(exchangeAccounts.id, accountId))
+    .limit(1)
+
+  if (!acc) return { ok: false, message: 'Account not found' }
+
+  try {
+    const ccxt = await import('ccxt') as unknown as Record<string, new (opts: object) => { fetchBalance: () => Promise<{ total: Record<string, number> }> }>
+    const ExClass = ccxt[acc.exchange]
+    if (!ExClass) return { ok: false, message: `Exchange "${acc.exchange}" not supported` }
+    const ex = new ExClass({
+      apiKey: acc.apiKey,
+      secret: acc.apiSecret,
+      ...(acc.passphrase ? { password: acc.passphrase } : {}),
+      enableRateLimit: true,
+    })
+    const raw = await ex.fetchBalance()
+    const balances: Record<string, number> = {}
+    for (const [coin, amt] of Object.entries(raw.total)) {
+      if (amt && amt > 0) balances[coin] = amt
+    }
+    return { ok: true, message: 'Connection successful', balances }
+  } catch (err) {
+    return { ok: false, message: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+/** Fetch live balances for a specific trader exchange account (admin-scoped). */
+export async function adminFetchTraderBalance(accountId: number): Promise<{ ok: boolean; balances?: Record<string, number>; message: string }> {
+  await requireAdmin()
+
+  const [acc] = await db
+    .select()
+    .from(exchangeAccounts)
+    .where(eq(exchangeAccounts.id, accountId))
+    .limit(1)
+
+  if (!acc) return { ok: false, message: 'Account not found' }
+
+  try {
+    const ccxt = await import('ccxt') as unknown as Record<string, new (opts: object) => { fetchBalance: () => Promise<{ total: Record<string, number> }> }>
+    const ExClass = ccxt[acc.exchange]
+    if (!ExClass) return { ok: false, message: `Exchange "${acc.exchange}" not supported` }
+    const ex = new ExClass({
+      apiKey: acc.apiKey,
+      secret: acc.apiSecret,
+      ...(acc.passphrase ? { password: acc.passphrase } : {}),
+      enableRateLimit: true,
+    })
+    const raw = await ex.fetchBalance()
+    const balances: Record<string, number> = {}
+    for (const [coin, amt] of Object.entries(raw.total)) {
+      if (amt && amt > 0) balances[coin] = amt
+    }
+    return { ok: true, balances, message: 'OK' }
+  } catch (err) {
+    return { ok: false, message: err instanceof Error ? err.message : String(err) }
   }
 }

@@ -16,7 +16,7 @@ import {
   Zap, Settings, Key, Plus, Trash2, Eye, EyeOff, TestTube2,
   DollarSign, TrendingUp, BarChart3, Send, Loader2, AlertTriangle,
   ChevronDown, ArrowRight, Brain, Shield, Play, Pause, ToggleLeft, ToggleRight,
-  Network, Wallet, BarChart2, Bot, List, Cpu, Clock, Globe,
+  Network, Wallet, BarChart2, Bot, List, Cpu, Clock, Globe, Users,
 } from 'lucide-react'
 
 // ── All server actions loaded lazily ──────────────────────────────────────
@@ -96,11 +96,18 @@ function riskBadge(level: string) {
 // ── Main Component ─────────────────────────────────────────────────────────
 export default function AdminArbitragePanel() {
   const [subTab, setSubTab] = useState<SubTab>('live-scan')
-  
-  // Trader exchange selection
-  const [selectedTraderExchange, setSelectedTraderExchange] = useState<string>('')
-  const [traderAccounts, setTraderAccounts] = useState<{ id: number; exchange: string; label: string | null }[]>([])
-  const [loadingAccounts, setLoadingAccounts] = useState(false)
+
+  // ── Trader + Exchange Selection ───────────────────────────────────────────
+  type TraderExchangeAcc = { id: number; exchange: string; label: string | null; tradeMode: string; testStatus: string | null }
+  type TraderEntry = { userId: string; name: string | null; email: string; exchanges: TraderExchangeAcc[] }
+  const [traders, setTraders] = useState<TraderEntry[]>([])
+  const [loadingTraders, setLoadingTraders] = useState(false)
+  const [selectedTraderId, setSelectedTraderId] = useState<string>('')
+  const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null)
+  const [testingAccountId, setTestingAccountId] = useState<number | null>(null)
+  const [accountTestResult, setAccountTestResult] = useState<{ ok: boolean; message: string; balances?: Record<string, number> } | null>(null)
+  const [traderBalances, setTraderBalances] = useState<Record<string, number>>({})
+  const [loadingTraderBal, setLoadingTraderBal] = useState(false)
 
   // Live-scan state
   const [prices, setPrices] = useState<AdminLivePrice[]>([])
@@ -403,62 +410,273 @@ export default function AdminArbitragePanel() {
   // ── Render helpers ───────────────────────────────────────────────────────
   const enabledKeys = useMemo(() => apiKeys.filter(k => k.isEnabled), [apiKeys])
 
-  // Load trader exchange accounts on mount
+  // Load all traders with their exchange accounts on mount
   useEffect(() => {
-    setLoadingAccounts(true)
-    loadActions().then(mod => mod.getExchangeApiKeys?.())
-      .then(keys => {
-        if (keys) {
-          const uniqueExchanges = Array.from(new Map(
-            (keys as Array<{ exchange: string; id: number; label: string | null }>)
-              .map(k => [k.exchange, { id: k.id, exchange: k.exchange, label: k.label }])
-          ).values())
-          setTraderAccounts(uniqueExchanges)
-          if (uniqueExchanges.length > 0) setSelectedTraderExchange(uniqueExchanges[0].exchange)
+    setLoadingTraders(true)
+    loadActions()
+      .then(mod => (mod as unknown as { adminGetTradersWithExchanges: () => Promise<TraderEntry[]> }).adminGetTradersWithExchanges())
+      .then(data => {
+        setTraders(data)
+        if (data.length > 0) {
+          setSelectedTraderId(data[0].userId)
+          if (data[0].exchanges.length > 0) setSelectedAccountId(data[0].exchanges[0].id)
         }
       })
-      .catch(() => { /* ignore */ })
-      .finally(() => setLoadingAccounts(false))
+      .catch(() => { /* no traders yet */ })
+      .finally(() => setLoadingTraders(false))
   }, [])
+
+  // When trader changes, auto-select their first exchange
+  useEffect(() => {
+    const trader = traders.find(t => t.userId === selectedTraderId)
+    if (trader && trader.exchanges.length > 0) {
+      setSelectedAccountId(trader.exchanges[0].id)
+      setAccountTestResult(null)
+      setTraderBalances({})
+    } else {
+      setSelectedAccountId(null)
+    }
+  }, [selectedTraderId, traders])
+
+  const selectedTrader = traders.find(t => t.userId === selectedTraderId) ?? null
+  const selectedAccount = selectedTrader?.exchanges.find(e => e.id === selectedAccountId) ?? null
+
+  async function handleTestAccount() {
+    if (!selectedAccountId) return
+    setTestingAccountId(selectedAccountId)
+    setAccountTestResult(null)
+    try {
+      const mod = await loadActions() as unknown as {
+        adminTestTraderExchange: (id: number) => Promise<{ ok: boolean; message: string; balances?: Record<string, number> }>
+      }
+      const result = await mod.adminTestTraderExchange(selectedAccountId)
+      setAccountTestResult(result)
+    } catch (e) {
+      setAccountTestResult({ ok: false, message: e instanceof Error ? e.message : 'Test failed' })
+    } finally {
+      setTestingAccountId(null)
+    }
+  }
+
+  async function handleLoadTraderBalance() {
+    if (!selectedAccountId) return
+    setLoadingTraderBal(true)
+    try {
+      const mod = await loadActions() as unknown as {
+        adminFetchTraderBalance: (id: number) => Promise<{ ok: boolean; balances?: Record<string, number>; message: string }>
+      }
+      const result = await mod.adminFetchTraderBalance(selectedAccountId)
+      if (result.ok && result.balances) setTraderBalances(result.balances)
+    } catch { /* ignore */ }
+    finally { setLoadingTraderBal(false) }
+  }
 
   // ── JSX ──────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-4">
-      {/* Trader Exchange Selector */}
-      <Card className="bg-slate-900 border-slate-800 p-4">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h3 className="text-sm font-semibold text-slate-300 mb-1">Trader Exchange Selection</h3>
-            <p className="text-xs text-slate-500">Select which trader exchange account to use for arbitrage operations</p>
+      {/* ── Trader / Exchange Selector ── */}
+      <Card className="bg-slate-900 border-slate-800 overflow-hidden">
+        <div className="flex items-center gap-3 px-5 py-3 border-b border-slate-800 bg-slate-800/40">
+          <div className="w-7 h-7 rounded-md bg-cyan-500/15 border border-cyan-500/25 flex items-center justify-center">
+            <Key className="w-3.5 h-3.5 text-cyan-400" />
           </div>
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1 md:flex-none min-w-48">
-              <select
-                value={selectedTraderExchange}
-                onChange={e => setSelectedTraderExchange(e.target.value)}
-                disabled={loadingAccounts || traderAccounts.length === 0}
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm appearance-none cursor-pointer hover:border-slate-600 focus:outline-none focus:border-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <option value="">
-                  {loadingAccounts ? 'Loading exchanges...' : traderAccounts.length === 0 ? 'No exchanges connected' : 'Select exchange'}
-                </option>
-                {traderAccounts.map(acc => (
-                  <option key={acc.exchange} value={acc.exchange}>
-                    {SUPPORTED_EXCHANGES[acc.exchange]?.name || acc.exchange}
-                    {acc.label ? ` (${acc.label})` : ''}
-                  </option>
+          <div>
+            <p className="text-sm font-semibold text-white leading-none">Trader Exchange Selection</p>
+            <p className="text-xs text-slate-500 mt-0.5">Select a trader and their connected exchange to use for arbitrage operations</p>
+          </div>
+          <div className="ml-auto">
+            <button
+              onClick={() => {
+                setLoadingTraders(true)
+                loadActions()
+                  .then(mod => (mod as unknown as { adminGetTradersWithExchanges: () => Promise<TraderEntry[]> }).adminGetTradersWithExchanges())
+                  .then(setTraders)
+                  .catch(() => {})
+                  .finally(() => setLoadingTraders(false))
+              }}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+            >
+              <RefreshCw className={`w-3 h-3 ${loadingTraders ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+          </div>
+        </div>
+
+        <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-5">
+          {/* Step 1 — Select Trader */}
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">Step 1 — Select Trader</label>
+            {loadingTraders ? (
+              <div className="flex items-center gap-2 text-slate-500 text-sm py-2">
+                <Loader2 className="w-4 h-4 animate-spin" />Loading traders...
+              </div>
+            ) : traders.length === 0 ? (
+              <div className="flex items-center gap-2 px-3 py-3 rounded-lg bg-slate-800/60 border border-slate-700">
+                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                <p className="text-xs text-slate-400">No traders have connected exchange accounts yet.</p>
+              </div>
+            ) : (
+              <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
+                {traders.map(t => (
+                  <button
+                    key={t.userId}
+                    onClick={() => setSelectedTraderId(t.userId)}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border text-left transition-all ${
+                      selectedTraderId === t.userId
+                        ? 'bg-cyan-500/10 border-cyan-500/40 text-white'
+                        : 'bg-slate-800/50 border-slate-700/50 text-slate-300 hover:border-slate-600 hover:bg-slate-800'
+                    }`}
+                  >
+                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-xs font-bold text-white shrink-0">
+                      {(t.name ?? t.email).charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium truncate">{t.name ?? t.email}</p>
+                      {t.name && <p className="text-xs text-slate-500 truncate">{t.email}</p>}
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <span className="text-xs text-slate-500">{t.exchanges.length}</span>
+                      <Globe className="w-3 h-3 text-slate-500" />
+                    </div>
+                    {selectedTraderId === t.userId && <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0" />}
+                  </button>
                 ))}
-              </select>
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-            </div>
-            {selectedTraderExchange && (
-              <div className="flex items-center gap-2 px-3 py-2 bg-slate-800 border border-emerald-500/30 rounded-lg">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                <span className="text-xs text-emerald-400 font-medium">Connected</span>
+              </div>
+            )}
+          </div>
+
+          {/* Step 2 — Select Exchange Account */}
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">Step 2 — Select Exchange</label>
+            {!selectedTrader ? (
+              <div className="flex items-center justify-center h-24 rounded-lg bg-slate-800/30 border border-slate-700/50 border-dashed">
+                <p className="text-xs text-slate-500">Select a trader first</p>
+              </div>
+            ) : selectedTrader.exchanges.length === 0 ? (
+              <div className="flex items-center gap-2 px-3 py-3 rounded-lg bg-slate-800/60 border border-slate-700">
+                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                <p className="text-xs text-slate-400">This trader has no connected exchanges.</p>
+              </div>
+            ) : (
+              <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
+                {selectedTrader.exchanges.map(acc => {
+                  const exInfo = SUPPORTED_EXCHANGES[acc.exchange]
+                  const isLive = acc.tradeMode === 'live'
+                  return (
+                    <button
+                      key={acc.id}
+                      onClick={() => { setSelectedAccountId(acc.id); setAccountTestResult(null); setTraderBalances({}) }}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border text-left transition-all ${
+                        selectedAccountId === acc.id
+                          ? 'bg-emerald-500/10 border-emerald-500/40 text-white'
+                          : 'bg-slate-800/50 border-slate-700/50 text-slate-300 hover:border-slate-600 hover:bg-slate-800'
+                      }`}
+                    >
+                      <div className="w-7 h-7 rounded-md bg-slate-700 flex items-center justify-center shrink-0 overflow-hidden">
+                        <Globe className="w-3.5 h-3.5 text-slate-400" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium truncate">{exInfo?.name ?? acc.exchange}</p>
+                        <p className="text-xs text-slate-500 truncate">{acc.label ?? 'No label'}</p>
+                      </div>
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${isLive ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700 text-slate-400'}`}>
+                          {isLive ? 'LIVE' : 'READ-ONLY'}
+                        </span>
+                        {acc.testStatus && (
+                          <span className={`text-[10px] ${acc.testStatus === 'ok' ? 'text-emerald-400' : 'text-red-400'}`}>
+                            {acc.testStatus === 'ok' ? 'Tested OK' : 'Test failed'}
+                          </span>
+                        )}
+                      </div>
+                      {selectedAccountId === acc.id && <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />}
+                    </button>
+                  )
+                })}
               </div>
             )}
           </div>
         </div>
+
+        {/* Active selection summary + actions */}
+        {selectedAccount && (
+          <div className="px-5 pb-4">
+            <div className="flex flex-wrap items-center gap-3 p-3 rounded-xl bg-slate-800/60 border border-slate-700">
+              <div className="flex items-center gap-2 text-sm text-slate-300 flex-1 min-w-0">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span className="font-medium text-white truncate">
+                  {selectedTrader?.name ?? selectedTrader?.email}
+                </span>
+                <ArrowRight className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                <span className="truncate">
+                  {SUPPORTED_EXCHANGES[selectedAccount.exchange]?.name ?? selectedAccount.exchange}
+                  {selectedAccount.label ? ` — ${selectedAccount.label}` : ''}
+                </span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0 ${selectedAccount.tradeMode === 'live' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                  {selectedAccount.tradeMode === 'live' ? 'LIVE' : 'READ-ONLY'}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleTestAccount}
+                  disabled={testingAccountId === selectedAccountId}
+                  className="h-7 px-3 text-xs border-slate-600 text-slate-300 hover:bg-slate-700"
+                >
+                  {testingAccountId === selectedAccountId
+                    ? <><Loader2 className="w-3 h-3 animate-spin mr-1" />Testing...</>
+                    : <><TestTube2 className="w-3 h-3 mr-1" />Test Connection</>
+                  }
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleLoadTraderBalance}
+                  disabled={loadingTraderBal}
+                  className="h-7 px-3 text-xs border-slate-600 text-slate-300 hover:bg-slate-700"
+                >
+                  {loadingTraderBal
+                    ? <><Loader2 className="w-3 h-3 animate-spin mr-1" />Loading...</>
+                    : <><Wallet className="w-3 h-3 mr-1" />Fetch Balance</>
+                  }
+                </Button>
+              </div>
+            </div>
+
+            {/* Test result */}
+            {accountTestResult && (
+              <div className={`mt-2 flex items-start gap-2 px-3 py-2 rounded-lg text-xs border ${accountTestResult.ok ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-red-500/10 border-red-500/30 text-red-300'}`}>
+                {accountTestResult.ok ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-0.5" /> : <XCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />}
+                <div>
+                  <p>{accountTestResult.message}</p>
+                  {accountTestResult.balances && Object.keys(accountTestResult.balances).length > 0 && (
+                    <p className="mt-1 text-slate-400">
+                      Balances: {Object.entries(accountTestResult.balances).slice(0, 8).map(([c, v]) => `${c}: ${v.toFixed(4)}`).join(' · ')}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Fetched balances */}
+            {Object.keys(traderBalances).length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {Object.entries(traderBalances).slice(0, 12).map(([coin, amt]) => (
+                  <div key={coin} className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-xs">
+                    <span className="font-semibold text-white">{coin}</span>
+                    <span className="text-slate-400">{amt < 0.0001 ? amt.toExponential(2) : amt.toFixed(4)}</span>
+                  </div>
+                ))}
+                {Object.keys(traderBalances).length > 12 && (
+                  <div className="flex items-center px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-xs text-slate-500">
+                    +{Object.keys(traderBalances).length - 12} more
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </Card>
 
       {/* Sub-tab bar */}
