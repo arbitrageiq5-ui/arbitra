@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // v4: Full rebuild - Turbopack corruption recovery
+  // v5: Fixed stale chunk cache - static imports only, no dynamic imports of server actions
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -37,11 +37,12 @@ const nextConfig = {
           { key: 'Pragma', value: 'no-cache' },
         ],
       },
-      // /_next/static — content-hashed by Next.js; safe to cache for 1 year
+      // /_next/static — do NOT set immutable/long-lived cache in dev;
+      // content-hashed chunks must be re-evaluated when the module graph changes
       {
         source: '/_next/static/:path*',
         headers: [
-          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
+          { key: 'Cache-Control', value: 'public, max-age=0, must-revalidate' },
         ],
       },
       // Manifest
