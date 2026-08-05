@@ -17,14 +17,23 @@ import {
 import AdminArbitragePanel from '@/components/admin-arbitrage-panel'
 import AdminAiPanel from '@/components/admin-ai-panel'
 
-// Dynamic import helpers - avoid bundling server actions on client
-const loadServerActions = async () => ({
-  users: await import('@/app/actions/users'),
-  deposits: await import('@/app/actions/deposits'),
-  autoTrade: await import('@/app/actions/auto-trade'),
-  referral: await import('@/app/actions/referral'),
-  wallet: await import('@/app/actions/wallet'),
-})
+// Static imports required — dynamic import() of 'use server' files breaks Next.js action ID registration
+import {
+  getAllUsers, changeUserRole, deleteUser, createAdminUser,
+  createProTraderUser, resetUserPassword,
+} from '@/app/actions/users'
+import {
+  getAllDepositAddresses, getAllFundRequests, upsertDepositAddress, reviewFundRequest,
+} from '@/app/actions/deposits'
+import {
+  getAllAutoTradePlans, createAutoTradePlan, updateAutoTradePlanStatus,
+} from '@/app/actions/auto-trade'
+import {
+  getActivationFeeRequests, approveActivationFee, rejectActivationFee,
+} from '@/app/actions/referral'
+import {
+  getAllTraderBalances, getAllWithdrawals, reviewWithdrawal,
+} from '@/app/actions/wallet'
 
 type Tab = 'users' | 'deposit-addresses' | 'fund-requests' | 'auto-trade' | 'activation-fees' | 'withdrawals' | 'wallets' | 'arbitrage' | 'ai-support'
 type Network = 'TRC20' | 'BEP20' | 'ERC20'
@@ -190,7 +199,6 @@ export default function AdminClient() {
   const loadUsers = async () => {
     try {
       setLoadingUsers(true)
-      const { getAllUsers } = await import('@/app/actions/users')
       setUsers((await getAllUsers()) as User[])
     } catch (e) { showToast(e instanceof Error ? e.message : 'Failed to load users', 'error') }
     finally { setLoadingUsers(false) }
@@ -199,7 +207,6 @@ export default function AdminClient() {
   const loadAddresses = async () => {
     try {
       setLoadingAddresses(true)
-      const { getAllDepositAddresses } = await import('@/app/actions/deposits')
       setAddresses((await getAllDepositAddresses()) as DepositAddress[])
     } catch (e) { showToast(e instanceof Error ? e.message : 'Failed to load addresses', 'error') }
     finally { setLoadingAddresses(false) }
@@ -208,7 +215,6 @@ export default function AdminClient() {
   const loadFundRequests = async () => {
     try {
       setLoadingRequests(true)
-      const { getAllFundRequests } = await import('@/app/actions/deposits')
       setFundRequests((await getAllFundRequests()) as FundRequest[])
     } catch (e) { showToast(e instanceof Error ? e.message : 'Failed to load requests', 'error') }
     finally { setLoadingRequests(false) }
@@ -217,7 +223,6 @@ export default function AdminClient() {
   const handleRoleChange = async (userId: string, newRole: UserRole) => {
     try {
       setUpdatingUserId(userId)
-      const { changeUserRole } = await import('@/app/actions/users')
       await changeUserRole(userId, newRole)
       await loadUsers()
       showToast('Role updated successfully')
@@ -230,7 +235,6 @@ export default function AdminClient() {
     if (!confirm('Delete this user? This cannot be undone.')) return
     try {
       setDeletingUserId(userId)
-      const { deleteUser } = await import('@/app/actions/users')
       await deleteUser(userId)
       await loadUsers()
       showToast('User deleted')
@@ -243,7 +247,6 @@ export default function AdminClient() {
     e.preventDefault()
     try {
       setCreatingAdmin(true)
-      const { createAdminUser } = await import('@/app/actions/users')
       await createAdminUser(newAdminName, newAdminEmail, newAdminPassword)
       await loadUsers()
       setShowCreateAdmin(false)
@@ -258,7 +261,6 @@ export default function AdminClient() {
     e.preventDefault()
     try {
       setCreatingProTrader(true)
-      const { createProTraderUser } = await import('@/app/actions/users')
       await createProTraderUser(newProTraderName, newProTraderEmail, newProTraderPassword)
       await loadUsers()
       setShowCreateProTrader(false)
@@ -274,9 +276,7 @@ export default function AdminClient() {
     if (!resetTarget) return
     try {
       setResetting(true)
-      const { resetUserPassword } = await import('@/app/actions/users')
       await resetUserPassword(resetTarget.id, resetPassword)
-      // Store plaintext so admin can see/copy it with toggle
       setRevealedPasswords(prev => ({
         ...prev,
         [resetTarget.id]: { plain: resetPassword, visible: false },
@@ -300,7 +300,6 @@ export default function AdminClient() {
     setLoadingPlans(true)
     setPlansError(null)
     try {
-      const { getAllAutoTradePlans } = await import('@/app/actions/auto-trade')
       const data = await getAllAutoTradePlans()
       setAutoTradePlans(data as AutoTradePlan[])
     } catch (err) {
@@ -317,12 +316,11 @@ export default function AdminClient() {
     if (!planStartDate) { showToast('Select a start date', 'error'); return }
     try {
       setCreatingPlan(true)
-      const { createAutoTradePlan } = await import('@/app/actions/auto-trade')
       await createAutoTradePlan(planTargetUserId, principal, planStartDate, planNote || undefined)
       await loadAutoTradePlans()
       setShowCreatePlan(false)
       setPlanTargetUserId(''); setPlanPrincipal(''); setPlanNote('')
-      setPlanStartDate(new Date().toISOString().split('T')[0]) // safe: called in event handler, not render
+      setPlanStartDate(new Date().toISOString().split('T')[0])
       showToast('Auto-trade plan created and daily logs generated')
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to create plan', 'error')
@@ -332,7 +330,6 @@ export default function AdminClient() {
   const handleTogglePlan = async (planId: number, currentStatus: string) => {
     try {
       setTogglingPlanId(planId)
-      const { updateAutoTradePlanStatus } = await import('@/app/actions/auto-trade')
       const next = currentStatus === 'active' ? 'paused' : 'active'
       await updateAutoTradePlanStatus(planId, next as 'active' | 'paused')
       await loadAutoTradePlans()
@@ -345,7 +342,6 @@ export default function AdminClient() {
   const loadActivationFeeReqs = async () => {
     setLoadingFeeReqs(true)
     try {
-      const { getActivationFeeRequests } = await import('@/app/actions/referral')
       const data = await getActivationFeeRequests()
       setActivationFeeReqs(data as ActivationFeeReq[])
     } catch { /* ignore */ }
@@ -355,7 +351,6 @@ export default function AdminClient() {
   const handleApproveFee = async (feeId: number) => {
     try {
       setReviewingFeeId(feeId)
-      const { approveActivationFee } = await import('@/app/actions/referral')
       await approveActivationFee(feeId)
       await loadActivationFeeReqs()
       showToast('Activation fee approved. Account activated and commissions distributed.')
@@ -367,7 +362,6 @@ export default function AdminClient() {
   const handleRejectFee = async (feeId: number) => {
     try {
       setReviewingFeeId(feeId)
-      const { rejectActivationFee } = await import('@/app/actions/referral')
       await rejectActivationFee(feeId, rejectNote || undefined)
       await loadActivationFeeReqs()
       setShowRejectModal(null)
@@ -381,7 +375,6 @@ export default function AdminClient() {
   const loadTraderBalances = async () => {
     setLoadingBalances(true)
     try {
-      const { getAllTraderBalances } = await import('@/app/actions/wallet')
       const data = await getAllTraderBalances()
       setTraderBalances(data as TraderBalance[])
     } catch { /* ignore */ }
@@ -391,7 +384,6 @@ export default function AdminClient() {
   const loadWithdrawalReqs = async () => {
     setLoadingWithdrawals(true)
     try {
-      const { getAllWithdrawals } = await import('@/app/actions/wallet')
       const data = await getAllWithdrawals()
       setWithdrawalReqs(data as WithdrawalReq[])
     } catch { /* ignore */ }
@@ -401,7 +393,6 @@ export default function AdminClient() {
   const handleApproveWithdrawal = async (id: number) => {
     try {
       setReviewingWithdrawId(id)
-      const { reviewWithdrawal } = await import('@/app/actions/wallet')
       await reviewWithdrawal(id, 'approved', withdrawTxHash || undefined)
       await loadWithdrawalReqs()
       setWithdrawTxHash('')
@@ -414,7 +405,6 @@ export default function AdminClient() {
   const handleRejectWithdrawal = async (id: number) => {
     try {
       setReviewingWithdrawId(id)
-      const { reviewWithdrawal } = await import('@/app/actions/wallet')
       await reviewWithdrawal(id, 'rejected', undefined, withdrawNote || undefined)
       await loadWithdrawalReqs()
       setShowWithdrawRejectModal(null)
@@ -436,7 +426,6 @@ export default function AdminClient() {
     if (!editNetwork || !editAddress.trim()) return
     try {
       setSavingAddress(true)
-      const { upsertDepositAddress } = await import('@/app/actions/deposits')
       await upsertDepositAddress(editNetwork, editAddress, editLabel)
       await loadAddresses()
       setEditNetwork(null); setEditAddress(''); setEditLabel('')
@@ -454,7 +443,6 @@ export default function AdminClient() {
     if (!reviewModalId || !reviewAction) return
     try {
       setReviewingId(reviewModalId)
-      const { reviewFundRequest } = await import('@/app/actions/deposits')
       await reviewFundRequest(reviewModalId, reviewAction, reviewNote)
       await loadFundRequests()
       setReviewModalId(null); setReviewAction(null); setReviewNote('')

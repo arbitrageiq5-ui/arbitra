@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-// Types only — no server actions imported at module level
 import type {
   AdminLivePrice, AdminArbitrageOpp, ExchangeStatus, TransferRoute,
   ExchangeApiKey, AiArbitrageStrategy, ExchangeBalance, BotConfig,
@@ -18,9 +17,25 @@ import {
   ChevronDown, ArrowRight, Brain, Shield, Play, Pause, ToggleLeft, ToggleRight,
   Network, Wallet, BarChart2, Bot, List, Cpu, Clock, Globe, Users,
 } from 'lucide-react'
+import {
+  adminFetchLivePrices, testExchangeConnection, testAllExchanges,
+  getExchangeApiKeys, saveExchangeApiKey, toggleExchangeEnabled, deleteExchangeApiKey,
+  generateAiArbitrageStrategy, getSavedAiStrategy, getTransferRoutes,
+  getExchangeBalances, executeExchangeTransfer, getTransferHistory,
+  getBotConfig, saveBotConfig, getBotAnalytics, executeBotTrade, evaluateRiskFilters,
+  adminGetTradersWithExchanges, adminTestTraderExchange, adminFetchTraderBalance,
+} from '@/app/actions/admin-arbitrage'
 
-// ── All server actions loaded lazily ──────────────────────────────────────
-const loadActions = () => import('@/app/actions/admin-arbitrage')
+// Alias for convenience - all server actions are now statically imported above
+// and called directly in handlers instead of via dynamic import.
+const loadActions = () => Promise.resolve({
+  adminFetchLivePrices, testExchangeConnection, testAllExchanges,
+  getExchangeApiKeys, saveExchangeApiKey, toggleExchangeEnabled, deleteExchangeApiKey,
+  generateAiArbitrageStrategy, getSavedAiStrategy, getTransferRoutes,
+  getExchangeBalances, executeExchangeTransfer, getTransferHistory,
+  getBotConfig, saveBotConfig, getBotAnalytics, executeBotTrade, evaluateRiskFilters,
+  adminGetTradersWithExchanges, adminTestTraderExchange, adminFetchTraderBalance,
+})
 
 // ── Inline net-profit calculator (duplicated from server for client preview) ─
 const _EXFEE: Record<string, number> = {

@@ -57,8 +57,17 @@ interface ScoredOpportunity {
   detectedAt: string
 }
 
-// ── Server action lazy loader ──────────────────────────────────────────────
-const loadActions = () => import('@/app/actions/admin-arbitrage')
+// ── Static server action imports (required for Next.js to register action IDs) ──
+import {
+  getSniperBotConfig, saveSniperBotConfig, grabLiveOpportunities,
+  getDepositAddress, executeExchangeTransfer,
+} from '@/app/actions/admin-arbitrage'
+
+// Wrap in a resolved promise so call-sites keep the same await pattern
+const loadActions = () => Promise.resolve({
+  getSniperBotConfig, saveSniperBotConfig, grabLiveOpportunities,
+  getDepositAddress, executeExchangeTransfer,
+})
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
