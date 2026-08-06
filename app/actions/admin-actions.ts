@@ -1,8 +1,8 @@
-'use server'
-
 // Single barrel re-export for all admin server actions.
 // Importing from one stable path prevents Turbopack from creating multiple
 // async-loader chunks (one per file) that go stale across rebuilds.
+// NOTE: Do NOT add 'use server' here — re-exports are not allowed in 'use server' files.
+// The individual source files already declare 'use server' themselves.
 
 export {
   getAllUsers,
