@@ -17,23 +17,16 @@ import {
 import AdminArbitragePanel from '@/components/admin-arbitrage-panel'
 import AdminAiPanel from '@/components/admin-ai-panel'
 
-// Static imports required — dynamic import() of 'use server' files breaks Next.js action ID registration
+// Single stable barrel — one import entry prevents multiple async-loader chunks
+// that go stale across Turbopack rebuilds
 import {
   getAllUsers, changeUserRole, deleteUser, createAdminUser,
   createProTraderUser, resetUserPassword,
-} from '@/app/actions/users'
-import {
   getAllDepositAddresses, getAllFundRequests, upsertDepositAddress, reviewFundRequest,
-} from '@/app/actions/deposits'
-import {
   getAllAutoTradePlans, createAutoTradePlan, updateAutoTradePlanStatus,
-} from '@/app/actions/auto-trade'
-import {
   getActivationFeeRequests, approveActivationFee, rejectActivationFee,
-} from '@/app/actions/referral'
-import {
   getAllTraderBalances, getAllWithdrawals, reviewWithdrawal,
-} from '@/app/actions/wallet'
+} from '@/app/actions/admin-actions'
 
 type Tab = 'users' | 'deposit-addresses' | 'fund-requests' | 'auto-trade' | 'activation-fees' | 'withdrawals' | 'wallets' | 'arbitrage' | 'ai-support'
 type Network = 'TRC20' | 'BEP20' | 'ERC20'

@@ -17,6 +17,7 @@ import {
   ChevronDown, ArrowRight, Brain, Shield, Play, Pause, ToggleLeft, ToggleRight,
   Network, Wallet, BarChart2, Bot, List, Cpu, Clock, Globe, Users,
 } from 'lucide-react'
+// Single barrel — stable Turbopack chunk across rebuilds
 import {
   adminFetchLivePrices, testExchangeConnection, testAllExchanges,
   getExchangeApiKeys, saveExchangeApiKey, toggleExchangeEnabled, deleteExchangeApiKey,
@@ -24,10 +25,8 @@ import {
   getExchangeBalances, executeExchangeTransfer, getTransferHistory,
   getBotConfig, saveBotConfig, getBotAnalytics, executeBotTrade, evaluateRiskFilters,
   adminGetTradersWithExchanges, adminTestTraderExchange, adminFetchTraderBalance,
-} from '@/app/actions/admin-arbitrage'
+} from '@/app/actions/admin-actions'
 
-// Alias for convenience - all server actions are now statically imported above
-// and called directly in handlers instead of via dynamic import.
 const loadActions = () => Promise.resolve({
   adminFetchLivePrices, testExchangeConnection, testAllExchanges,
   getExchangeApiKeys, saveExchangeApiKey, toggleExchangeEnabled, deleteExchangeApiKey,

@@ -57,11 +57,11 @@ interface ScoredOpportunity {
   detectedAt: string
 }
 
-// ── Static server action imports (required for Next.js to register action IDs) ──
+// Single barrel — stable Turbopack chunk across rebuilds
 import {
   getSniperBotConfig, saveSniperBotConfig, grabLiveOpportunities,
   getDepositAddress, executeExchangeTransfer,
-} from '@/app/actions/admin-arbitrage'
+} from '@/app/actions/admin-actions'
 
 // Wrap in a resolved promise so call-sites keep the same await pattern
 const loadActions = () => Promise.resolve({
