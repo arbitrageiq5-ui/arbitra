@@ -27,13 +27,13 @@ import {
   adminGetTradersWithExchanges, adminTestTraderExchange, adminFetchTraderBalance,
 } from '@/app/actions/admin-actions'
 
+// Direct function references — no dynamic import wrapper needed
 const loadActions = () => Promise.resolve({
   adminFetchLivePrices, testExchangeConnection, testAllExchanges,
   getExchangeApiKeys, saveExchangeApiKey, toggleExchangeEnabled, deleteExchangeApiKey,
   generateAiArbitrageStrategy, getSavedAiStrategy, getTransferRoutes,
   getExchangeBalances, executeExchangeTransfer, getTransferHistory,
   getBotConfig, saveBotConfig, getBotAnalytics, executeBotTrade, evaluateRiskFilters,
-  adminGetTradersWithExchanges, adminTestTraderExchange, adminFetchTraderBalance,
 })
 
 // ── Inline net-profit calculator (duplicated from server for client preview) ─
@@ -122,6 +122,7 @@ export default function AdminArbitragePanel() {
   const [accountTestResult, setAccountTestResult] = useState<{ ok: boolean; message: string; balances?: Record<string, number> } | null>(null)
   const [traderBalances, setTraderBalances] = useState<Record<string, number>>({})
   const [loadingTraderBal, setLoadingTraderBal] = useState(false)
+  const [showTraderPicker, setShowTraderPicker] = useState(false)
 
   // Live-scan state
   const [prices, setPrices] = useState<AdminLivePrice[]>([])
@@ -424,21 +425,21 @@ export default function AdminArbitragePanel() {
   // ── Render helpers ───────────────────────────────────────────────────────
   const enabledKeys = useMemo(() => apiKeys.filter(k => k.isEnabled), [apiKeys])
 
-  // Load all traders with their exchange accounts on mount
-  useEffect(() => {
+  // Load all traders with their exchange accounts
+  const loadTraders = useCallback(async () => {
     setLoadingTraders(true)
-    loadActions()
-      .then(mod => (mod as unknown as { adminGetTradersWithExchanges: () => Promise<TraderEntry[]> }).adminGetTradersWithExchanges())
-      .then(data => {
-        setTraders(data)
-        if (data.length > 0) {
-          setSelectedTraderId(data[0].userId)
-          if (data[0].exchanges.length > 0) setSelectedAccountId(data[0].exchanges[0].id)
-        }
-      })
-      .catch(() => { /* no traders yet */ })
-      .finally(() => setLoadingTraders(false))
-  }, [])
+    try {
+      const data = await adminGetTradersWithExchanges()
+      setTraders(data as TraderEntry[])
+      if (data.length > 0 && !selectedTraderId) {
+        setSelectedTraderId(data[0].userId)
+        if (data[0].exchanges.length > 0) setSelectedAccountId(data[0].exchanges[0].id)
+      }
+    } catch { /* no traders yet */ }
+    finally { setLoadingTraders(false) }
+  }, [selectedTraderId])
+
+  useEffect(() => { loadTraders() }, [])
 
   // When trader changes, auto-select their first exchange
   useEffect(() => {
@@ -460,10 +461,7 @@ export default function AdminArbitragePanel() {
     setTestingAccountId(selectedAccountId)
     setAccountTestResult(null)
     try {
-      const mod = await loadActions() as unknown as {
-        adminTestTraderExchange: (id: number) => Promise<{ ok: boolean; message: string; balances?: Record<string, number> }>
-      }
-      const result = await mod.adminTestTraderExchange(selectedAccountId)
+      const result = await adminTestTraderExchange(selectedAccountId)
       setAccountTestResult(result)
     } catch (e) {
       setAccountTestResult({ ok: false, message: e instanceof Error ? e.message : 'Test failed' })
@@ -476,222 +474,220 @@ export default function AdminArbitragePanel() {
     if (!selectedAccountId) return
     setLoadingTraderBal(true)
     try {
-      const mod = await loadActions() as unknown as {
-        adminFetchTraderBalance: (id: number) => Promise<{ ok: boolean; balances?: Record<string, number>; message: string }>
-      }
-      const result = await mod.adminFetchTraderBalance(selectedAccountId)
+      const result = await adminFetchTraderBalance(selectedAccountId)
       if (result.ok && result.balances) setTraderBalances(result.balances)
     } catch { /* ignore */ }
     finally { setLoadingTraderBal(false) }
   }
 
+  function selectTraderAndAccount(traderId: string, accountId: number) {
+    setSelectedTraderId(traderId)
+    setSelectedAccountId(accountId)
+    setAccountTestResult(null)
+    setTraderBalances({})
+    setShowTraderPicker(false)
+  }
+
   // ── JSX ──────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-4">
-      {/* ── Trader / Exchange Selector ── */}
-      <Card className="bg-slate-900 border-slate-800 overflow-hidden">
-        <div className="flex items-center gap-3 px-5 py-3 border-b border-slate-800 bg-slate-800/40">
-          <div className="w-7 h-7 rounded-md bg-cyan-500/15 border border-cyan-500/25 flex items-center justify-center">
-            <Key className="w-3.5 h-3.5 text-cyan-400" />
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-white leading-none">Trader Exchange Selection</p>
-            <p className="text-xs text-slate-500 mt-0.5">Select a trader and their connected exchange to use for arbitrage operations</p>
-          </div>
-          <div className="ml-auto">
+      {/* ── Active Trader Account Banner ── */}
+      <div className="rounded-xl border border-slate-700 bg-slate-900 overflow-hidden">
+        {/* Header row */}
+        <div className="flex items-center gap-3 px-4 py-3 bg-slate-800/50">
+          <Users className="w-4 h-4 text-cyan-400 shrink-0" />
+          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Active Trader Account</span>
+          <div className="ml-auto flex items-center gap-2">
             <button
-              onClick={() => {
-                setLoadingTraders(true)
-                loadActions()
-                  .then(mod => (mod as unknown as { adminGetTradersWithExchanges: () => Promise<TraderEntry[]> }).adminGetTradersWithExchanges())
-                  .then(setTraders)
-                  .catch(() => {})
-                  .finally(() => setLoadingTraders(false))
-              }}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+              onClick={loadTraders}
+              disabled={loadingTraders}
+              className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs text-slate-500 hover:text-white hover:bg-slate-700 transition-colors disabled:opacity-40"
             >
               <RefreshCw className={`w-3 h-3 ${loadingTraders ? 'animate-spin' : ''}`} />
               Refresh
             </button>
+            <button
+              onClick={() => setShowTraderPicker(p => !p)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20 transition-colors"
+            >
+              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showTraderPicker ? 'rotate-180' : ''}`} />
+              {showTraderPicker ? 'Close' : 'Change Account'}
+            </button>
           </div>
         </div>
 
-        <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-5">
-          {/* Step 1 — Select Trader */}
-          <div className="space-y-2">
-            <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">Step 1 — Select Trader</label>
-            {loadingTraders ? (
-              <div className="flex items-center gap-2 text-slate-500 text-sm py-2">
-                <Loader2 className="w-4 h-4 animate-spin" />Loading traders...
-              </div>
-            ) : traders.length === 0 ? (
-              <div className="flex items-center gap-2 px-3 py-3 rounded-lg bg-slate-800/60 border border-slate-700">
-                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
-                <p className="text-xs text-slate-400">No traders have connected exchange accounts yet.</p>
-              </div>
-            ) : (
-              <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
-                {traders.map(t => (
-                  <button
-                    key={t.userId}
-                    onClick={() => setSelectedTraderId(t.userId)}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border text-left transition-all ${
-                      selectedTraderId === t.userId
-                        ? 'bg-cyan-500/10 border-cyan-500/40 text-white'
-                        : 'bg-slate-800/50 border-slate-700/50 text-slate-300 hover:border-slate-600 hover:bg-slate-800'
-                    }`}
-                  >
-                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-xs font-bold text-white shrink-0">
-                      {(t.name ?? t.email).charAt(0).toUpperCase()}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium truncate">{t.name ?? t.email}</p>
-                      {t.name && <p className="text-xs text-slate-500 truncate">{t.email}</p>}
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <span className="text-xs text-slate-500">{t.exchanges.length}</span>
-                      <Globe className="w-3 h-3 text-slate-500" />
-                    </div>
-                    {selectedTraderId === t.userId && <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0" />}
-                  </button>
-                ))}
-              </div>
-            )}
+        {/* Active selection display */}
+        {loadingTraders && !selectedAccount ? (
+          <div className="flex items-center gap-2 px-4 py-3 text-slate-500 text-sm">
+            <Loader2 className="w-4 h-4 animate-spin" /> Loading trader accounts...
           </div>
-
-          {/* Step 2 — Select Exchange Account */}
-          <div className="space-y-2">
-            <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">Step 2 — Select Exchange</label>
-            {!selectedTrader ? (
-              <div className="flex items-center justify-center h-24 rounded-lg bg-slate-800/30 border border-slate-700/50 border-dashed">
-                <p className="text-xs text-slate-500">Select a trader first</p>
-              </div>
-            ) : selectedTrader.exchanges.length === 0 ? (
-              <div className="flex items-center gap-2 px-3 py-3 rounded-lg bg-slate-800/60 border border-slate-700">
-                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
-                <p className="text-xs text-slate-400">This trader has no connected exchanges.</p>
-              </div>
-            ) : (
-              <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
-                {selectedTrader.exchanges.map(acc => {
-                  const exInfo = SUPPORTED_EXCHANGES[acc.exchange]
-                  const isLive = acc.tradeMode === 'live'
-                  return (
-                    <button
-                      key={acc.id}
-                      onClick={() => { setSelectedAccountId(acc.id); setAccountTestResult(null); setTraderBalances({}) }}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border text-left transition-all ${
-                        selectedAccountId === acc.id
-                          ? 'bg-emerald-500/10 border-emerald-500/40 text-white'
-                          : 'bg-slate-800/50 border-slate-700/50 text-slate-300 hover:border-slate-600 hover:bg-slate-800'
-                      }`}
-                    >
-                      <div className="w-7 h-7 rounded-md bg-slate-700 flex items-center justify-center shrink-0 overflow-hidden">
-                        <Globe className="w-3.5 h-3.5 text-slate-400" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium truncate">{exInfo?.name ?? acc.exchange}</p>
-                        <p className="text-xs text-slate-500 truncate">{acc.label ?? 'No label'}</p>
-                      </div>
-                      <div className="flex flex-col items-end gap-1 shrink-0">
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${isLive ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700 text-slate-400'}`}>
-                          {isLive ? 'LIVE' : 'READ-ONLY'}
-                        </span>
-                        {acc.testStatus && (
-                          <span className={`text-[10px] ${acc.testStatus === 'ok' ? 'text-emerald-400' : 'text-red-400'}`}>
-                            {acc.testStatus === 'ok' ? 'Tested OK' : 'Test failed'}
-                          </span>
-                        )}
-                      </div>
-                      {selectedAccountId === acc.id && <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />}
-                    </button>
-                  )
-                })}
-              </div>
-            )}
+        ) : !selectedAccount ? (
+          <div className="flex items-center gap-3 px-4 py-3">
+            <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+            <p className="text-sm text-slate-400">No trader account selected. Click <span className="text-cyan-400 font-medium">Change Account</span> to select one.</p>
           </div>
-        </div>
-
-        {/* Active selection summary + actions */}
-        {selectedAccount && (
-          <div className="px-5 pb-4">
-            <div className="flex flex-wrap items-center gap-3 p-3 rounded-xl bg-slate-800/60 border border-slate-700">
-              <div className="flex items-center gap-2 text-sm text-slate-300 flex-1 min-w-0">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span className="font-medium text-white truncate">
-                  {selectedTrader?.name ?? selectedTrader?.email}
-                </span>
-                <ArrowRight className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                <span className="truncate">
-                  {SUPPORTED_EXCHANGES[selectedAccount.exchange]?.name ?? selectedAccount.exchange}
-                  {selectedAccount.label ? ` — ${selectedAccount.label}` : ''}
-                </span>
-                <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0 ${selectedAccount.tradeMode === 'live' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
-                  {selectedAccount.tradeMode === 'live' ? 'LIVE' : 'READ-ONLY'}
-                </span>
+        ) : (
+          <div className="flex flex-wrap items-center gap-4 px-4 py-3">
+            {/* Trader info */}
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-xs font-bold text-white shrink-0">
+                {(selectedTrader?.name ?? selectedTrader?.email ?? '?').charAt(0).toUpperCase()}
               </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleTestAccount}
-                  disabled={testingAccountId === selectedAccountId}
-                  className="h-7 px-3 text-xs border-slate-600 text-slate-300 hover:bg-slate-700"
-                >
-                  {testingAccountId === selectedAccountId
-                    ? <><Loader2 className="w-3 h-3 animate-spin mr-1" />Testing...</>
-                    : <><TestTube2 className="w-3 h-3 mr-1" />Test Connection</>
-                  }
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleLoadTraderBalance}
-                  disabled={loadingTraderBal}
-                  className="h-7 px-3 text-xs border-slate-600 text-slate-300 hover:bg-slate-700"
-                >
-                  {loadingTraderBal
-                    ? <><Loader2 className="w-3 h-3 animate-spin mr-1" />Loading...</>
-                    : <><Wallet className="w-3 h-3 mr-1" />Fetch Balance</>
-                  }
-                </Button>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-white leading-none truncate">{selectedTrader?.name ?? selectedTrader?.email}</p>
+                {selectedTrader?.name && <p className="text-xs text-slate-500 truncate mt-0.5">{selectedTrader.email}</p>}
               </div>
             </div>
 
-            {/* Test result */}
-            {accountTestResult && (
-              <div className={`mt-2 flex items-start gap-2 px-3 py-2 rounded-lg text-xs border ${accountTestResult.ok ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-red-500/10 border-red-500/30 text-red-300'}`}>
-                {accountTestResult.ok ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-0.5" /> : <XCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />}
-                <div>
-                  <p>{accountTestResult.message}</p>
-                  {accountTestResult.balances && Object.keys(accountTestResult.balances).length > 0 && (
-                    <p className="mt-1 text-slate-400">
-                      Balances: {Object.entries(accountTestResult.balances).slice(0, 8).map(([c, v]) => `${c}: ${v.toFixed(4)}`).join(' · ')}
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
+            <ArrowRight className="w-3.5 h-3.5 text-slate-600 shrink-0" />
 
-            {/* Fetched balances */}
-            {Object.keys(traderBalances).length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {Object.entries(traderBalances).slice(0, 12).map(([coin, amt]) => (
-                  <div key={coin} className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-xs">
-                    <span className="font-semibold text-white">{coin}</span>
-                    <span className="text-slate-400">{amt < 0.0001 ? amt.toExponential(2) : amt.toFixed(4)}</span>
-                  </div>
-                ))}
-                {Object.keys(traderBalances).length > 12 && (
-                  <div className="flex items-center px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-xs text-slate-500">
-                    +{Object.keys(traderBalances).length - 12} more
-                  </div>
-                )}
+            {/* Exchange info */}
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-7 h-7 rounded-md bg-slate-800 border border-slate-700 flex items-center justify-center shrink-0">
+                <Globe className="w-3.5 h-3.5 text-slate-400" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-white leading-none">
+                  {SUPPORTED_EXCHANGES[selectedAccount.exchange]?.name ?? selectedAccount.exchange}
+                </p>
+                {selectedAccount.label && <p className="text-xs text-slate-500 truncate mt-0.5">{selectedAccount.label}</p>}
+              </div>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold border shrink-0 ${
+                selectedAccount.tradeMode === 'live'
+                  ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+                  : 'bg-amber-500/15 border-amber-500/30 text-amber-400'
+              }`}>
+                {selectedAccount.tradeMode === 'live' ? 'LIVE' : 'READ-ONLY'}
+              </span>
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center gap-2 ml-auto shrink-0">
+              <button
+                onClick={handleTestAccount}
+                disabled={testingAccountId === selectedAccountId}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs border border-slate-700 text-slate-300 hover:bg-slate-800 hover:border-slate-600 transition-colors disabled:opacity-40"
+              >
+                {testingAccountId === selectedAccountId
+                  ? <><Loader2 className="w-3 h-3 animate-spin" /> Testing...</>
+                  : <><TestTube2 className="w-3 h-3" /> Test</>}
+              </button>
+              <button
+                onClick={handleLoadTraderBalance}
+                disabled={loadingTraderBal}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs border border-slate-700 text-slate-300 hover:bg-slate-800 hover:border-slate-600 transition-colors disabled:opacity-40"
+              >
+                {loadingTraderBal
+                  ? <><Loader2 className="w-3 h-3 animate-spin" /> Loading...</>
+                  : <><Wallet className="w-3 h-3" /> Balance</>}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Test / Balance results */}
+        {accountTestResult && (
+          <div className={`mx-4 mb-3 flex items-start gap-2 px-3 py-2 rounded-lg text-xs border ${
+            accountTestResult.ok
+              ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-300'
+              : 'bg-red-500/10 border-red-500/25 text-red-300'
+          }`}>
+            {accountTestResult.ok
+              ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+              : <XCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />}
+            <div>
+              <p>{accountTestResult.message}</p>
+              {accountTestResult.balances && Object.keys(accountTestResult.balances).length > 0 && (
+                <p className="mt-0.5 text-slate-400">
+                  {Object.entries(accountTestResult.balances).slice(0, 6).map(([c, v]) => `${c}: ${v.toFixed(4)}`).join(' · ')}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+        {Object.keys(traderBalances).length > 0 && (
+          <div className="px-4 pb-3 flex flex-wrap gap-1.5">
+            {Object.entries(traderBalances).slice(0, 10).map(([coin, amt]) => (
+              <div key={coin} className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-slate-800 border border-slate-700 text-xs">
+                <span className="font-semibold text-white">{coin}</span>
+                <span className="text-slate-400">{amt < 0.0001 ? amt.toExponential(2) : amt.toFixed(4)}</span>
+              </div>
+            ))}
+            {Object.keys(traderBalances).length > 10 && (
+              <div className="flex items-center px-2 py-1 rounded-md bg-slate-800 border border-slate-700 text-xs text-slate-500">
+                +{Object.keys(traderBalances).length - 10} more
               </div>
             )}
           </div>
         )}
-      </Card>
+
+        {/* ── Picker panel (slides open) ── */}
+        {showTraderPicker && (
+          <div className="border-t border-slate-700 bg-slate-950/60">
+            {loadingTraders ? (
+              <div className="flex items-center justify-center gap-2 py-8 text-slate-500 text-sm">
+                <Loader2 className="w-4 h-4 animate-spin" /> Loading accounts...
+              </div>
+            ) : traders.length === 0 ? (
+              <div className="flex items-center justify-center gap-2 py-8 text-slate-500 text-sm">
+                <AlertTriangle className="w-4 h-4 text-amber-400" />
+                No trader exchange accounts found. Ask traders to connect their exchanges first.
+              </div>
+            ) : (
+              <div className="p-4 space-y-3 max-h-80 overflow-y-auto">
+                {traders.map(trader => (
+                  <div key={trader.userId}>
+                    {/* Trader header */}
+                    <div className="flex items-center gap-2 mb-1.5 px-1">
+                      <div className="w-5 h-5 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-[10px] font-bold text-white shrink-0">
+                        {(trader.name ?? trader.email).charAt(0).toUpperCase()}
+                      </div>
+                      <span className="text-xs font-semibold text-slate-300">{trader.name ?? trader.email}</span>
+                      {trader.name && <span className="text-xs text-slate-600 truncate">{trader.email}</span>}
+                      <span className="text-[10px] text-slate-600 ml-auto">{trader.exchanges.length} exchange{trader.exchanges.length !== 1 ? 's' : ''}</span>
+                    </div>
+
+                    {/* Exchange accounts for this trader */}
+                    {trader.exchanges.length === 0 ? (
+                      <p className="text-xs text-slate-600 pl-7 pb-1">No connected exchanges</p>
+                    ) : (
+                      <div className="space-y-1 pl-7">
+                        {trader.exchanges.map(acc => {
+                          const isSelected = selectedTraderId === trader.userId && selectedAccountId === acc.id
+                          const exName = SUPPORTED_EXCHANGES[acc.exchange]?.name ?? acc.exchange
+                          const isLive = acc.tradeMode === 'live'
+                          return (
+                            <button
+                              key={acc.id}
+                              onClick={() => selectTraderAndAccount(trader.userId, acc.id)}
+                              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg border text-left transition-all ${
+                                isSelected
+                                  ? 'bg-cyan-500/10 border-cyan-500/40'
+                                  : 'bg-slate-800/60 border-slate-700/60 hover:border-slate-600 hover:bg-slate-800'
+                              }`}
+                            >
+                              <Globe className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-cyan-400' : 'text-slate-500'}`} />
+                              <span className={`text-sm font-medium flex-1 ${isSelected ? 'text-cyan-300' : 'text-slate-300'}`}>{exName}</span>
+                              {acc.label && <span className="text-xs text-slate-500 truncate max-w-24">{acc.label}</span>}
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0 ${
+                                isLive ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700 text-slate-500'
+                              }`}>
+                                {isLive ? 'LIVE' : 'READ'}
+                              </span>
+                              {acc.testStatus === 'ok' && <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />}
+                              {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 shrink-0" />}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Sub-tab bar */}
       <div className="flex flex-wrap gap-1 bg-slate-900 border border-slate-800 rounded-xl p-1">

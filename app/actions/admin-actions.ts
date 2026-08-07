@@ -36,7 +36,6 @@ export {
 } from '@/app/actions/auto-trade'
 
 export {
-  storeReferredBy,
   creditIncomeCommission,
   ensureReferralCode,
   getMyReferralCode,
