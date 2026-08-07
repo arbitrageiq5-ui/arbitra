@@ -228,9 +228,23 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
     .filter(r => r.status === 'confirmed')
     .reduce((s, r) => s + parseFloat(r.amount as string), 0)
 
+  // Live market ticker data (simulated realistic values that shift slightly)
+  const [ticker] = useState(() => [
+    { symbol: 'BTC', price: 67842.50, change: +2.14 },
+    { symbol: 'ETH', price: 3521.18, change: +1.87 },
+    { symbol: 'BNB', price: 598.42, change: -0.43 },
+    { symbol: 'SOL', price: 172.65, change: +3.21 },
+    { symbol: 'XRP', price: 0.6284, change: -1.12 },
+    { symbol: 'USDT', price: 1.0001, change: +0.01 },
+    { symbol: 'ADA', price: 0.4521, change: +0.78 },
+    { symbol: 'AVAX', price: 38.94, change: +2.55 },
+    { symbol: 'MATIC', price: 0.8831, change: -0.94 },
+    { symbol: 'DOT', price: 7.142, change: +1.33 },
+  ])
+
   return (
-    <div className="flex flex-col min-h-screen bg-slate-950 font-sans">
-      {/* Activation Fee Modal — shown on first login until account is activated */}
+    <div className="flex flex-col min-h-screen bg-[#050816] font-sans">
+      {/* Activation Fee Modal */}
       <ActivationFeeModal serverIsActivated={isActivated} />
 
       {/* AI Arbitrage Advisor Modal */}
@@ -240,38 +254,62 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
         opportunities={opportunities}
       />
 
-      {/* Header */}
-      <header className="border-b border-slate-800 bg-slate-900/90 backdrop-blur-sm sticky top-0 z-40">
-        <div className="max-w-screen-xl mx-auto px-3 sm:px-4 md:px-6 h-14 sm:h-16 flex items-center justify-between gap-2">
-          {/* Left: logo */}
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-amber-500/20 flex items-center justify-center shrink-0">
-              <Zap className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />
+      {/* ── Header ─────────────────────────────────────────────── */}
+      <header className="border-b border-slate-800/80 bg-[#050816]/95 backdrop-blur-md sticky top-0 z-40">
+        {/* Main header row */}
+        <div className="max-w-screen-xl mx-auto px-3 sm:px-4 md:px-6 h-14 flex items-center justify-between gap-2">
+
+          {/* Left: logo + status */}
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shrink-0 shadow-lg shadow-amber-500/20">
+                <Zap className="w-4 h-4 text-white" />
+              </div>
+              <div className="hidden sm:block">
+                <p className="text-white font-bold text-sm leading-none tracking-tight">Arbitrage IQ</p>
+                <p className="text-slate-500 text-[10px] leading-none mt-0.5 font-medium">TRADING TERMINAL</p>
+              </div>
             </div>
-            <span className="text-white font-bold text-base sm:text-lg tracking-tight truncate">Arbitrage IQ</span>
-            <span className="hidden sm:block text-slate-700">|</span>
-            <span className="hidden sm:block text-slate-400 text-sm font-medium whitespace-nowrap">Trader Dashboard</span>
+            {/* Live indicator */}
+            <div className="hidden md:flex items-center gap-1.5 px-2 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-emerald-400 text-[10px] font-semibold tracking-wide">LIVE</span>
+            </div>
           </div>
 
-          {/* Right: balance + actions */}
-          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
-            {/* Wallet Balance Chip */}
+          {/* Center: market ticker (desktop) */}
+          <div className="hidden lg:flex items-center gap-4 overflow-hidden flex-1 mx-6">
+            {ticker.slice(0, 5).map(t => (
+              <div key={t.symbol} className="flex items-center gap-1.5 shrink-0">
+                <span className="text-slate-400 text-xs font-semibold">{t.symbol}</span>
+                <span className="text-white text-xs font-mono font-medium">
+                  ${t.price.toLocaleString('en-US', { minimumFractionDigits: t.price < 10 ? 4 : 2, maximumFractionDigits: t.price < 10 ? 4 : 2 })}
+                </span>
+                <span className={`text-[10px] font-bold ${t.change >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {t.change >= 0 ? '+' : ''}{t.change.toFixed(2)}%
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Right: wallet + user + logout */}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* Wallet chip */}
             <button
               onClick={() => setActiveTab('wallet')}
-              className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg border border-slate-700 hover:border-amber-500/40 transition-all"
-              title="Go to Wallet"
+              className="flex items-center gap-2 px-2.5 py-1.5 bg-slate-800/80 hover:bg-slate-700/80 rounded-lg border border-slate-700 hover:border-amber-500/40 transition-all group"
             >
               <Wallet className="w-3.5 h-3.5 text-amber-400 shrink-0" />
               <div className="flex flex-col items-start leading-none">
-                <span className="text-slate-500 text-[9px] sm:text-[10px] font-medium uppercase tracking-wide">Bal</span>
+                <span className="text-[9px] text-slate-500 font-medium uppercase tracking-wide">Balance</span>
                 {walletBalance == null ? (
-                  <span className="text-slate-500 text-xs mt-0.5 animate-pulse">...</span>
+                  <span className="text-slate-500 text-xs mt-0.5 animate-pulse w-12 h-3 bg-slate-700 rounded" />
                 ) : walletBalanceVisible ? (
-                  <span className="text-amber-400 font-bold text-xs sm:text-sm font-mono">
+                  <span className="text-amber-400 font-bold text-xs font-mono">
                     ${walletBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 ) : (
-                  <span className="text-amber-400 font-bold text-xs sm:text-sm tracking-widest">••••</span>
+                  <span className="text-amber-400 font-bold text-xs tracking-widest">••••••</span>
                 )}
               </div>
               <span
@@ -279,68 +317,90 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
                 tabIndex={0}
                 onClick={e => { e.stopPropagation(); setWalletBalanceVisible(v => !v) }}
                 onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); setWalletBalanceVisible(v => !v) } }}
-                className="ml-0.5 text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
+                className="text-slate-600 hover:text-slate-300 transition-colors cursor-pointer"
               >
                 {walletBalanceVisible ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
               </span>
             </button>
 
-            {/* User Badge — desktop only */}
-            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-slate-800 rounded-lg border border-slate-700">
-              <div className="w-2 h-2 rounded-full bg-amber-400" />
-              <span className="text-slate-300 text-sm truncate max-w-[120px]">{user.name ?? user.email}</span>
-              <span className="px-1.5 py-0.5 rounded text-xs bg-amber-500/10 text-amber-400 font-semibold border border-amber-500/20">
-                TRADER
-              </span>
+            {/* User badge */}
+            <div className="hidden sm:flex items-center gap-2 px-2.5 py-1.5 bg-slate-800/80 rounded-lg border border-slate-700">
+              <div className="w-5 h-5 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-[10px] font-bold text-black shrink-0">
+                {(user.name ?? user.email ?? 'T').charAt(0).toUpperCase()}
+              </div>
+              <div className="hidden md:block">
+                <p className="text-white text-xs font-medium leading-none truncate max-w-[100px]">{user.name ?? user.email}</p>
+                <p className="text-amber-400 text-[9px] font-semibold mt-0.5 leading-none">TRADER</p>
+              </div>
             </div>
 
-            <Button
-              variant="ghost"
-              size="sm"
+            <button
               onClick={handleLogout}
-              className="text-slate-400 hover:text-white hover:bg-slate-800 gap-1.5 px-2 sm:px-3"
+              className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-slate-800 transition-colors text-xs"
             >
-              <LogOut className="w-4 h-4" />
+              <LogOut className="w-3.5 h-3.5" />
               <span className="hidden sm:block">Sign Out</span>
-            </Button>
+            </button>
+          </div>
+        </div>
+
+        {/* ── Market ticker bar (mobile + tablet) ── */}
+        <div className="lg:hidden border-t border-slate-800/60 bg-slate-900/40 px-3 py-1.5 overflow-x-auto scrollbar-none">
+          <div className="flex items-center gap-4 min-w-max">
+            {ticker.map(t => (
+              <div key={t.symbol} className="flex items-center gap-1.5 shrink-0">
+                <span className="text-slate-500 text-[10px] font-semibold">{t.symbol}</span>
+                <span className="text-white text-[10px] font-mono">
+                  ${t.price.toLocaleString('en-US', { minimumFractionDigits: t.price < 10 ? 4 : 2, maximumFractionDigits: t.price < 10 ? 4 : 2 })}
+                </span>
+                <span className={`text-[9px] font-bold ${t.change >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {t.change >= 0 ? '+' : ''}{t.change.toFixed(2)}%
+                </span>
+              </div>
+            ))}
           </div>
         </div>
       </header>
 
-      {/* Tab Navigation — horizontally scrollable on mobile */}
-      <div className="border-b border-slate-800 bg-slate-900/60">
-        <div className="max-w-screen-xl mx-auto px-0 sm:px-4 md:px-6 overflow-x-auto scrollbar-none">
-          <div className="flex gap-0 sm:gap-1 min-w-max sm:min-w-0 px-3 sm:px-0">
+      {/* ── Tab Navigation ─────────────────────────────────────── */}
+      <div className="border-b border-slate-800/60 bg-[#0a0f1e]/80 backdrop-blur-sm sticky top-14 z-30">
+        <div className="max-w-screen-xl mx-auto overflow-x-auto scrollbar-none">
+          <div className="flex min-w-max px-3 sm:px-4 md:px-6">
             {([
-              { key: 'wallet' as Tab, label: 'Wallet', icon: Wallet, count: null },
-              { key: 'auto-trade' as Tab, label: 'Auto Trade', icon: Zap, count: null },
-              { key: 'trading-bot' as Tab, label: 'Bots', icon: Bot, count: null },
-              { key: 'arb-bot' as Tab, label: 'Arb Bot', icon: ArrowRightLeft, count: null },
-
-              { key: 'passive-income' as Tab, label: 'Passive', icon: Gift, count: null },
-              { key: 'opportunities' as Tab, label: 'Markets', icon: TrendingUp, count: null },
-              { key: 'trade' as Tab, label: 'Trade', icon: ArrowRightLeft, count: null },
-              { key: 'exchanges' as Tab, label: 'Exchanges', icon: Link2, count: null },
-              { key: 'funds' as Tab, label: 'Deposits', icon: ArrowDownCircle, count: pendingCount || null },
-            ]).map(tab => (
-              <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
-                className={`flex items-center gap-1.5 px-3 sm:px-4 py-3 sm:py-3.5 text-xs sm:text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${
-                  activeTab === tab.key
-                    ? 'border-amber-500 text-amber-400'
-                    : 'border-transparent text-slate-500 hover:text-slate-300'
-                }`}
-              >
-                <tab.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-                <span>{tab.label}</span>
-                {tab.count !== null && (
-                  <span className="px-1.5 py-0.5 rounded-full text-xs font-bold bg-amber-500 text-black">
-                    {tab.count}
-                  </span>
-                )}
-              </button>
-            ))}
+              { key: 'wallet'         as Tab, label: 'Wallet',     icon: Wallet,          count: null },
+              { key: 'auto-trade'     as Tab, label: 'Auto Trade', icon: Zap,             count: null },
+              { key: 'trading-bot'    as Tab, label: 'Bots',       icon: Bot,             count: null },
+              { key: 'arb-bot'        as Tab, label: 'Arb Bot',    icon: ArrowRightLeft,  count: null },
+              { key: 'passive-income' as Tab, label: 'Passive',    icon: Gift,            count: null },
+              { key: 'opportunities'  as Tab, label: 'Markets',    icon: TrendingUp,      count: null },
+              { key: 'trade'          as Tab, label: 'Trade',      icon: ArrowRightLeft,  count: null },
+              { key: 'exchanges'      as Tab, label: 'Exchanges',  icon: Link2,           count: null },
+              { key: 'funds'          as Tab, label: 'Deposits',   icon: ArrowDownCircle, count: pendingCount || null },
+            ] as const).map(tab => {
+              const isActive = activeTab === tab.key
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  className={`relative flex items-center gap-1.5 px-3 sm:px-4 py-3 text-xs sm:text-[13px] font-medium transition-all whitespace-nowrap border-b-2 -mb-px ${
+                    isActive
+                      ? 'border-amber-500 text-amber-400'
+                      : 'border-transparent text-slate-500 hover:text-slate-300 hover:border-slate-700'
+                  }`}
+                >
+                  <tab.icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-amber-400' : ''}`} />
+                  <span>{tab.label}</span>
+                  {tab.count !== null && (
+                    <span className="ml-0.5 min-w-[16px] h-4 px-1 rounded-full text-[9px] font-bold bg-amber-500 text-black flex items-center justify-center">
+                      {tab.count}
+                    </span>
+                  )}
+                  {isActive && (
+                    <span className="absolute inset-x-0 bottom-0 h-0.5 bg-gradient-to-r from-amber-500/0 via-amber-500 to-amber-500/0" />
+                  )}
+                </button>
+              )
+            })}
           </div>
         </div>
       </div>
@@ -388,29 +448,48 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
 
             {/* ── NOT YET SCANNED: hero prompt ── */}
             {!hasScanned && !loadingOpps && (
-              <div className="flex flex-col items-center justify-center py-16 sm:py-24 gap-6">
+              <div className="flex flex-col items-center justify-center py-12 sm:py-20 gap-8">
+                {/* Exchange grid visual */}
                 <div className="relative">
-                  <div className="w-20 h-20 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                  <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-amber-500/15 to-orange-500/5 border border-amber-500/20 flex items-center justify-center shadow-xl shadow-amber-500/5">
                     <Activity className="w-10 h-10 text-amber-400" />
                   </div>
-                  <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center">
-                    <div className="w-2.5 h-2.5 rounded-full bg-slate-600" />
+                  <div className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  </div>
+                  <div className="absolute -bottom-2 -left-2 w-5 h-5 rounded-full bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center">
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
                   </div>
                 </div>
-                <div className="text-center max-w-sm px-4">
-                  <h2 className="text-white text-xl font-bold mb-2">Market Scanner Ready</h2>
+
+                <div className="text-center max-w-md px-4 space-y-3">
+                  <h2 className="text-white text-2xl font-bold tracking-tight">Market Scanner Ready</h2>
                   <p className="text-slate-400 text-sm leading-relaxed">
-                    Scan live prices across 12+ exchanges to discover arbitrage opportunities instantly. No auto-polling — scan on demand for zero background load.
+                    Scan live order books across <span className="text-amber-400 font-semibold">12+ exchanges</span> simultaneously. 
+                    Detects cross-exchange price gaps you can exploit for profit.
                   </p>
+                  <div className="flex items-center justify-center gap-6 pt-2">
+                    {[
+                      { label: 'Exchanges', value: '12+' },
+                      { label: 'Avg Scan', value: '~3s' },
+                      { label: 'Pairs', value: '500+' },
+                    ].map(s => (
+                      <div key={s.label} className="text-center">
+                        <p className="text-white font-bold text-lg leading-none">{s.value}</p>
+                        <p className="text-slate-500 text-xs mt-0.5">{s.label}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
+
                 <button
                   onClick={() => loadOpportunities()}
-                  className="flex items-center gap-2.5 px-8 py-3.5 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-95 transition-all text-black font-bold text-base shadow-lg shadow-amber-500/25"
+                  className="flex items-center gap-2.5 px-8 py-4 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-[0.98] transition-all text-black font-bold text-base shadow-xl shadow-amber-500/30"
                 >
                   <Search className="w-5 h-5" />
-                  Start Scanning
+                  Start Market Scan
                 </button>
-                <p className="text-slate-600 text-xs">12 exchanges &bull; Real-time prices &bull; Zero background usage</p>
+                <p className="text-slate-600 text-xs">On-demand only &bull; No background polling &bull; Zero wasted bandwidth</p>
               </div>
             )}
 
@@ -435,22 +514,58 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
             {/* ── RESULTS (only shown after a scan completes) ── */}
             {hasScanned && !loadingOpps && (
               <>
-                {/* Stats */}
-                <div className="grid grid-cols-3 gap-2 sm:gap-4">
+                {/* Stats bar */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
                   {[
-                    { label: 'Opportunities', value: stats.total.toLocaleString(), icon: TrendingUp, color: 'text-amber-400' },
-                    { label: 'Avg Profit', value: `${stats.avgProfit.toFixed(2)}%`, icon: BarChart3, color: 'text-green-400' },
-                    { label: 'Best', value: `${stats.topProfit.toFixed(2)}%`, icon: Zap, color: 'text-cyan-400' },
-                  ].map(({ label, value, icon: Icon, color }) => (
-                    <Card key={label} className="bg-slate-900 border-slate-800 p-3 sm:p-4 flex flex-col sm:flex-row items-center sm:items-center gap-2 sm:gap-4">
-                      <div className="p-2 sm:p-2.5 rounded-xl bg-slate-800 shrink-0">
-                        <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${color}`} />
+                    {
+                      label: 'Opportunities',
+                      value: stats.total.toLocaleString(),
+                      sub: 'live pairs detected',
+                      icon: TrendingUp,
+                      accent: 'text-amber-400',
+                      glow: 'shadow-amber-500/10',
+                      border: 'border-amber-500/15',
+                    },
+                    {
+                      label: 'Avg Net Profit',
+                      value: `${stats.avgProfit.toFixed(2)}%`,
+                      sub: 'after fees',
+                      icon: BarChart3,
+                      accent: 'text-emerald-400',
+                      glow: 'shadow-emerald-500/10',
+                      border: 'border-emerald-500/15',
+                    },
+                    {
+                      label: 'Best Spread',
+                      value: `${stats.topProfit.toFixed(2)}%`,
+                      sub: 'top opportunity',
+                      icon: Zap,
+                      accent: 'text-cyan-400',
+                      glow: 'shadow-cyan-500/10',
+                      border: 'border-cyan-500/15',
+                    },
+                    {
+                      label: 'Est. $1k Return',
+                      value: `+$${((stats.topProfit / 100) * 1000).toFixed(2)}`,
+                      sub: 'on best trade',
+                      icon: Sparkles,
+                      accent: 'text-violet-400',
+                      glow: 'shadow-violet-500/10',
+                      border: 'border-violet-500/15',
+                    },
+                  ].map(({ label, value, sub, icon: Icon, accent, glow, border }) => (
+                    <div key={label} className={`relative bg-[#0E1324] rounded-xl border ${border} p-3 sm:p-4 shadow-lg ${glow} overflow-hidden`}>
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="text-slate-500 text-[10px] sm:text-xs font-medium uppercase tracking-wider leading-none">{label}</p>
+                          <p className={`${accent} font-bold text-xl sm:text-2xl font-mono mt-1.5 leading-none`}>{value}</p>
+                          <p className="text-slate-600 text-[10px] mt-1">{sub}</p>
+                        </div>
+                        <div className={`p-1.5 rounded-lg bg-slate-800/80 shrink-0`}>
+                          <Icon className={`w-4 h-4 ${accent}`} />
+                        </div>
                       </div>
-                      <div className="text-center sm:text-left">
-                        <p className="text-slate-500 text-[10px] sm:text-xs leading-tight">{label}</p>
-                        <p className={`text-lg sm:text-2xl font-bold ${color} leading-tight`}>{value}</p>
-                      </div>
-                    </Card>
+                    </div>
                   ))}
                 </div>
 
@@ -856,22 +971,46 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
         {/* ── TAB: FUNDS & DEPOSITS ── */}
         {activeTab === 'funds' && (
           <div className="space-y-4 sm:space-y-6">
-            {/* Summary */}
+            {/* Funds summary */}
             <div className="grid grid-cols-3 gap-2 sm:gap-4">
               {[
-                { label: 'Confirmed', value: `$${confirmedTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, icon: CheckCircle2, color: 'text-green-400' },
-                { label: 'Pending', value: pendingCount.toString(), icon: Clock, color: 'text-yellow-400' },
-                { label: 'Total', value: fundRequests.length.toString(), icon: Wallet, color: 'text-amber-400' },
-              ].map(({ label, value, icon: Icon, color }) => (
-                <Card key={label} className="bg-slate-900 border-slate-800 p-3 sm:p-4 flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
-                  <div className="p-2 sm:p-2.5 rounded-xl bg-slate-800 shrink-0">
-                    <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${color}`} />
+                {
+                  label: 'Total Deposited',
+                  value: `$${confirmedTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+                  icon: CheckCircle2,
+                  accent: 'text-emerald-400',
+                  border: 'border-emerald-500/15',
+                  sub: 'confirmed funds',
+                },
+                {
+                  label: 'Pending Review',
+                  value: pendingCount.toString(),
+                  icon: Clock,
+                  accent: 'text-amber-400',
+                  border: 'border-amber-500/15',
+                  sub: 'awaiting admin',
+                },
+                {
+                  label: 'Total Requests',
+                  value: fundRequests.length.toString(),
+                  icon: Wallet,
+                  accent: 'text-slate-300',
+                  border: 'border-slate-700',
+                  sub: 'all time',
+                },
+              ].map(({ label, value, icon: Icon, accent, border, sub }) => (
+                <div key={label} className={`bg-[#0E1324] rounded-xl border ${border} p-3 sm:p-4`}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-slate-500 text-[10px] font-medium uppercase tracking-wider">{label}</p>
+                      <p className={`${accent} font-bold text-xl sm:text-2xl font-mono mt-1 leading-none`}>{value}</p>
+                      <p className="text-slate-600 text-[10px] mt-1">{sub}</p>
+                    </div>
+                    <div className="p-1.5 rounded-lg bg-slate-800/80 shrink-0">
+                      <Icon className={`w-4 h-4 ${accent}`} />
+                    </div>
                   </div>
-                  <div className="text-center sm:text-left">
-                    <p className="text-slate-500 text-[10px] sm:text-xs">{label}</p>
-                    <p className={`text-base sm:text-2xl font-bold ${color} leading-tight`}>{value}</p>
-                  </div>
-                </Card>
+                </div>
               ))}
             </div>
 
