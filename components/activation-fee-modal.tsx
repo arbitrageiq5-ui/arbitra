@@ -226,10 +226,20 @@ export function ActivationFeeModal({ serverIsActivated }: { serverIsActivated: b
                         const meta = NETWORK_META[addr.network] ?? { color: 'text-slate-400', bg: 'bg-slate-800', border: 'border-slate-700', badge: addr.network }
                         const isSelected = selectedNetwork === addr.network
                         return (
-                          <button
+                          // Not a native <button> — it wraps CopyBtn (also a <button>), and
+                          // nested buttons are invalid HTML and trigger a hydration error.
+                          <div
                             key={addr.id}
+                            role="button"
+                            tabIndex={0}
                             onClick={() => setSelectedNetwork(addr.network)}
-                            className={`w-full text-left rounded-xl border px-4 py-3 transition-all ${
+                            onKeyDown={e => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault()
+                                setSelectedNetwork(addr.network)
+                              }
+                            }}
+                            className={`w-full text-left rounded-xl border px-4 py-3 transition-all cursor-pointer ${
                               isSelected
                                 ? `${meta.bg} ${meta.border} ring-1 ring-offset-0 ${meta.border.replace('border-', 'ring-')}`
                                 : 'bg-slate-800/50 border-slate-700 hover:border-slate-600'
@@ -245,7 +255,7 @@ export function ActivationFeeModal({ serverIsActivated }: { serverIsActivated: b
                               </div>
                               <CopyBtn text={addr.address} />
                             </div>
-                          </button>
+                          </div>
                         )
                       })}
                     </div>

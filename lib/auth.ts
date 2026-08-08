@@ -44,6 +44,8 @@ export const auth = betterAuth({
     'http://localhost:3002',
     // v0 preview sandbox — vusercontent.net is the v0 preview domain
     'https://vm-crypto-exchange-platform.vusercontent.net',
+    // v0 sandbox VM runtime — wildcard covers the per-session subdomain (e.g. sb-<id>.vercel.run)
+    'https://*.vercel.run',
     ...(process.env.V0_RUNTIME_URL ? [process.env.V0_RUNTIME_URL] : []),
     // Dynamic Vercel deployment URLs (Better Auth does NOT support wildcards — exact only)
     ...(process.env.VERCEL_URL ? [`https://${process.env.VERCEL_URL}`] : []),
