@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { ActivationFeeModal } from '@/components/activation-fee-modal'
 import { TraderAiArbitrageModal } from '@/components/trader-ai-modal'
+import { MarketTicker } from '@/components/market-ticker'
 import { formatPrice, formatVolume, timeAgo, CopyButton } from '@/lib/trader-utils'
 
 // Lazy load non-critical tabs for faster initial load
@@ -228,20 +229,6 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
     .filter(r => r.status === 'confirmed')
     .reduce((s, r) => s + parseFloat(r.amount as string), 0)
 
-  // Live market ticker data (simulated realistic values that shift slightly)
-  const [ticker] = useState(() => [
-    { symbol: 'BTC', price: 67842.50, change: +2.14 },
-    { symbol: 'ETH', price: 3521.18, change: +1.87 },
-    { symbol: 'BNB', price: 598.42, change: -0.43 },
-    { symbol: 'SOL', price: 172.65, change: +3.21 },
-    { symbol: 'XRP', price: 0.6284, change: -1.12 },
-    { symbol: 'USDT', price: 1.0001, change: +0.01 },
-    { symbol: 'ADA', price: 0.4521, change: +0.78 },
-    { symbol: 'AVAX', price: 38.94, change: +2.55 },
-    { symbol: 'MATIC', price: 0.8831, change: -0.94 },
-    { symbol: 'DOT', price: 7.142, change: +1.33 },
-  ])
-
   return (
     <div className="flex flex-col min-h-screen bg-[#050816] font-sans">
       {/* Activation Fee Modal */}
@@ -277,20 +264,8 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
             </div>
           </div>
 
-          {/* Center: market ticker (desktop) */}
-          <div className="hidden lg:flex items-center gap-4 overflow-hidden flex-1 mx-6">
-            {ticker.slice(0, 5).map(t => (
-              <div key={t.symbol} className="flex items-center gap-1.5 shrink-0">
-                <span className="text-slate-400 text-xs font-semibold">{t.symbol}</span>
-                <span className="text-white text-xs font-mono font-medium">
-                  ${t.price.toLocaleString('en-US', { minimumFractionDigits: t.price < 10 ? 4 : 2, maximumFractionDigits: t.price < 10 ? 4 : 2 })}
-                </span>
-                <span className={`text-[10px] font-bold ${t.change >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {t.change >= 0 ? '+' : ''}{t.change.toFixed(2)}%
-                </span>
-              </div>
-            ))}
-          </div>
+          {/* Center: live market ticker (desktop) — fetched from Binance's public API */}
+          <MarketTicker variant="desktop" />
 
           {/* Right: wallet + user + logout */}
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
@@ -344,21 +319,9 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
           </div>
         </div>
 
-        {/* ── Market ticker bar (mobile + tablet) ── */}
-        <div className="lg:hidden border-t border-slate-800/60 bg-slate-900/40 px-3 py-1.5 overflow-x-auto scrollbar-none">
-          <div className="flex items-center gap-4 min-w-max">
-            {ticker.map(t => (
-              <div key={t.symbol} className="flex items-center gap-1.5 shrink-0">
-                <span className="text-slate-500 text-[10px] font-semibold">{t.symbol}</span>
-                <span className="text-white text-[10px] font-mono">
-                  ${t.price.toLocaleString('en-US', { minimumFractionDigits: t.price < 10 ? 4 : 2, maximumFractionDigits: t.price < 10 ? 4 : 2 })}
-                </span>
-                <span className={`text-[9px] font-bold ${t.change >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {t.change >= 0 ? '+' : ''}{t.change.toFixed(2)}%
-                </span>
-              </div>
-            ))}
-          </div>
+        {/* ── Live market ticker bar (mobile + tablet) ── */}
+        <div className="lg:hidden border-t border-slate-800/60 bg-slate-900/40 overflow-x-auto scrollbar-none">
+          <MarketTicker variant="mobile" />
         </div>
       </header>
 
