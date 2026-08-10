@@ -32,6 +32,28 @@ export const PRECIOUS_METALS_EXCHANGES = ['coinswitch', 'delta', 'binance', 'okx
 
 export type PreciousMetalsPair = typeof PRECIOUS_METALS_PAIRS[number]
 
+// Forex / metals / index pairs tradeable via MetaTrader 4 & 5 bridges
+export const FOREX_PAIRS = [
+  { symbol: 'EUR/USD', base: 'EUR', quote: 'USD', name: 'Euro / US Dollar' },
+  { symbol: 'GBP/USD', base: 'GBP', quote: 'USD', name: 'British Pound / US Dollar' },
+  { symbol: 'USD/JPY', base: 'USD', quote: 'JPY', name: 'US Dollar / Japanese Yen' },
+  { symbol: 'USD/CHF', base: 'USD', quote: 'CHF', name: 'US Dollar / Swiss Franc' },
+  { symbol: 'AUD/USD', base: 'AUD', quote: 'USD', name: 'Australian Dollar / US Dollar' },
+  { symbol: 'USD/CAD', base: 'USD', quote: 'CAD', name: 'US Dollar / Canadian Dollar' },
+  { symbol: 'NZD/USD', base: 'NZD', quote: 'USD', name: 'New Zealand Dollar / US Dollar' },
+  { symbol: 'EUR/GBP', base: 'EUR', quote: 'GBP', name: 'Euro / British Pound' },
+  { symbol: 'XAU/USD', base: 'XAU', quote: 'USD', name: 'Gold Spot' },
+  { symbol: 'XAG/USD', base: 'XAG', quote: 'USD', name: 'Silver Spot' },
+  { symbol: 'US30/USD', base: 'US30', quote: 'USD', name: 'Dow Jones 30 Index' },
+  { symbol: 'NAS100/USD', base: 'NAS100', quote: 'USD', name: 'Nasdaq 100 Index' },
+] as const
+
+// MetaTrader platform/broker bridges supported for automated execution
+export const META_TRADER_PLATFORMS = ['mt5', 'mt4'] as const
+
+export type ForexPair = typeof FOREX_PAIRS[number]
+export type MetaTraderPlatform = typeof META_TRADER_PLATFORMS[number]
+
 export type DcaConfig = {
   baseOrderSize: number        // USDT for first buy
   safetyOrderSize: number      // USDT per safety order
