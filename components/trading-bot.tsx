@@ -2063,6 +2063,8 @@ export function TradingBot() {
   function handleLaunchBot(id: string) {
     if (id === 'gold-silver') {
       setShowGoldSilver(true)
+    } else if (id === 'meta-trader') {
+      setShowMetaTrader(true)
     } else {
       setShowCreate(true)
     }
@@ -2152,6 +2154,7 @@ export function TradingBot() {
               accounts={accounts}
               onLaunch={handleLaunchTemplate}
               onLaunchGoldSilver={() => setShowGoldSilver(true)}
+              onLaunchMetaTrader={() => setShowMetaTrader(true)}
             />
           )}
         </>
@@ -2172,6 +2175,15 @@ export function TradingBot() {
         <GoldSilverBotModal
           accounts={accounts}
           onClose={() => setShowGoldSilver(false)}
+          onCreate={load}
+        />
+      )}
+
+      {/* MT4/MT5 bot modal */}
+      {showMetaTrader && (
+        <MetaTraderBotModal
+          accounts={accounts}
+          onClose={() => setShowMetaTrader(false)}
           onCreate={load}
         />
       )}
