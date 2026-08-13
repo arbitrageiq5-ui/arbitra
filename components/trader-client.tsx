@@ -23,6 +23,7 @@ import { formatPrice, formatVolume, timeAgo, CopyButton } from '@/lib/trader-uti
 
 // Lazy load non-critical tabs for faster initial load
 const ExchangeConnectionManager = lazy(() => import('@/components/exchange-connection-manager').then(m => ({ default: m.ExchangeConnectionManager })))
+const MetaTraderBridgeManager = lazy(() => import('@/components/metatrader-bridge-manager').then(m => ({ default: m.MetaTraderBridgeManager })))
 const TradeExecutionPanel = lazy(() => import('@/components/trade-execution-panel').then(m => ({ default: m.TradeExecutionPanel })))
 const AutoTradePlatform = lazy(() => import('@/components/auto-trade-platform').then(m => ({ default: m.AutoTradePlatform })))
 const PassiveIncome = lazy(() => import('@/components/passive-income').then(m => ({ default: m.PassiveIncome })))
@@ -325,7 +326,7 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
         </div>
       </header>
 
-      {/* ── Tab Navigation ─────────────────────────────────────── */}
+      {/* ── Tab Navigation ─────────────────────────���───────────── */}
       <div className="border-b border-slate-800/60 bg-[#0a0f1e]/80 backdrop-blur-sm sticky top-14 z-30">
         <div className="max-w-screen-xl mx-auto overflow-x-auto scrollbar-none">
           <div className="flex min-w-max px-3 sm:px-4 md:px-6">
@@ -918,6 +919,7 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
           <Suspense fallback={<TabLoader />}>
             <div className="space-y-6">
               <ExchangeConnectionManager />
+              <MetaTraderBridgeManager />
             </div>
           </Suspense>
         )}

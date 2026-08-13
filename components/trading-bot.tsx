@@ -11,7 +11,7 @@ import {
   Info, X, Activity, Sparkles, Target, Repeat2,
   LineChart, Cpu, FlameKindling, Rocket,
   Signal, GitCompareArrows, Grid2x2, Lock,
-  Star, ChevronRight, LayoutDashboard, BookOpen, Gem,
+  Star, ChevronRight, LayoutDashboard, BookOpen, Gem, Plug,
 } from 'lucide-react'
 import {
   createTradingBot, getMyBots, getBotOrders,
@@ -21,6 +21,7 @@ import {
 import { DCA_PAIRS, PRECIOUS_METALS_PAIRS, PRECIOUS_METALS_EXCHANGES, FOREX_PAIRS, META_TRADER_PLATFORMS, type DcaConfig } from '@/lib/trading-bot-constants'
 import { SUPPORTED_EXCHANGES } from '@/lib/exchange-constants'
 import { BotAiAdvisorModal } from '@/components/bot-ai-advisor-modal'
+import { MetaTraderConnectWizard } from '@/components/metatrader-connect-wizard'
 
 // ─── Types ──────────────────────────────────────────────────────────────────────
 
@@ -889,6 +890,7 @@ function MetaTraderBotModal({
   const [tab, setTab] = useState<'strategies' | 'custom'>('strategies')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [showConnectWizard, setShowConnectWizard] = useState(false)
 
   const filteredAccounts = accounts.filter(a => a.exchange === platform)
   const maxInvestment = cfg.baseOrderSize + cfg.safetyOrderSize * cfg.maxSafetyOrders
@@ -1085,6 +1087,13 @@ function MetaTraderBotModal({
                       <option key={a.id} value={a.id}>{a.label ?? a.exchange}</option>
                     ))}
                   </select>
+                  {filteredAccounts.length === 0 && (
+                    <button type="button" onClick={() => setShowConnectWizard(true)}
+                      className="w-full mt-2 flex items-center gap-2 text-left p-2.5 rounded-lg bg-blue-500/5 border border-blue-500/20 hover:bg-blue-500/10 transition-colors">
+                      <Plug className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                      <span className="text-blue-300 text-xs font-semibold">No {platform.toUpperCase()} account connected — connect one now</span>
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -1148,8 +1157,12 @@ function MetaTraderBotModal({
               <div className="flex items-start gap-2.5 bg-blue-500/5 border border-blue-500/20 rounded-xl px-4 py-3">
                 <Shield className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
                 <p className="text-blue-300/80 text-xs leading-relaxed">
-                  MT4/MT5 bots execute via an EA-compatible signal bridge to your broker terminal. Ensure your MetaTrader account
-                  is connected in the <strong>Exchanges</strong> tab and auto-trading is enabled before going live.
+                  MT4/MT5 bots execute via an EA-compatible signal bridge to your broker terminal, since MetaTrader has no
+                  public REST API. {filteredAccounts.length === 0 ? (
+                    <>Use the <button type="button" onClick={() => setShowConnectWizard(true)} className="underline font-semibold hover:text-blue-200">step-by-step connect wizard</button> to link your broker account and enable Algo Trading before going live.</>
+                  ) : (
+                    <>Make sure your terminal is open and Algo Trading is enabled — bots can&apos;t signal a closed terminal.</>
+                  )}
                 </p>
               </div>
 
@@ -1174,6 +1187,13 @@ function MetaTraderBotModal({
           </form>
         )}
       </Card>
+
+      {showConnectWizard && (
+        <MetaTraderConnectWizard
+          onClose={() => setShowConnectWizard(false)}
+          onConnected={() => { onCreate(); setShowConnectWizard(false) }}
+        />
+      )}
     </div>
   )
 }
