@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import {
@@ -22,6 +22,7 @@ import { DCA_PAIRS, PRECIOUS_METALS_PAIRS, PRECIOUS_METALS_EXCHANGES, FOREX_PAIR
 import { SUPPORTED_EXCHANGES } from '@/lib/exchange-constants'
 import { BotAiAdvisorModal } from '@/components/bot-ai-advisor-modal'
 import { MetaTraderConnectWizard } from '@/components/metatrader-connect-wizard'
+import { StrategyExplainerModal } from '@/components/strategy-explainer-modal'
 
 // ─── Types ──────────────────────────────────────────────────────────────────────
 
@@ -578,6 +579,7 @@ function GoldSilverBotModal({
   const [tab, setTab] = useState<'strategies' | 'custom'>('strategies')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [explainStrategy, setExplainStrategy] = useState<typeof GOLD_SILVER_STRATEGIES[number] | null>(null)
 
   const filteredAccounts = accounts.filter(a => a.exchange === customExchange)
   const maxInvestment = cfg.baseOrderSize + cfg.safetyOrderSize * cfg.maxSafetyOrders
@@ -617,6 +619,15 @@ function GoldSilverBotModal({
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-start justify-center p-4 overflow-y-auto">
+      {explainStrategy && (
+        <StrategyExplainerModal
+          strategyId={explainStrategy.id}
+          name={explainStrategy.name}
+          icon={<span>{explainStrategy.icon}</span>}
+          stats={explainStrategy.stats}
+          onClose={() => setExplainStrategy(null)}
+        />
+      )}
       <Card className="bg-slate-900 border-slate-700 w-full max-w-3xl my-8">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-slate-800">
@@ -704,12 +715,19 @@ function GoldSilverBotModal({
                       ))}
                     </div>
                   </div>
-                  <div className="px-4 pb-4">
+                  <div className="px-4 pb-4 flex gap-2">
                     <button
                       onClick={e => { e.stopPropagation(); applyStrategy(strat) }}
-                      className="w-full py-2 rounded-lg bg-yellow-500/10 border border-yellow-500/25 text-yellow-300 text-xs font-bold hover:bg-yellow-500/20 transition-colors"
+                      className="flex-1 py-2 rounded-lg bg-yellow-500/10 border border-yellow-500/25 text-yellow-300 text-xs font-bold hover:bg-yellow-500/20 transition-colors"
                     >
                       Deploy This Strategy
+                    </button>
+                    <button
+                      onClick={e => { e.stopPropagation(); setExplainStrategy(strat) }}
+                      className="px-3 py-2 rounded-lg border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                      aria-label={`Learn how ${strat.name} works`}
+                    >
+                      <BookOpen className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </Card>
@@ -891,6 +909,7 @@ function MetaTraderBotModal({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [showConnectWizard, setShowConnectWizard] = useState(false)
+  const [explainStrategy, setExplainStrategy] = useState<typeof META_TRADER_STRATEGIES[number] | null>(null)
 
   const filteredAccounts = accounts.filter(a => a.exchange === platform)
   const maxInvestment = cfg.baseOrderSize + cfg.safetyOrderSize * cfg.maxSafetyOrders
@@ -930,6 +949,15 @@ function MetaTraderBotModal({
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-start justify-center p-4 overflow-y-auto">
+      {explainStrategy && (
+        <StrategyExplainerModal
+          strategyId={explainStrategy.id}
+          name={explainStrategy.name}
+          icon={<span>{explainStrategy.icon}</span>}
+          stats={explainStrategy.stats}
+          onClose={() => setExplainStrategy(null)}
+        />
+      )}
       <Card className="bg-slate-900 border-slate-700 w-full max-w-3xl my-8">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-slate-800">
@@ -1017,12 +1045,19 @@ function MetaTraderBotModal({
                       ))}
                     </div>
                   </div>
-                  <div className="px-4 pb-4">
+                  <div className="px-4 pb-4 flex gap-2">
                     <button
                       onClick={e => { e.stopPropagation(); applyStrategy(strat) }}
-                      className="w-full py-2 rounded-lg bg-blue-500/10 border border-blue-500/25 text-blue-300 text-xs font-bold hover:bg-blue-500/20 transition-colors"
+                      className="flex-1 py-2 rounded-lg bg-blue-500/10 border border-blue-500/25 text-blue-300 text-xs font-bold hover:bg-blue-500/20 transition-colors"
                     >
                       Deploy This Strategy
+                    </button>
+                    <button
+                      onClick={e => { e.stopPropagation(); setExplainStrategy(strat) }}
+                      className="px-3 py-2 rounded-lg border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                      aria-label={`Learn how ${strat.name} works`}
+                    >
+                      <BookOpen className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </Card>
@@ -1642,6 +1677,8 @@ function BotCard({ bot, onRefresh, onToast }: {
 
 function OpportunitiesPanel({ onLaunchBot }: { onLaunchBot: (id: string) => void }) {
   const [selected, setSelected] = useState<string | null>(null)
+  const [explainId, setExplainId] = useState<string | null>(null)
+  const explainOpp = explainId ? OPPORTUNITY_TYPES.find(o => o.id === explainId) : null
 
   return (
     <div className="space-y-5">
@@ -1649,6 +1686,16 @@ function OpportunitiesPanel({ onLaunchBot }: { onLaunchBot: (id: string) => void
         <h3 className="text-white font-bold text-base">Bot Opportunities</h3>
         <p className="text-slate-500 text-sm mt-1">Choose a bot type that matches your trading style and risk appetite.</p>
       </div>
+
+      {explainOpp && (
+        <StrategyExplainerModal
+          strategyId={explainOpp.id}
+          name={explainOpp.name}
+          icon={<explainOpp.icon className={`w-5 h-5 ${explainOpp.color}`} />}
+          stats={{ risk: explainOpp.risk }}
+          onClose={() => setExplainId(null)}
+        />
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {OPPORTUNITY_TYPES.map(opp => {
@@ -1713,6 +1760,12 @@ function OpportunitiesPanel({ onLaunchBot }: { onLaunchBot: (id: string) => void
                       </div>
                     ))}
                   </div>
+                  <button
+                    onClick={e => { e.stopPropagation(); setExplainId(opp.id) }}
+                    className="w-full flex items-center justify-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-white border border-slate-700 hover:border-slate-600 rounded-lg py-2 transition-colors"
+                  >
+                    <BookOpen className="w-3.5 h-3.5" /> How This Strategy Works
+                  </button>
                   {opp.id === 'dca' ? (
                     <Button onClick={e => { e.stopPropagation(); onLaunchBot('dca') }}
                       className="w-full bg-amber-500 hover:bg-amber-400 text-black font-bold gap-2 mt-2">
@@ -1756,8 +1809,20 @@ function StrategiesPanel({ accounts, onLaunch, onLaunchGoldSilver, onLaunchMetaT
   onLaunchGoldSilver: () => void
   onLaunchMetaTrader: () => void
 }) {
+  const [explain, setExplain] = useState<{ id: string; name: string; icon?: ReactNode; stats?: { risk?: string; monthly?: string; winRate?: string } } | null>(null)
+
   return (
     <div className="space-y-6">
+      {explain && (
+        <StrategyExplainerModal
+          strategyId={explain.id}
+          name={explain.name}
+          icon={explain.icon}
+          stats={explain.stats}
+          onClose={() => setExplain(null)}
+        />
+      )}
+
       {/* Crypto DCA strategies */}
       <div>
         <h3 className="text-white font-bold text-base">Crypto Strategy Templates</h3>
@@ -1828,12 +1893,20 @@ function StrategiesPanel({ accounts, onLaunch, onLaunchGoldSilver, onLaunchMetaT
               </div>
             </div>
 
-            <div className="px-4 pb-4">
+            <div className="px-4 pb-4 flex gap-2">
               <Button
                 onClick={() => onLaunch({ ...strat.config, name: strat.name })}
-                className="w-full bg-amber-500 hover:bg-amber-400 text-black font-bold gap-2 text-sm"
+                className="flex-1 bg-amber-500 hover:bg-amber-400 text-black font-bold gap-2 text-sm"
               >
                 <Rocket className="w-3.5 h-3.5" /> Deploy Strategy
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setExplain({ id: strat.id, name: strat.name, icon: <span>{strat.icon}</span>, stats: strat.stats })}
+                className="border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 px-3"
+                aria-label={`Learn how ${strat.name} works`}
+              >
+                <BookOpen className="w-3.5 h-3.5" />
               </Button>
             </div>
           </Card>
@@ -1872,10 +1945,19 @@ function StrategiesPanel({ accounts, onLaunch, onLaunchGoldSilver, onLaunchMetaT
                   </div>
                 </div>
                 <p className="text-slate-400 text-xs leading-relaxed mb-2">{strat.description}</p>
-                <div className="flex items-center gap-2">
-                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-green-500/10 border border-green-500/20 text-green-400">{strat.stats.monthly}</span>
-                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">{strat.stats.winRate} WR</span>
-                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-400">{strat.stats.risk}</span>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-green-500/10 border border-green-500/20 text-green-400">{strat.stats.monthly}</span>
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">{strat.stats.winRate} WR</span>
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-400">{strat.stats.risk}</span>
+                  </div>
+                  <button
+                    onClick={e => { e.stopPropagation(); setExplain({ id: strat.id, name: strat.name, icon: <span>{strat.icon}</span>, stats: strat.stats }) }}
+                    className="p-1 rounded-md text-slate-500 hover:text-yellow-400 hover:bg-slate-800 transition-colors shrink-0"
+                    aria-label={`Learn how ${strat.name} works`}
+                  >
+                    <BookOpen className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               </div>
             </Card>
@@ -1915,10 +1997,19 @@ function StrategiesPanel({ accounts, onLaunch, onLaunchGoldSilver, onLaunchMetaT
                   </div>
                 </div>
                 <p className="text-slate-400 text-xs leading-relaxed mb-2">{strat.description}</p>
-                <div className="flex items-center gap-2">
-                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-green-500/10 border border-green-500/20 text-green-400">{strat.stats.monthly}</span>
-                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">{strat.stats.winRate} WR</span>
-                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-400">{strat.stats.risk}</span>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-green-500/10 border border-green-500/20 text-green-400">{strat.stats.monthly}</span>
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">{strat.stats.winRate} WR</span>
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-400">{strat.stats.risk}</span>
+                  </div>
+                  <button
+                    onClick={e => { e.stopPropagation(); setExplain({ id: strat.id, name: strat.name, icon: <span>{strat.icon}</span>, stats: strat.stats }) }}
+                    className="p-1 rounded-md text-slate-500 hover:text-blue-400 hover:bg-slate-800 transition-colors shrink-0"
+                    aria-label={`Learn how ${strat.name} works`}
+                  >
+                    <BookOpen className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               </div>
             </Card>
@@ -2046,7 +2137,7 @@ function OverviewPanel({ bots, onNewBot, onGoTab }: {
   )
 }
 
-// ─── Main Component ────────────────────────────────────────────────────────────────
+// ─── Main Component ────────────────────────────────────────��───────────────────────
 
 export function TradingBot() {
   const [bots, setBots] = useState<Bot[]>([])
