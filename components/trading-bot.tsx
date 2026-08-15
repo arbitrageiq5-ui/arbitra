@@ -489,6 +489,21 @@ const META_TRADER_STRATEGIES = [
     highlight: 'High win-rate, low drawdown on range days',
     popular: false,
   },
+  {
+    id: 'xau-xag-smart-averaging',
+    name: 'Gold & Silver Smart Averaging',
+    pair: 'XAU/USD',
+    platform: 'mt5',
+    platformLabel: 'MetaTrader 5',
+    icon: '🥇',
+    description: 'Our best-rated averaging (DCA) engine for precious metals. Scales into Gold with wide, volatility-adjusted safety orders instead of one fixed entry, lowering the average cost basis on every dip and exiting the whole basket in profit together. Switch the pair to XAG/USD to run the identical logic on Silver.',
+    strategy: 'Smart Averaging (Wide-Grid DCA)',
+    config: { baseOrderSize: 220, safetyOrderSize: 160, maxSafetyOrders: 6, priceDeviationPct: 0.8, takeProfitPct: 2.0, safetyOrderVolumePct: 1.4, interval: '4h' },
+    stats: { risk: 'Medium', monthly: '+9–20%', winRate: '88%' },
+    tags: ['XAU/USD', 'XAG/USD', 'Gold', 'Silver', 'Averaging', 'DCA', 'MT5'],
+    highlight: 'Top-rated averaging strategy — works on both Gold and Silver',
+    popular: true,
+  },
 ] as const
 
 // ─── Helpers ────────────────────────────────────────────────────────────────────

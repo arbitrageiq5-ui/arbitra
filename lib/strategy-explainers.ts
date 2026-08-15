@@ -482,4 +482,44 @@ export const STRATEGY_EXPLAINERS: Record<string, StrategyExplainer> = {
     pros: ['High win rate (83%) with low drawdown on range days', 'Low risk, consistent small gains'],
     cons: ['Underperforms if AUD/USD enters a genuine sustained trend rather than reverting'],
   },
+  'xau-xag-smart-averaging': {
+    tagline: 'The flagship averaging engine for Gold and Silver — lower your cost basis on every dip, exit the whole basket together.',
+    howItWorks:
+      'This is a wide-grid DCA (Dollar-Cost Averaging) strategy purpose-built for precious metals volatility. Instead of one fixed entry, it opens a base order on XAU/USD (or XAG/USD if you switch the pair) then automatically layers in safety orders as price drifts lower, each spaced 0.8% apart and sized up by a 1.4x multiplier. Every safety order pulls the volume-weighted average entry price down, so the whole basket only needs a modest bounce — not a full recovery — to close in profit. Gold and Silver both trend in long, grinding waves with sharp intraday pullbacks, which is exactly the price behavior this averaging logic is designed to harvest.',
+    entryRules: [
+      'Base order of $220 fires at market when the bot starts',
+      'Safety order fires each time price falls 0.8% below the last filled order, up to 6 safety orders',
+      'Each new safety order is sized 1.4x larger than the previous one, weighting the average entry toward the deepest, most attractive prices',
+      'Runs on the 4h timeframe to filter out intraday noise and only react to meaningful pullbacks',
+    ],
+    exitRules: [
+      'Entire basket closes together once price rises 2.0% above the volume-weighted average entry of all filled orders',
+      'A fresh cycle starts immediately after a successful close — no manual restart needed',
+      'Manual stop closes the open position at the current market price',
+    ],
+    riskManagement: [
+      'Max Safety Orders (6) caps total capital exposure per cycle — you always know the worst-case deployed size upfront',
+      'Wide 0.8% spacing between safety orders avoids over-committing capital on shallow, insignificant dips',
+      'Best run with a Broker Account connected via the MT4/MT5 bridge and Algo Trading enabled so orders execute even if you step away',
+      'Consider running Gold and Silver as two separate bot instances (one per pair) rather than doubling size on a single pair, to diversify metal-specific risk',
+    ],
+    bestConditions: [
+      'Long-term bullish or range-bound bias on precious metals — this strategy is not designed to fight a sustained one-directional crash',
+      'Periods of elevated Gold/Silver volatility (rate-decision weeks, dollar weakness, safe-haven demand) that create the frequent pullbacks the averaging ladder needs',
+      'Traders who want to accumulate a metals position gradually rather than timing a single entry',
+    ],
+    example:
+      'You start the bot on XAU/USD with a $220 base order at $1,950. Gold pulls back to $1,934 (−0.8%), triggering a $308 safety order (1.4x sizing); it drifts further to $1,919, triggering a $431 order. Your blended average is now roughly $1,928. Gold then reverses and rises 2% above that average to about $1,967 — the bot closes the entire basket in profit and immediately restarts a fresh cycle, ready for the next dip.',
+    pros: [
+      'Highest win rate in the MT4/MT5 lineup (88%) — small bounces are enough to close a cycle in profit',
+      'One config works identically on both XAU/USD and XAG/USD — just swap the pair',
+      'Removes the emotional pressure of picking a single "perfect" entry on a volatile metal',
+      'Fully automated once your MetaTrader account is bridged — no manual order placement needed',
+    ],
+    cons: [
+      'Can tie up meaningfully more capital than a single-entry strategy during a deep, sustained drawdown',
+      'Not designed for a sharp one-directional crash in Gold or Silver with no pullbacks to average into',
+      'Wider take-profit (2.0%) means cycles can take longer to close than tighter scalping strategies',
+    ],
+  },
 }
