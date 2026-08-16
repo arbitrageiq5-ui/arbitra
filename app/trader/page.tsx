@@ -21,10 +21,10 @@ export default async function TraderPage() {
   if (role === 'protrader') redirect('/protrader')
   if (role === 'viewer') redirect('/opportunities')
 
-  // Fetch fresh isActivated directly from DB — the session object does not
-  // include custom fields like isActivated so we always query the DB here.
+  // Fetch fresh isActivated + createdAt directly from DB — the session object
+  // does not include custom fields like isActivated so we always query the DB here.
   const [dbUser] = await db
-    .select({ isActivated: userTable.isActivated })
+    .select({ isActivated: userTable.isActivated, createdAt: userTable.createdAt })
     .from(userTable)
     .where(eq(userTable.id, session.user.id))
     .limit(1)
@@ -37,6 +37,7 @@ export default async function TraderPage() {
         email: session.user.email,
       }}
       isActivated={dbUser?.isActivated ?? false}
+      createdAt={(dbUser?.createdAt ?? new Date()).toISOString()}
     />
   )
 }

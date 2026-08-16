@@ -58,7 +58,7 @@ const STATUS_META = {
   rejected:  { icon: XCircle,        color: 'text-red-400',    bg: 'bg-red-500/10 border-red-500/20',       label: 'Rejected' },
 }
 
-export function TraderClient({ user, isActivated }: { user: { id: string; name?: string | null; email?: string }; isActivated: boolean }) {
+export function TraderClient({ user, isActivated, createdAt }: { user: { id: string; name?: string | null; email?: string }; isActivated: boolean; createdAt: string }) {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<Tab>('opportunities')
 
@@ -233,7 +233,7 @@ export function TraderClient({ user, isActivated }: { user: { id: string; name?:
   return (
     <div className="flex flex-col min-h-screen bg-[#050816] font-sans">
       {/* Activation Fee Modal */}
-      <ActivationFeeModal serverIsActivated={isActivated} />
+      <ActivationFeeModal serverIsActivated={isActivated} createdAt={createdAt} />
 
       {/* AI Arbitrage Advisor Modal */}
       <TraderAiArbitrageModal

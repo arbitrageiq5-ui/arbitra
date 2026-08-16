@@ -29,12 +29,19 @@ const NETWORK_META: Record<string, { color: string; bg: string; border: string; 
 
 
 
-export function ActivationFeeModal({ serverIsActivated }: { serverIsActivated: boolean }) {
+const GRACE_PERIOD_DAYS = 7
+const GRACE_PERIOD_MS = GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000
+
+export function ActivationFeeModal({ serverIsActivated, createdAt }: { serverIsActivated: boolean; createdAt: string }) {
   const router = useRouter()
   const [status, setStatus] = useState<ActivationStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [dismissed, setDismissed] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
+
+  const registeredAt = new Date(createdAt).getTime()
+  const msSinceRegistration = Date.now() - registeredAt
+  const inGracePeriod = msSinceRegistration < GRACE_PERIOD_MS
 
   const handleSignOut = async () => {
     setSigningOut(true)
@@ -65,10 +72,11 @@ export function ActivationFeeModal({ serverIsActivated }: { serverIsActivated: b
   }
 
   useEffect(() => {
-    // If the server already confirmed activated, skip the async fetch entirely
-    if (serverIsActivated) return
+    // If the server already confirmed activated, or the 7-day grace period
+    // hasn't elapsed yet, skip the async fetch entirely — nothing to show.
+    if (serverIsActivated || inGracePeriod) return
     load()
-  }, [serverIsActivated])
+  }, [serverIsActivated, inGracePeriod])
 
   const load = async () => {
     setLoading(true)
@@ -84,6 +92,10 @@ export function ActivationFeeModal({ serverIsActivated }: { serverIsActivated: b
 
   // Never show for already-activated traders (server-authoritative check)
   if (serverIsActivated) return null
+
+  // Full unrestricted access for the first 7 days after registration —
+  // no activation prompts at all during the grace period.
+  if (inGracePeriod) return null
 
   // Don't show while loading
   if (loading) return null
@@ -136,7 +148,9 @@ export function ActivationFeeModal({ serverIsActivated }: { serverIsActivated: b
             </div>
             <div>
               <h2 className="text-white font-bold text-lg leading-tight">Account Activation Required</h2>
-              <p className="text-slate-400 text-xs mt-0.5">One-time fee to unlock your Trader Dashboard</p>
+              <p className="text-slate-400 text-xs mt-0.5">
+                Your {GRACE_PERIOD_DAYS}-day free trial has ended — one-time fee to keep using the Trader Dashboard
+              </p>
             </div>
           </div>
         </div>

@@ -13,9 +13,10 @@ type Mode = 'arbitrage' | 'trading'
 interface ProtraderClientProps {
   user: { id: string; name?: string | null; email?: string }
   isActivated: boolean
+  createdAt: string
 }
 
-export function ProtraderClient({ user, isActivated }: ProtraderClientProps) {
+export function ProtraderClient({ user, isActivated, createdAt }: ProtraderClientProps) {
   const [mode, setMode] = useState<Mode>('arbitrage')
   const router = useRouter()
 
@@ -112,7 +113,7 @@ export function ProtraderClient({ user, isActivated }: ProtraderClientProps) {
           </div>
         ) : (
           /* Full trader dashboard — identical to /trader */
-          <TraderClient user={user} isActivated={isActivated} />
+          <TraderClient user={user} isActivated={isActivated} createdAt={createdAt} />
         )}
       </div>
     </div>

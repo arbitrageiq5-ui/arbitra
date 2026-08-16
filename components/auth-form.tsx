@@ -46,7 +46,7 @@ function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [selectedRole, setSelectedRole] = useState<UserRole>('viewer')
+  const [selectedRole, setSelectedRole] = useState<UserRole>('trader')
   const [referralCode, setReferralCode] = useState('')
   const [referralValid, setReferralValid] = useState<boolean | null>(null)
   const [referralChecking, setReferralChecking] = useState(false)
@@ -222,7 +222,7 @@ function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
               <div className="flex flex-col gap-3 pb-2 border-b border-slate-200">
                 <Label className="text-base font-semibold">Select your role</Label>
                 <div className="space-y-2">
-                  {(['viewer', 'trader'] as const).map((role) => (
+                  {(['trader', 'viewer'] as const).map((role) => (
                     <label
                       key={role}
                       className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${

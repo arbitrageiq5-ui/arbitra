@@ -22,7 +22,7 @@ export default async function ProtraderPage() {
   if (role !== 'protrader') redirect('/unauthorized')
 
   const [dbUser] = await db
-    .select({ isActivated: userTable.isActivated })
+    .select({ isActivated: userTable.isActivated, createdAt: userTable.createdAt })
     .from(userTable)
     .where(eq(userTable.id, session.user.id))
     .limit(1)
@@ -35,6 +35,7 @@ export default async function ProtraderPage() {
         email: session.user.email,
       }}
       isActivated={dbUser?.isActivated ?? false}
+      createdAt={(dbUser?.createdAt ?? new Date()).toISOString()}
     />
   )
 }
