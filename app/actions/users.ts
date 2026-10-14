@@ -3,7 +3,7 @@
 import { auth } from '@/lib/auth'
 import { db, pool } from '@/lib/db'
 import { user, session as sessionTable } from '@/lib/db/schema'
-import { eq, sql } from 'drizzle-orm'
+import { desc, eq, sql } from 'drizzle-orm'
 import { headers } from 'next/headers'
 import { UserRole } from '@/lib/roles'
 import { logAudit, AuditActions } from '@/lib/audit'
@@ -46,7 +46,19 @@ export async function getAllUsers() {
     throw new Error('Only admins can view all users')
   }
 
-  const users = await db.select().from(user).orderBy(user.createdAt)
+  const [users, sessions] = await Promise.all([
+    db.select().from(user).orderBy(user.createdAt),
+    db.select({ userId: sessionTable.userId, createdAt: sessionTable.createdAt, ipAddress: sessionTable.ipAddress })
+      .from(sessionTable)
+      .orderBy(desc(sessionTable.createdAt)),
+  ])
+
+  const latestSessionByUser = new Map<string, { createdAt: Date; ipAddress: string | null }>()
+  for (const session of sessions) {
+    if (!latestSessionByUser.has(session.userId)) {
+      latestSessionByUser.set(session.userId, session)
+    }
+  }
 
   return users.map((u) => ({
     id: u.id,
@@ -54,6 +66,8 @@ export async function getAllUsers() {
     email: u.email,
     role: u.role,
     createdAt: u.createdAt,
+    lastLoginAt: u.lastLoginAt ?? latestSessionByUser.get(u.id)?.createdAt ?? null,
+    lastLoginIp: u.lastLoginIp ?? latestSessionByUser.get(u.id)?.ipAddress ?? null,
   }))
 }
 

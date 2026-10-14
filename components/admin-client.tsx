@@ -11,7 +11,7 @@ import {
   CheckCircle2, XCircle, Clock, AlertCircle, Pencil,
   Zap, Shield, BarChart3, RefreshCw, UserPlus, X, Eye, EyeOff, KeyRound,
   TrendingUp, Activity, PauseCircle, StopCircle, DollarSign, Gift, ArrowUpCircle,
-  Sparkles,
+  Sparkles, LogIn, Wifi,
 } from 'lucide-react'
 
 import AdminArbitragePanel from '@/components/admin-arbitrage-panel'
@@ -31,7 +31,10 @@ import {
 type Tab = 'users' | 'deposit-addresses' | 'fund-requests' | 'auto-trade' | 'activation-fees' | 'withdrawals' | 'wallets' | 'arbitrage' | 'ai-support'
 type Network = 'TRC20' | 'BEP20' | 'ERC20'
 
-interface User { id: string; name: string | null; email: string; role: string; createdAt: Date }
+interface User {
+  id: string; name: string | null; email: string; role: string; createdAt: Date
+  lastLoginAt: Date | string | null; lastLoginIp: string | null
+}
 interface DepositAddress { id: number; network: string; address: string; label: string | null; isActive: boolean; createdAt: Date }
 interface FundRequest {
   id: number; userId: string; network: string; amount: string; txHash: string | null
@@ -593,7 +596,7 @@ export default function AdminClient() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-slate-800 bg-slate-950/40">
-                      {['Name', 'Email', 'Role', 'Password', 'Joined', 'Actions'].map(h => (
+                      {['Name', 'Email', 'Role', 'Password', 'Joined', 'Last Login', 'Login IP', 'Actions'].map(h => (
                         <th key={h} className="px-5 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">{h}</th>
                       ))}
                     </tr>
@@ -646,6 +649,26 @@ export default function AdminClient() {
                           )}
                         </td>
                         <td className="px-5 py-3.5 text-slate-500 text-xs">{new Date(u.createdAt).toLocaleDateString()}</td>
+                        <td className="px-5 py-3.5 text-xs">
+                          {u.lastLoginAt ? (
+                            <div className="flex items-center gap-1.5 text-slate-300 whitespace-nowrap" title={new Date(u.lastLoginAt).toLocaleString()}>
+                              <LogIn className="w-3.5 h-3.5 text-emerald-400" />
+                              {new Date(u.lastLoginAt).toLocaleString()}
+                            </div>
+                          ) : (
+                            <span className="text-slate-600 italic">Never</span>
+                          )}
+                        </td>
+                        <td className="px-5 py-3.5 text-xs">
+                          {u.lastLoginIp ? (
+                            <div className="flex items-center gap-1.5 text-slate-400 font-mono whitespace-nowrap">
+                              <Wifi className="w-3.5 h-3.5 text-blue-400" />
+                              {u.lastLoginIp}
+                            </div>
+                          ) : (
+                            <span className="text-slate-600 italic">Unavailable</span>
+                          )}
+                        </td>
                         <td className="px-5 py-3.5">
                           <div className="flex items-center gap-1">
                             <Button
