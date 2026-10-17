@@ -1294,10 +1294,11 @@ function CreateBotModal({
     setSaving(true)
     try {
       await createTradingBot({
-        name: name || `${pair.base} DCA Bot`,
+        name: name || `${pair.base} ${marketType === 'futures' ? `${cfg.leverage ?? 1}x Futures` : 'Spot'} DCA Bot`,
         strategy: 'dca', marketType, exchange,
         exchangeAccountId: accountId, symbol,
-        baseCurrency: pair.base, quoteCurrency: pair.quote, config: cfg,
+        baseCurrency: pair.base, quoteCurrency: pair.quote,
+        config: { ...cfg, leverage: marketType === 'futures' ? Math.max(1, Math.min(10, cfg.leverage ?? 1)) : 1 },
       })
       onCreate(); onClose()
     } catch (err) {
@@ -1441,7 +1442,7 @@ function CreateBotModal({
                 </div>
               </div>
             </div>
-            <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4 grid grid-cols-3 gap-3">
+            <div className={`bg-slate-950/60 border rounded-xl p-4 grid ${marketType === 'futures' ? 'grid-cols-4' : 'grid-cols-3'} gap-3`}>
               <div className="text-center">
                 <p className="text-slate-500 text-xs">Max Investment</p>
                 <p className="text-white font-bold text-lg">${maxInvestment.toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
@@ -1450,6 +1451,12 @@ function CreateBotModal({
                 <p className="text-slate-500 text-xs">Safety Orders</p>
                 <p className="text-amber-400 font-bold text-lg">{cfg.maxSafetyOrders}</p>
               </div>
+              {marketType === 'futures' && (
+                <div className="text-center border-r border-slate-800">
+                  <p className="text-slate-500 text-xs">Leverage</p>
+                  <p className="text-orange-400 font-bold text-lg">{cfg.leverage ?? 1}x</p>
+                </div>
+              )}
               <div className="text-center">
                 <p className="text-slate-500 text-xs">Target Profit/Cycle</p>
                 <p className="text-green-400 font-bold text-lg">${estProfit.toFixed(2)}</p>
