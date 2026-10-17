@@ -157,7 +157,7 @@ export function Registration() {
       <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#00D4FF]/20 to-transparent" />
       <div className="absolute top-1/2 right-0 w-[500px] h-[500px] bg-[#00D4FF]/5 blur-[120px] pointer-events-none" />
 
-      <div className="max-w-7xl mx-auto px-6 relative z-10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10">
         <div className="grid lg:grid-cols-2 gap-16 items-center">
           {/* Left: benefits */}
           <motion.div

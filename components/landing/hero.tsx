@@ -156,7 +156,7 @@ export function Hero() {
       <Orbs />
       <ParticleField />
 
-      <div className="relative z-10 max-w-7xl mx-auto px-6 w-full">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 w-full min-w-0">
         <div className="text-center max-w-4xl mx-auto">
           {/* Badge */}
           <motion.div

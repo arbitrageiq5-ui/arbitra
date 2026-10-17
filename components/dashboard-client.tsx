@@ -69,7 +69,7 @@ export function DashboardClient({ user }: { user: any }) {
     <div className="flex flex-col min-h-screen">
       {/* Header */}
       <header className="border-b border-slate-700 bg-slate-800/50 backdrop-blur-sm sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2">
           <div className="flex items-center gap-3">
             <Zap className="w-8 h-8 text-amber-400" />
             <h1 className="text-2xl font-bold text-white">Arbitrage IQ</h1>
@@ -160,7 +160,7 @@ export function DashboardClient({ user }: { user: any }) {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 max-w-7xl mx-auto px-6 py-8 w-full">
+      <main className="flex-1 max-w-7xl mx-auto px-3 sm:px-6 py-5 sm:py-8 w-full min-w-0">
         {/* Stats Row */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           <Card className="bg-slate-800 border-slate-700 p-6">

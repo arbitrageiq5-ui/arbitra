@@ -633,7 +633,7 @@ function GoldSilverBotModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-start justify-center p-4 overflow-y-auto">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-start justify-center p-2 sm:p-4 overflow-y-auto">
       {explainStrategy && (
         <StrategyExplainerModal
           strategyId={explainStrategy.id}
@@ -963,7 +963,7 @@ function MetaTraderBotModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-start justify-center p-4 overflow-y-auto">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-start justify-center p-2 sm:p-4 overflow-y-auto">
       {explainStrategy && (
         <StrategyExplainerModal
           strategyId={explainStrategy.id}
@@ -1307,7 +1307,7 @@ function CreateBotModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-start justify-center p-4 overflow-y-auto">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-start justify-center p-2 sm:p-4 overflow-y-auto">
       <Card className="bg-slate-900 border-slate-700 w-full max-w-2xl my-8">
         <div className="flex items-center justify-between px-6 py-5 border-b border-slate-800">
           <div className="flex items-center gap-3">
