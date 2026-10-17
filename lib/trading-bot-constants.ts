@@ -4,6 +4,7 @@
 export const DCA_PAIRS = [
   { symbol: 'BTC/USDT',   base: 'BTC',   quote: 'USDT', name: 'Bitcoin' },
   { symbol: 'ETH/USDT',   base: 'ETH',   quote: 'USDT', name: 'Ethereum' },
+  { symbol: 'XAU/USDT',   base: 'XAU',   quote: 'USDT', name: 'Gold' },
   { symbol: 'BNB/USDT',   base: 'BNB',   quote: 'USDT', name: 'BNB' },
   { symbol: 'SOL/USDT',   base: 'SOL',   quote: 'USDT', name: 'Solana' },
   { symbol: 'XRP/USDT',   base: 'XRP',   quote: 'USDT', name: 'XRP' },
