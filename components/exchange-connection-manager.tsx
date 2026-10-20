@@ -71,6 +71,11 @@ export function ExchangeConnectionManager() {
     try {
       const accs = await getExchangeAccounts()
       setAccounts(accs as Account[])
+    } catch (error) {
+      // Authentication can settle after the dashboard shell mounts.
+      // Keep the panel usable instead of surfacing an unhandled server-action error.
+      console.warn('[exchange-connection] Unable to load accounts', error)
+      setAccounts([])
     } finally {
       setLoading(false)
     }

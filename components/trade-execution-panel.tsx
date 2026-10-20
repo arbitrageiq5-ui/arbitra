@@ -84,14 +84,21 @@ export function TradeExecutionPanel() {
   const load = useCallback(async () => {
     setLoadingAccounts(true)
     setLoadingHistory(true)
-    const [accs, hist] = await Promise.all([
-      getExchangeAccounts(),
-      getTradeHistory(50),
-    ])
-    setAccounts(accs as Account[])
-    setHistory(hist as TradeOrder[])
-    setLoadingAccounts(false)
-    setLoadingHistory(false)
+    try {
+      const [accs, hist] = await Promise.all([
+        getExchangeAccounts(),
+        getTradeHistory(50),
+      ])
+      setAccounts(accs as Account[])
+      setHistory(hist as TradeOrder[])
+    } catch (error) {
+      console.warn('[trade-execution] Unable to load account data', error)
+      setAccounts([])
+      setHistory([])
+    } finally {
+      setLoadingAccounts(false)
+      setLoadingHistory(false)
+    }
   }, [])
 
   useEffect(() => { load() }, [load])

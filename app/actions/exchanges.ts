@@ -17,6 +17,11 @@ async function getUserId(): Promise<string> {
   return session.user.id
 }
 
+async function getOptionalUserId(): Promise<string | null> {
+  const session = await auth.api.getSession({ headers: await headers() })
+  return session?.user?.id ?? null
+}
+
 async function getCCXT(): Promise<typeof import('ccxt')> {
   return (await import('ccxt')) as unknown as typeof import('ccxt')
 }
@@ -100,7 +105,11 @@ export async function testExchangeConnection(accountId: number): Promise<{ ok: b
 
 // ─── Get All Connected Accounts ─────────────────────────────────────────────
 export async function getExchangeAccounts() {
-  const userId = await getUserId()
+  // Read-only dashboard surfaces may render before authentication is available.
+  // Treat that state as an empty account list; mutations remain protected by getUserId().
+  const userId = await getOptionalUserId()
+  if (!userId) return []
+
   return db
     .select()
     .from(exchangeAccounts)
