@@ -222,8 +222,8 @@ export function AuthForm({ mode, embedded = false }: { mode: 'sign-in' | 'sign-u
                 />
               </div>
               <fieldset className="flex flex-col gap-3 border-b border-slate-200 pb-4">
-                <legend className="text-sm font-semibold text-slate-900">Choose your trading workspace</legend>
-                <p className="text-xs text-slate-500">You can start with the plan that matches how hands-on you want to be.</p>
+                <legend className="text-sm font-semibold text-slate-900">Choose your AlgoBot workspace</legend>
+                <p className="text-xs text-slate-500">Build, automate, and monitor your strategy with the level of control you need.</p>
                 <div className="grid gap-3 sm:grid-cols-2">
                   {(['trader', 'protrader'] as const).map((role) => {
                     const isPro = role === 'protrader'
@@ -254,8 +254,18 @@ export function AuthForm({ mode, embedded = false }: { mode: 'sign-in' | 'sign-u
                           {isPro && <span className="rounded-full bg-cyan-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-cyan-700">Advanced</span>}
                         </div>
                         <div>
-                          <p className="font-semibold text-slate-900">{getRoleLabel(role)}</p>
+                          <p className="font-semibold text-slate-900">{isPro ? 'Pro Algo Trader' : 'AlgoBot Trader'}</p>
                           <p className="mt-1 text-xs leading-5 text-slate-600">{getRoleDescription(role)}</p>
+                          <ul className="mt-3 flex flex-col gap-1 text-[11px] text-slate-500">
+                            {(isPro
+                              ? ['Advanced arbitrage and futures', 'Higher control over risk and execution', 'Detailed bot performance insights']
+                              : ['DCA, grid, and arbitrage bots', 'Connect and manage exchanges', 'Simple controls with live analytics']
+                            ).map((feature) => (
+                              <li key={feature} className="flex items-center gap-1.5">
+                                <span className="size-1.5 rounded-full bg-cyan-500" /> {feature}
+                              </li>
+                            ))}
+                          </ul>
                         </div>
                       </label>
                     )
@@ -390,8 +400,8 @@ export function AuthForm({ mode, embedded = false }: { mode: 'sign-in' | 'sign-u
             {loading
               ? 'Please wait...'
               : isSignUp
-                ? 'Create account'
-                : 'Sign in'}
+          ? 'Create AlgoBot account'
+          : 'Sign in'}
           </Button>
         </form>
 

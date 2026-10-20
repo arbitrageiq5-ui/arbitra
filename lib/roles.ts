@@ -134,8 +134,8 @@ export function getRoleLabel(role: string): string {
 export function getRoleDescription(role: UserRole): string {
   const descriptions: Record<UserRole, string> = {
     viewer: 'Can view opportunities, analytics, and portfolio. Read-only access.',
-    trader: 'Can execute trades, manage exchange accounts, and view all analytics.',
-    protrader: 'Full arbitrage panel access (all Admin arbitrage features) plus all Trader bot & trading features. Cannot manage users or change roles.',
+    trader: 'AlgoBot Trader workspace with DCA, grid, and arbitrage automation, exchange connections, execution controls, and performance analytics.',
+    protrader: 'Professional AlgoBot workspace with advanced arbitrage, leveraged futures, bot risk controls, execution logs, and all Trader features. Cannot manage users or change roles.',
     admin: 'Full system access including user management, audit logs, and configuration.',
   }
   return descriptions[role]
