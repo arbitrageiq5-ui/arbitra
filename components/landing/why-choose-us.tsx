@@ -84,7 +84,7 @@ export function WhyChooseUs() {
           className="text-center mb-16"
         >
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#00D4FF]/20 bg-[#00D4FF]/5 text-[#00D4FF] text-xs font-medium mb-4">
-            Why ArbitrageIQ
+            Why Algobot
           </div>
           <h2 className="text-4xl md:text-5xl font-bold text-white mb-4 text-balance">
             Built for Serious Traders

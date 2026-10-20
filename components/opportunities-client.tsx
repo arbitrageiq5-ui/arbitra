@@ -207,7 +207,7 @@ export function OpportunitiesClient({ user }: { user: { name?: string | null; em
               <div className="w-7 h-7 rounded bg-[#00D4FF]/20 flex items-center justify-center">
                 <Activity className="w-4 h-4 text-[#00D4FF]" />
               </div>
-              <span className="text-white font-bold text-lg">Arbitrage IQ</span>
+              <span className="text-white font-bold text-lg">AlgoBot</span>
             </div>
             <span className="hidden md:block text-slate-600">/</span>
             <span className="hidden md:block text-slate-400 text-sm">Market Opportunities</span>

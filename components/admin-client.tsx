@@ -465,7 +465,7 @@ export default function AdminClient() {
               <Shield className="w-5 h-5 text-red-400" />
             </div>
             <div>
-              <span className="text-white font-bold text-lg tracking-tight">Arbitrage IQ</span>
+              <span className="text-white font-bold text-lg tracking-tight">AlgoBot</span>
               <span className="text-slate-500 text-sm ml-2">Admin Panel</span>
             </div>
           </div>

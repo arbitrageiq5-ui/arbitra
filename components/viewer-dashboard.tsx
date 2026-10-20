@@ -162,7 +162,7 @@ export function ViewerDashboard({ user }: ViewerDashboardProps) {
             <div className="w-7 h-7 rounded-lg bg-[#00D4FF]/15 border border-[#00D4FF]/30 flex items-center justify-center">
               <TrendingUp className="w-4 h-4 text-[#00D4FF]" />
             </div>
-            <span className="font-bold text-white text-sm">ArbitrageIQ</span>
+            <span className="font-bold text-white text-sm">AlgoBot</span>
             <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-[#00D4FF]/10 text-[#00D4FF] border border-[#00D4FF]/20 ml-1">
               Viewer
             </span>

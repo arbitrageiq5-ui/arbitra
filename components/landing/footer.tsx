@@ -71,7 +71,7 @@ export function Footer() {
         <div className="border-t border-white/[0.06] pt-8">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <p className="text-xs text-[#98A2B3]/60">
-              &copy; 2025 ArbitrageIQ. All rights reserved.
+              &copy; 2025 Algobot. All rights reserved.
             </p>
             <p className="text-xs text-[#98A2B3]/40 max-w-lg text-right leading-relaxed">
               Crypto markets involve significant risk. Arbitrage opportunities depend on market conditions, liquidity,
