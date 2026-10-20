@@ -326,19 +326,47 @@ export function TraderClient({ user, isActivated, createdAt }: { user: { id: str
         </div>
       </header>
 
-      {/* ── Tab Navigation ─────────────────────────���───────────── */}
+      {/* ── AlgoBot quick-launch panel ───────────────────────────── */}
+      <section className="border-b border-cyan-500/10 bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.12),transparent_34rem)]">
+        <div className="max-w-screen-xl mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-start gap-3 min-w-0">
+              <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-cyan-400/10 ring-1 ring-cyan-400/25 shadow-lg shadow-cyan-500/10">
+                <Bot className="size-6 text-cyan-300" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-base sm:text-lg font-bold tracking-tight text-white">AlgoBot Trading Center</h2>
+                  <span className="rounded-full bg-emerald-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-emerald-300 ring-1 ring-emerald-400/20">Ready to automate</span>
+                </div>
+                <p className="mt-1 max-w-2xl text-xs sm:text-sm text-slate-400">Launch disciplined crypto strategies, monitor execution, and connect exchanges from one professional workspace.</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:shrink-0">
+              <button type="button" onClick={() => setActiveTab('trading-bot')} className="inline-flex items-center justify-center gap-2 rounded-xl bg-cyan-400 px-3 sm:px-4 py-2.5 text-xs sm:text-sm font-bold text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:bg-cyan-300">
+                <Bot className="size-4" /> Open AlgoBot
+              </button>
+              <button type="button" onClick={() => setActiveTab('exchanges')} className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-900/80 px-3 sm:px-4 py-2.5 text-xs sm:text-sm font-semibold text-slate-200 transition hover:border-cyan-400/50 hover:text-white">
+                <Link2 className="size-4 text-cyan-300" /> Manage Exchanges
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Tab Navigation ────────────────────────────────────────── */}
       <div className="border-b border-slate-800/60 bg-[#0a0f1e]/80 backdrop-blur-sm sticky top-14 z-30">
         <div className="max-w-screen-xl mx-auto overflow-x-auto scrollbar-none">
           <div className="flex min-w-max px-3 sm:px-4 md:px-6">
             {([
-              { key: 'wallet'         as Tab, label: 'Wallet',     icon: Wallet,          count: null },
-              { key: 'auto-trade'     as Tab, label: 'Auto Trade', icon: Zap,             count: null },
-              { key: 'trading-bot'    as Tab, label: 'Bots',       icon: Bot,             count: null },
+              { key: 'trading-bot'    as Tab, label: 'AlgoBot',    icon: Bot,             count: null },
+              { key: 'exchanges'      as Tab, label: 'Exchanges',  icon: Link2,           count: null },
               { key: 'arb-bot'        as Tab, label: 'Arb Bot',    icon: ArrowRightLeft,  count: null },
-              { key: 'passive-income' as Tab, label: 'Passive',    icon: Gift,            count: null },
+              { key: 'auto-trade'     as Tab, label: 'Auto Trade', icon: Zap,             count: null },
+              { key: 'wallet'         as Tab, label: 'Wallet',     icon: Wallet,          count: null },
               { key: 'opportunities'  as Tab, label: 'Markets',    icon: TrendingUp,      count: null },
               { key: 'trade'          as Tab, label: 'Trade',      icon: ArrowRightLeft,  count: null },
-              { key: 'exchanges'      as Tab, label: 'Exchanges',  icon: Link2,           count: null },
+              { key: 'passive-income' as Tab, label: 'Passive',    icon: Gift,            count: null },
               { key: 'funds'          as Tab, label: 'Deposits',   icon: ArrowDownCircle, count: pendingCount || null },
             ] as const).map(tab => {
               const isActive = activeTab === tab.key
@@ -348,8 +376,10 @@ export function TraderClient({ user, isActivated, createdAt }: { user: { id: str
                   onClick={() => setActiveTab(tab.key)}
                   className={`relative flex items-center gap-1.5 px-3 sm:px-4 py-3 text-xs sm:text-[13px] font-medium transition-all whitespace-nowrap border-b-2 -mb-px ${
                     isActive
-                      ? 'border-amber-500 text-amber-400'
-                      : 'border-transparent text-slate-500 hover:text-slate-300 hover:border-slate-700'
+                      ? 'border-cyan-400 text-cyan-300 bg-cyan-400/5'
+                      : tab.key === 'trading-bot' || tab.key === 'exchanges'
+                        ? 'border-transparent text-slate-300 hover:text-cyan-300 hover:border-cyan-400/50 bg-cyan-400/[0.03]'
+                        : 'border-transparent text-slate-500 hover:text-slate-300 hover:border-slate-700'
                   }`}
                 >
                   <tab.icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-amber-400' : ''}`} />
