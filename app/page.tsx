@@ -1,6 +1,7 @@
 import dynamic from 'next/dynamic'
 import { Navbar } from '@/components/landing/navbar'
 import { Hero } from '@/components/landing/hero'
+import { AuthAccessLoader } from '@/components/landing/auth-access-loader'
 
 // Skeleton placeholder shown while below-fold sections load
 function SectionSkeleton({ height = 'h-64' }: { height?: string }) {
@@ -35,6 +36,7 @@ export default function Home() {
       <Testimonials />
       <FAQ />
       <Registration />
+      <AuthAccessLoader />
       <Footer />
     </main>
   )

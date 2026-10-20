@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card } from '@/components/ui/card'
 import { getRoleLabel, getRoleDescription, UserRole } from '@/lib/roles'
-import { RefreshCw, Shield, Eye, EyeOff, ArrowLeft } from 'lucide-react'
+import { RefreshCw, Shield, Eye, EyeOff, ArrowLeft, Bot, Zap } from 'lucide-react'
 
 // Server actions are imported dynamically inside event handlers to avoid bundling them on the client
 
@@ -40,7 +40,7 @@ function generateChallenge(): CaptchaChallenge {
   return { question, answer }
 }
 
-function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
+export function AuthForm({ mode, embedded = false }: { mode: 'sign-in' | 'sign-up'; embedded?: boolean }) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [name, setName] = useState('')
@@ -186,22 +186,24 @@ function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
   }
 
   return (
-    <main className="min-h-svh bg-background flex items-center justify-center px-4">
-      <Card className="w-full max-w-sm p-6">
+    <main className={embedded ? 'w-full' : 'min-h-svh bg-background flex items-center justify-center px-4'}>
+      <Card className={embedded ? 'w-full border-white/[0.08] bg-[#0e1324]/90 p-5 shadow-[0_0_60px_rgba(0,212,255,0.08)] sm:p-7' : 'w-full max-w-sm p-6'}>
         <div className="mb-6">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-5 group"
-          >
-            <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" />
-            Back to Home
-          </Link>
+          {!embedded && (
+            <Link
+              href="/"
+              className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-5 group"
+            >
+              <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" />
+              Back to Home
+            </Link>
+          )}
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            {isSignUp ? 'Create an account' : 'Welcome back'}
+            {isSignUp ? 'Start trading with Algobot' : 'Welcome back'}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
             {isSignUp
-              ? 'Sign up to get started'
+              ? 'Choose your workspace and automate with confidence.'
               : 'Sign in to your account to continue'}
           </p>
         </div>
@@ -219,34 +221,57 @@ function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
                   autoComplete="name"
                 />
               </div>
-              <div className="flex flex-col gap-3 pb-2 border-b border-slate-200">
-                <Label className="text-base font-semibold">Select your role</Label>
-                <div className="space-y-2">
-                  {(['trader', 'viewer'] as const).map((role) => (
-                    <label
-                      key={role}
-                      className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                        selectedRole === role
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-slate-200 hover:border-slate-300'
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="role"
-                        value={role}
-                        checked={selectedRole === role}
-                        onChange={(e) => setSelectedRole(e.target.value as UserRole)}
-                        className="mt-1"
-                      />
-                      <div className="flex-1">
-                        <p className="font-medium text-slate-900">{getRoleLabel(role)}</p>
-                        <p className="text-xs text-slate-600">{getRoleDescription(role)}</p>
-                      </div>
-                    </label>
-                  ))}
+              <fieldset className="flex flex-col gap-3 border-b border-slate-200 pb-4">
+                <legend className="text-sm font-semibold text-slate-900">Choose your AlgoBot workspace</legend>
+                <p className="text-xs text-slate-500">Build, automate, and monitor your strategy with the level of control you need.</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {(['trader', 'protrader'] as const).map((role) => {
+                    const isPro = role === 'protrader'
+                    const Icon = isPro ? Zap : Bot
+                    return (
+                      <label
+                        key={role}
+                        className={`relative flex cursor-pointer flex-col gap-3 rounded-2xl border p-4 transition-all ${
+                          selectedRole === role
+                            ? isPro
+                              ? 'border-cyan-400 bg-cyan-50 shadow-[0_8px_24px_rgba(6,182,212,0.14)]'
+                              : 'border-blue-500 bg-blue-50 shadow-[0_8px_24px_rgba(37,99,235,0.12)]'
+                            : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="role"
+                          value={role}
+                          checked={selectedRole === role}
+                          onChange={(e) => setSelectedRole(e.target.value as UserRole)}
+                          className="sr-only"
+                        />
+                        <div className="flex items-center justify-between gap-2">
+                          <span className={`flex size-9 items-center justify-center rounded-xl ${isPro ? 'bg-cyan-100 text-cyan-700' : 'bg-blue-100 text-blue-700'}`}>
+                            <Icon className="size-5" />
+                          </span>
+                          {isPro && <span className="rounded-full bg-cyan-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-cyan-700">Advanced</span>}
+                        </div>
+                        <div>
+                          <p className="font-semibold text-slate-900">{isPro ? 'Pro Algo Trader' : 'AlgoBot Trader'}</p>
+                          <p className="mt-1 text-xs leading-5 text-slate-600">{getRoleDescription(role)}</p>
+                          <ul className="mt-3 flex flex-col gap-1 text-[11px] text-slate-500">
+                            {(isPro
+                              ? ['Advanced arbitrage and futures', 'Higher control over risk and execution', 'Detailed bot performance insights']
+                              : ['DCA, grid, and arbitrage bots', 'Connect and manage exchanges', 'Simple controls with live analytics']
+                            ).map((feature) => (
+                              <li key={feature} className="flex items-center gap-1.5">
+                                <span className="size-1.5 rounded-full bg-cyan-500" /> {feature}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </label>
+                    )
+                  })}
                 </div>
-              </div>
+              </fieldset>
               {/* Referral code */}
               <div className="flex flex-col gap-2">
                 <Label htmlFor="referralCode">
@@ -375,8 +400,8 @@ function AuthForm({ mode }: { mode: 'sign-in' | 'sign-up' }) {
             {loading
               ? 'Please wait...'
               : isSignUp
-                ? 'Create account'
-                : 'Sign in'}
+          ? 'Create AlgoBot account'
+          : 'Sign in'}
           </Button>
         </form>
 
