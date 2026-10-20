@@ -6,13 +6,13 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 
 export const metadata: Metadata = {
-  title: 'ArbitrageIQ — Discover Arbitrage Opportunities Before Everyone Else',
-  description: 'Monitor prices across global exchanges, compare spreads, estimate transaction costs, and identify potential arbitrage opportunities using AI-powered analytics.',
+  title: 'Algobot — Autonomous Trading Bots for Crypto Markets',
+  description: 'Deploy disciplined DCA, grid, and arbitrage trading bots across crypto markets with real-time signals, risk controls, and transparent execution.',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'ArbitrageIQ',
+    title: 'Algobot',
   },
   icons: {
     icon: [
@@ -81,7 +81,7 @@ export default function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="ArbitrageIQ" />
+        <meta name="apple-mobile-web-app-title" content="Algobot" />
       </head>
       <body className="antialiased font-sans" style={{ backgroundColor: '#050816', color: '#FFFFFF' }}>
         {children}

@@ -36,7 +36,7 @@ export function ProtraderClient({ user, isActivated, createdAt }: ProtraderClien
               <Zap className="w-4 h-4 text-violet-400" />
             </div>
             <div className="hidden sm:block">
-              <span className="text-white font-bold text-base tracking-tight">Arbitrage IQ</span>
+              <span className="text-white font-bold text-base tracking-tight">AlgoBot</span>
               <span className="ml-2 text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300 border border-violet-500/30">
                 Pro Trader
               </span>

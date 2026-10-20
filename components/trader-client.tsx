@@ -254,7 +254,7 @@ export function TraderClient({ user, isActivated, createdAt }: { user: { id: str
                 <Zap className="w-4 h-4 text-white" />
               </div>
               <div className="hidden sm:block">
-                <p className="text-white font-bold text-sm leading-none tracking-tight">Arbitrage IQ</p>
+                <p className="text-white font-bold text-sm leading-none tracking-tight">AlgoBot</p>
                 <p className="text-slate-500 text-[10px] leading-none mt-0.5 font-medium">TRADING TERMINAL</p>
               </div>
             </div>
