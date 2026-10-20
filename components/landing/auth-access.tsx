@@ -1,10 +1,25 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AuthForm } from '@/components/auth-form'
 
 export function AuthAccess() {
   const [mode, setMode] = useState<'sign-in' | 'sign-up'>('sign-up')
+
+  useEffect(() => {
+    const syncModeFromHash = () => {
+      setMode(window.location.hash === '#auth-sign-in' ? 'sign-in' : 'sign-up')
+    }
+    syncModeFromHash()
+    window.addEventListener('hashchange', syncModeFromHash)
+    return () => window.removeEventListener('hashchange', syncModeFromHash)
+  }, [])
+
+  const selectMode = (nextMode: 'sign-in' | 'sign-up') => {
+    setMode(nextMode)
+    window.history.replaceState(null, '', nextMode === 'sign-in' ? '#auth-sign-in' : '#auth-sign-up')
+    document.getElementById('auth')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 
   return (
     <section id="auth" className="relative overflow-hidden border-t border-white/[0.06] bg-[#050a12] py-16 sm:py-24">
@@ -36,7 +51,7 @@ export function AuthAccess() {
               <button
                 key={item}
                 type="button"
-                onClick={() => setMode(item)}
+                onClick={() => selectMode(item)}
                 className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-semibold transition ${mode === item ? 'bg-cyan-400 text-slate-950 shadow-lg shadow-cyan-500/15' : 'text-slate-400 hover:text-white'}`}
               >
                 {item === 'sign-up' ? 'Create account' : 'Sign in'}
